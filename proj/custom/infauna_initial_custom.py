@@ -1,8 +1,11 @@
 # Dont touch this file! This is intended to be a template for implementing new custom checks
 
 from inspect import currentframe
-from flask import current_app
+from flask import current_app, g
 from .functions import checkData
+import re
+import pandas as pd
+
 
 def infauna_initial(all_dfs):
     
@@ -20,39 +23,8 @@ def infauna_initial(all_dfs):
     errs = []
     warnings = []
 
-
-    # since often times checks are done by merging tables (Paul calls those logic checks)
-    # we assign dataframes of all_dfs to variables and go from there
-    # This is the convention that was followed in the old checker
-    
-    # This data type should only have tbl_example
-    # example = all_dfs['tbl_example']
-
-    # Alter this args dictionary as you add checks and use it for the checkData function
-    # for errors that apply to multiple columns, separate them with commas
-    # args = {
-    #     "dataframe": example,
-    #     "tablename": 'tbl_example',
-    #     "badrows": [],
-    #     "badcolumn": "",
-    #     "error_type": "",
-    #     "is_core_error": False,
-    #     "error_message": ""
-    # }
-
-    # Example of appending an error (same logic applies for a warning)
-    # args.update({
-    #   "badrows": df[df.temperature != 'asdf'].index.tolist(),
-    #   "badcolumn": "temperature",
-    #   "error_type" : "Not asdf",
-    #   "error_message" : "This is a helpful useful message for the user"
-    # })
-    # errs = [*errs, checkData(**args)]
-
-    # return {'errors': errs, 'warnings': warnings}
-
     infaunalabundance_initial = all_dfs['tbl_infaunalabundance_initial']
-
+    infaunalabundance_initial = infaunalabundance_initial.assign(tmp_row = infaunalabundance_initial.index)
 
     infaunalabundance_initial_args = {
         "dataframe": infaunalabundance_initial,
@@ -63,7 +35,88 @@ def infauna_initial(all_dfs):
         "is_core_error": False,
         "error_message": ""
     }
+    
+    eng = g.eng
+    
+    
+    print("## FORMATTING BUG FIX ##")
+    # SampleTime should be written as a string, not a time value. -Jordan 2/19/2019
+    infaunalabundance_initial['sampletime'] = infaunalabundance_initial['sampletime'].astype(str)		
+    # Jordan - Check that time values for each sheet are in the proper format (hh:mm:ss)
+    print('Check that SampleTime field is in proper format (e.g. hh:mm:ss)')
+    print('Check that SampleTime field is in proper format (e.g. hh:mm:ss)')
+    time_format = re.compile('\d{2}:\d{2}:\d{2}')
+    # occupation time field
+    print('Checking SampleTime format...')
+    print('Checking SampleTime format...')
+    print(infaunalabundance_initial[~infaunalabundance_initial.sampletime.str.match(time_format)])
+    badrows = infaunalabundance_initial[
+        ~infaunalabundance_initial.sampletime.str.match(time_format)
+    ].tmp_row.tolist()
+    infaunalabundance_initial_args = {
+        "dataframe": infaunalabundance_initial,
+        "tablename": 'tbl_infaunalabundance_initial',
+        "badrows": badrows,
+        "badcolumn": "sampletime",
+        "error_type": "Logic Error",
+        "is_core_error": False,
+        "error_message": "SampleTime is not in correct format. Please use the format hh:mm:ss."
+    }
+    errs = [*errs, checkData(**infaunalabundance_initial_args)]   
+    
+
+    print("## LOGIC ##")
+    print("Starting Infauna Logic Checks")
+    #1. Each infaunal abundance record must have a corresponding record in the Sediment Grab Event Table where BenthicInfauna = Yes. Tables matched on StationID and SampleDate.
+    print("Each infaunal abundance record must have corresponding record in Sediment Grab Event Table where BenthicInfauna = Yes. Tables matched on StationID and SampleDate")
+    grab_event_sql = "SELECT stationid, sampledate, benthicinfauna FROM tbl_grabevent WHERE benthicinfauna = 'Yes' ;"
+    grab_infauna_records = eng.execute(grab_event_sql)
+    gdf = pd.DataFrame(grab_infauna_records.fetchall());
+    gdf.columns = grab_infauna_records.keys()
+    # checkLogic on records not found in tbl_grabevent (based on stationID and sampledate)
+    print(infaunalabundance_initial[~((infaunalabundance_initial.stationid.isin(gdf.stationid.tolist()))&(infaunalabundance_initial.sampledate.isin(gdf.sampledate.tolist())))])
+    badrows = infaunalabundance_initial[
+        ~((infaunalabundance_initial.stationid.isin(gdf.stationid.tolist())) & 
+        (infaunalabundance_initial.sampledate.isin(gdf.sampledate.tolist())))
+    ].tmp_row.tolist()
+    infaunalabundance_initial_args = {
+        "dataframe": infaunalabundance_initial,
+        "tablename": 'tbl_infaunalabundance_initial',
+        "badrows": badrows,
+        "badcolumn": "stationid",
+        "error_type": "Logic Error",
+        "is_core_error": False,
+        "error_message": "There is no corresponding Sediment Grab Event record (Based on StationID and SampleDate)."
+    }
+    errs = [*errs, checkData(**infaunalabundance_initial_args)]    
+    
+    print("END LOGIC CHECKS")
 
 
+    print("## CUSTOM CHECKS ##")
+    #1. If Taxon = NoOrganismsPresent, Then abundance should equal 0.
+    print("Custom Check: If Taxon = NoOrganismsPresent, Then abundance should equal 0.")
+    print("All records that do not pass this check:")
+    print(infaunalabundance_initial[(infaunalabundance_initial.taxon == 'NoOrganismsPresent')&(infaunalabundance_initial.abundance != 0)])
+    #checkData(infaunalabundance_initial[(infaunalabundance_initial.taxon == 'NoOrganismsPresent')&(infaunalabundance_initial.abundance != 0)].tmp_row.tolist(),'Abundance','Undefined Error','error','You recorded Taxon as NoOrganismsPresent. Abundance should equal 0.',infaunalabundance_initial)
+    #2. Abundance cannot have -88, must be 1 or greater.
+    print("Abundance cannot have -88, must be 1 or greater.")
+    print("All records that do not pass this check:")
+    print(infaunalabundance_initial[(infaunalabundance_initial.abundance < 1)])
+    badrows = infaunalabundance_initial[
+        (infaunalabundance_initial.abundance < 1)
+    ].tmp_row.tolist()
+    infaunalabundance_initial_args = {
+        "dataframe": infaunalabundance_initial,
+        "tablename": 'tbl_infaunalabundance_initial',
+        "badrows": badrows,
+        "badcolumn": "abundance",
+        "error_type": "Undefined Error",
+        "is_core_error": False,
+        "error_message": "Abundance should be 1 or greater."
+    }
+    errs = [*errs, checkData(**infaunalabundance_initial_args)]     
+    
+    print("## END CUSTOM CHECKS ##")
 
     return {'errors': errs, 'warnings': warnings}

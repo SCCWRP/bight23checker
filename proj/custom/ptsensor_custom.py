@@ -1,8 +1,10 @@
 # Dont touch this file! This is intended to be a template for implementing new custom checks
 
 from inspect import currentframe
-from flask import current_app
+from flask import current_app, g
 from .functions import checkData
+import pandas as pd
+
 
 def ptsensor(all_dfs):
     
@@ -20,39 +22,8 @@ def ptsensor(all_dfs):
     errs = []
     warnings = []
 
-
-    # since often times checks are done by merging tables (Paul calls those logic checks)
-    # we assign dataframes of all_dfs to variables and go from there
-    # This is the convention that was followed in the old checker
-    
-    # This data type should only have tbl_example
-    # example = all_dfs['tbl_example']
-
-    # Alter this args dictionary as you add checks and use it for the checkData function
-    # for errors that apply to multiple columns, separate them with commas
-    # args = {
-    #     "dataframe": example,
-    #     "tablename": 'tbl_example',
-    #     "badrows": [],
-    #     "badcolumn": "",
-    #     "error_type": "",
-    #     "is_core_error": False,
-    #     "error_message": ""
-    # }
-
-    # Example of appending an error (same logic applies for a warning)
-    # args.update({
-    #   "badrows": df[df.temperature != 'asdf'].index.tolist(),
-    #   "badcolumn": "temperature",
-    #   "error_type" : "Not asdf",
-    #   "error_message" : "This is a helpful useful message for the user"
-    # })
-    # errs = [*errs, checkData(**args)]
-
-    # return {'errors': errs, 'warnings': warnings}
-
     ptsensorresults = all_dfs['tbl_ptsensorresults']
-
+    ptsensorresults = ptsensorresults.assign(tmp_row = ptsensorresults.index)
 
     ptsensorresults_args = {
         "dataframe": ptsensorresults,
@@ -64,6 +35,69 @@ def ptsensor(all_dfs):
         "error_message": ""
     }
 
+    ## LOGIC ##
+    print("Starting PTSensor Logic Checks")
+    #Jordan - Station occupation and trawl event data should be submitted before pressure temperature data. Check those tables to make sure the agency has submitted those first. [records are matched on StationID, SampleDate, Sampling Organization, and Trawl Number]
+    print('Station occupation and trawl event data should be submitted before pressure temperature data. Check those tables to make sure the agency has submitted those first. [records are matched on StationID, SampleDate, Sampling Organization, and Trawl Number] ')
+
+    # call database for trawl event data
+    eng = g.eng
+    ta_db = eng.execute("SELECT stationid,sampledate,samplingorganization,trawlnumber FROM tbl_trawlevent;")
+    ta = pd.DataFrame(ta_db.fetchall())
+    
+    if len(ta) > 0: 
+        ta.columns = ta_db.keys()
+
+        # Series containing pertinent trawl assemblage and fish abundance/biomass records
+        trawl_assemblage = zip(
+            ta.stationid, 
+            ta.sampledate,
+            ta.samplingorganization,
+            ta.trawlnumber
+        )
+        pt_data = pd.Series(
+            zip(
+                ptsensorresults.stationid,
+                ptsensorresults.sampledate,
+                ptsensorresults.samplingorganization,
+                ptsensorresults.trawlnumber
+            )
+        )
+
+        # Check To see if there is any data in fish abundance, not in trawl assemblage and vice versa
+        print(ptsensorresults.loc[~pt_data.apply(lambda x: x in trawl_assemblage)])
+        badrows = ptsensorresults.loc[
+            ~pt_data.apply(
+                lambda x: x in trawl_assemblage
+            )
+        ].tmp_row.tolist()
+        ptsensorresults_args = {
+            "dataframe": ptsensorresults,
+            "tablename": 'tbl_ptsensorresults',
+            "badrows": badrows,
+            "badcolumn": "stationid,sampledate,samplingorganization,trawlnumber",
+            "error_type": "Logic Error",
+            "is_core_error": False,
+            "error_message": "Each PTSensorResult record must have a corresponding Occupation and Trawl Event record. Records are matched on StationID, SampleDate, Sampling Organization, and Trawl Number."
+        }        
+        errs = [*errs, checkData(**ptsensorresults_args)]
+    else:
+        badrows = ptsensorresults.tmp_row.tolist()
+        ptsensorresults_args = {
+            "dataframe": ptsensorresults,
+            "tablename": 'tbl_ptsensorresults',
+            "badrows": badrows,
+            "badcolumn": "stationid",
+            "error_type": "Undefined Error",
+            "is_core_error": False,
+            "error_message": "Field data must be submitted before ptsensorresults data."
+        }        
+        errs = [*errs, checkData(**ptsensorresults_args)]    
+
+    ## END LOGIC CHECKS ##
+
+    ## CUSTOM CHECKS ##
+    ## END CUSTOM CHECKS ##
 
 
     return {'errors': errs, 'warnings': warnings}

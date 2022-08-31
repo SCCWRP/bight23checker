@@ -539,7 +539,8 @@ def toxicity(all_dfs):
     ## END CUSTOM CHECKS ##
     
     
-    
+    # clean up the errors list
+    errs = [e for e in errs if len(e) > 0]
     
     ### SUMMARY TABLE START ###
     if len(errs) == 0:
@@ -599,47 +600,47 @@ def toxicity(all_dfs):
         grouping_columns = ['stationid','toxbatch','sampletypecode','samplecollectdate','treatment','concentration']
         #grouping_columns = ['stationid','toxbatch','sampletypecode','fieldreplicate']
 
-        print("1 - who said print statements aren't debuggers?")
+        print("1")
         print(list(df_match.groupby(grouping_columns)))
         toxsummary = df_match.groupby(grouping_columns).apply(getCalculatedValues)
         
         print("summary")
         print(toxsummary)
 
-        print("2 - who said print statements aren't debuggers?")
+        print("2")
         # get all control records
         cneg = toxsummary[grouping_columns + ['mean']].where(toxsummary['sampletypecode'] == 'CNEG')
-        print("3 - who said print statements aren't debuggers?")
+        print("3")
         # get all non control records
         nocneg = toxsummary[grouping_columns + ['mean']].where(toxsummary['sampletypecode'] != 'CNEG')
 
         # get all reference toxicant records just save them for now
-        print("4 - who said print statements aren't debuggers?")
+        print("4")
         reference_toxicants = toxsummary.loc[toxsummary['matrix'].isin(['Reference Toxicant'])]
         # drop all reference toxicants from the summary dataframe - not a part of summary results
-        print("5 - who said print statements aren't debuggers?")
-        summary = summary.loc[~summary['matrix'].isin(['Reference Toxicant'])]
+        print("5")
+        toxsummary = toxsummary.loc[~toxsummary['matrix'].isin(['Reference Toxicant'])]
 
         cneg = cneg.dropna()
-        print("6 - who said print statements aren't debuggers?")
+        print("6")
         nocneg = nocneg.dropna()
-        print("7 - who said print statements aren't debuggers?")
+        print("7")
 
         cneg['unique'] = np.nan
         nocneg['unique'] = np.nan
 
-        print("8 - who said print statements aren't debuggers?")
+        print("8")
         control_mean = cneg.groupby(grouping_columns + ['mean'])['unique'].nunique().reset_index()
-        print("9 - who said print statements aren't debuggers?")
+        print("9")
         result_mean = nocneg.groupby(grouping_columns + ['mean'])['unique'].nunique().reset_index()
 
-        print("10 - who said print statements aren't debuggers?")
+        print("10")
         control_mean_dict = control_mean.set_index('toxbatch')['mean'].to_dict()
 
-        print("11 - who said print statements aren't debuggers?")
+        print("11")
         # copy control_mean dataframe column mean to controlvalue
         control_mean['controlvalue'] = control_mean['mean']
-        summary = toxsummary.merge(control_mean[['toxbatch','controlvalue']], how = 'left', on = ['toxbatch'])
+        toxsummary = toxsummary.merge(control_mean[['toxbatch','controlvalue']], how = 'left', on = ['toxbatch'])
 
         def getPctControl(row):
             ## toxbatch control should always be 100
@@ -660,7 +661,7 @@ def toxicity(all_dfs):
         ## author - Tyler Vu
         def getPValue(summary):
             for index, values in summary['toxbatch'].iteritems():
-                station_code = summary.ix[index, 'stationid']
+                station_code = summary.loc[index, 'stationid']
                 cneg_result = summary[['result']].where((summary['sampletypecode'] == 'CNEG') & (summary['toxbatch'] == values))
                 result_both = summary[['result']].where((summary['toxbatch'] == values) & (summary['stationid'] == station_code) )
                 #plus it was causing a critical and i dont know why
@@ -668,17 +669,17 @@ def toxicity(all_dfs):
                 result_both = result_both.dropna()
                 t, p = stats.ttest_ind(cneg_result, result_both, equal_var = False)
                 print("pvalue t: %s, p: %s" % (t,p))
-                summary.ix[index, 'tstat'] = t
+                summary.loc[index, 'tstat'] = t
                 single_tail = p/2
-                #summary.ix[index, 'pvalue'] = p/2 #we divide by 2 to make it a 1 tailed
-                summary.ix[index, 'pvalue'] = single_tail #we divide by 2 to make it a 1 tailed
+                #summary.loc[index, 'pvalue'] = p/2 #we divide by 2 to make it a 1 tailed
+                summary.loc[index, 'pvalue'] = single_tail #we divide by 2 to make it a 1 tailed
                 if (t < 0):
-                    summary.ix[index, 'sigeffect'] = 'NSC'
+                    summary.loc[index, 'sigeffect'] = 'NSC'
                 else:
                     if (single_tail <= .05):
-                        summary.ix[index, 'sigeffect'] = 'SC'
+                        summary.loc[index, 'sigeffect'] = 'SC'
                     else:
-                        summary.ix[index, 'sigeffect'] = 'NSC'
+                        summary.loc[index, 'sigeffect'] = 'NSC'
         getPValue(toxsummary)
         print("done w getPValue")
 
@@ -737,8 +738,8 @@ def toxicity(all_dfs):
         ## SUMMARY TABLE CHECKS ##
         print("Starting Toxicity Summary Result Checks")
         toxsummary_args = {
-            "dataframe": toxwq,
-            "tablename": 'tbl_toxwq',
+            "dataframe": toxsummary,
+            "tablename" : "analysis_toxsummaryresults",
             "badrows": [],
             "badcolumn": "",
             "error_type": "",
@@ -749,13 +750,44 @@ def toxicity(all_dfs):
         print("## WARNING TO CHECK FOR DATA ENTRY ERRORS IF THE STANDARD DEVIATION FOR A SAMPLE EXCEEDS 50 ##")
         print(toxsummary.loc[(toxsummary["stddev"] > 50)])
         badrows = toxsummary.loc[(toxsummary["stddev"] > 50)].index.tolist()
-        toxbatch_args.update({
+        toxsummary_args.update({
             "badrows": badrows,
-            "badcolumn": "toxbatch",
-            "error_type": "Undefined Error",
-            "error_message": 'Associated water quality group %s/%s/%s is missing time points %s.' %(k.parameter[i],k.species[i],k.sampletypecode[i],list(k.missing[i]))
+            "badcolumn": "stddev",
+            "error_type": "Undefined Warning",
+            "error_message": 'Warning standard deviation exceeds 50.'
         })
-        errs = [*errs, checkData(**toxbatch_args)]
+        warnings = [*warnings, checkData(**toxsummary_args)]
+
+        toxsummary_args.update({
+            "badrows": toxsummary.loc[(toxsummary['species'].isin(['Eohaustorius estuarius','EE'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['mean'] < 90)].index.tolist(),
+            "badcolumn": "mean",
+            "error_type": "Undefined Error",
+            "error_message": 'Does not meet control acceptability criterion; mean control value < 90'
+        })
+        errs = [*errs, checkData(**toxsummary_args)]
+        
+        toxsummary_args.update({
+            "badrows": toxsummary.loc[(toxsummary['species'].isin(['Mytilus galloprovinialis','MG'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['mean'] < 70)].index.tolist(),
+            "badcolumn": "mean",
+            "error_type": "Undefined Error",
+            "error_message": 'Does not meet control acceptability criterion; mean control value < 70'
+        })
+        errs = [*errs, checkData(**toxsummary_args)]
+        
+        toxsummary_args.update({
+            "badrows": toxsummary.loc[(toxsummary['species'].isin(['Eohaustorius estuarius','EE'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['coefficientvariance'] > 11.9)].index.tolist(),
+            "badcolumn": "mean",
+            "error_type": "Undefined Error",
+            "error_message": 'Does not meet control acceptability criterion; coefficient value > 11.9'
+        })
+        errs = [*errs, checkData(**toxsummary_args)]
+
+
+
+
+
+
+
 
         # ## END SUMMARY TABLE CHECKS ##
 
@@ -769,7 +801,7 @@ def toxicity(all_dfs):
         toxsummary['tstat'].fillna(-88,inplace=True)
         toxsummary['pvalue'].fillna(-88,inplace=True)
         # group on the following columns and reset as a dataframe rather than groupby object
-        print("summary start")
+        print("toxsummary start")
 
         # get summary dataframe with error columns before it is replaced - bug fix number 37 below for duplicate summary rows
         toxsummary = toxsummary.drop_duplicates(subset = ['stationid','toxbatch','fieldreplicate','pvalue'],keep='first')
