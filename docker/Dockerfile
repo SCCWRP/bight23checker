@@ -33,7 +33,13 @@ RUN pip3 install matplotlib
 RUN pip3 install arcgis 
 RUN pip3 install scipy 
 RUN pip3 install shapely 
+RUN pip3 install rpy2 
 #RUN pip3 install opencv-python
+# Install what we need for the R Python bridge
+RUN apt-get install r-base
+WORKDIR /tmp
+RUN git clone https://r7butler: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@github.com/SCCWRP/SQOUnified
+RUN R CMD INSTALL --no-multiarch --with-keep.source SQOUnified
 
 RUN mkdir -p /var/www/checker/
 #WORKDIR /var/www/checker/
