@@ -1,4 +1,4 @@
-#FROM debian:latest
+# IMAGE NAME sccwrp/flask:bight23checker
 FROM debian:sid
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update 
@@ -9,7 +9,6 @@ RUN apt-get install -y vim
 RUN apt-get install -y libpq-dev && pip3 install psycopg2
 RUN apt-get install -y libgdal-dev
 RUN apt-get install -y libproj-dev
-# RUN apt-get install -y cython cython3
 RUN apt-get install -y cython3
 RUN apt-get install -y python3-pyproj
 RUN pip3 install wheel
@@ -48,5 +47,6 @@ RUN mkdir -p /var/www/checker/
 #     -v /etc/localtime:/etc/localtime:ro \
 #     -w /var/www/checker \
 #     -e DB_CONNECTION_STRING='$2' \
+#     -e FLASK_APP_SECRET_KEY=$3 \      
 #     sccwrp/flask:checkertemplate \
 #     uwsgi -s /tmp/$1.sock --uid www-data --gid www-data --manage-script-name --mount /checker=run:app --chmod-socket=666
