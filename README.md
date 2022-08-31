@@ -42,4 +42,8 @@ Contributors:
 - Paul Smith (pauls@sccwrp.org)
 - Robert Butler (robertb@sccwrp.org)
 - Duy Nguyen (duyn@sccwrp.org)
+- Kristen
+- Jordan Golemo
+- Eric Hermoso
 - Zaib Quraishi (zaibq@sccwrp.org)
+- Matthew McCauley
