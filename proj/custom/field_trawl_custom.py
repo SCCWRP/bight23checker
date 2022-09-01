@@ -61,6 +61,9 @@ def field_trawl(all_dfs):
 
     occupation = all_dfs['tbl_stationoccupation']
     trawl = all_dfs['tbl_trawlevent']
+    
+    occupation['tmp_row'] = occupation.index
+    trawl['tmp_row'] = trawl.index
 
 
     occupation_args = {
@@ -85,7 +88,14 @@ def field_trawl(all_dfs):
 
     # ------- LOGIC CHECKS ------- #
     # Check - Each Trawl record must have a corresponding stationoccupation record
-    tmp = occupation.merge(trawl.assign(present = 'yes'), on = ['staitonid','sampledate','samplingorganization'], how = 'left')
+    tmp = occupation.merge(
+        trawl.assign(present = 'yes'), 
+        left_on = ['stationid','occupationdate','samplingorganization'], 
+        right_on = ['stationid','sampledate','samplingorganization'], 
+        how = 'left',
+        suffixes = ('','_trawl')
+    )
+
     badrows = tmp[pd.isnull(tmp.present)].tmp_row.tolist()
     trawl_args.update({
       "badrows": badrows,
@@ -212,7 +222,7 @@ def field_trawl(all_dfs):
     if len((occupation[(occupation.stationid.isin(estuaries.stationid))]))!=0 :
         # for matching stationids, make sure Estuary and Brackish Estuary salinity has a value
         print('## Make sure Estuary and Brackish Estuary salinity value is non-empty ##')
-        strats = pd.merge(occupation[['stationid','salinity']],estuaries, how = 'left', on='stationid')
+        strats = pd.merge(occupation[['stationid','salinity','tmp_row']],estuaries, how = 'left', on='stationid', suffixes = ('','_estuaries'))
         occupation_args.update({
             "badrows": strats[pd.isnull(strats.salinity)].tmp_row.tolist(),
             "badcolumn": 'Salinity',
@@ -224,6 +234,7 @@ def field_trawl(all_dfs):
 
 
     # Jordan - Station Occupation Latitude/Longitude should be no more than 100M from Field Assignment Table Target Latitude/Longitude otherwise warning
+    print('# Jordan - Station Occupation Latitude/Longitude should be no more than 100M from Field Assignment Table Target Latitude/Longitude otherwise warning')
     # Merges SO dataframe and FAT dataframe according to StationIDs
     so = occupation[['stationid','occupationlatitude','occupationlongitude','tmp_row']]
     fat = pd.read_sql("SELECT * FROM field_assignment_table", eng)

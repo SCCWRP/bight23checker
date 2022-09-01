@@ -62,7 +62,10 @@ def field_trawl_and_grab(all_dfs):
     occupation = all_dfs['tbl_stationoccupation']
     trawl = all_dfs['tbl_trawlevent']
     grab = all_dfs['tbl_grabevent']
-
+    
+    occupation['tmp_row'] = occupation.index
+    trawl['tmp_row'] = trawl.index
+    grab['tmp_row'] = grab.index
 
     occupation_args = {
         "dataframe": occupation,
