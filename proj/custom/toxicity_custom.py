@@ -783,12 +783,6 @@ def toxicity(all_dfs):
         errs = [*errs, checkData(**toxsummary_args)]
 
 
-
-
-
-
-
-
         # ## END SUMMARY TABLE CHECKS ##
 
         # ORGANIZE SUMMARY OUTPUT
@@ -809,6 +803,12 @@ def toxicity(all_dfs):
         print("summary end")
         ## END SUMMARY TABLE CHECKS ##
 
-   
+        print("toxsummary")
+        print(toxsummary)
+        print(toxsummary.columns)
+        for c in toxsummary.columns:
+            print(f"column: {c}")
+            print(toxsummary[c])
+
 
     return {'errors': errs, 'warnings': warnings}
