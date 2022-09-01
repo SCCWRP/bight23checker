@@ -122,6 +122,7 @@ def load():
             f"""
             ALTER TABLE "{tbl}" ADD COLUMN IF NOT EXISTS submissionid int4 NOT NULL;
             ALTER TABLE "{tbl}" ADD COLUMN IF NOT EXISTS warnings VARCHAR(5000);
+            ALTER TABLE "{tbl}" ADD COLUMN IF NOT EXISTS login_email VARCHAR(50);
             """
         )
         all_dfs[tbl].to_geodb(tbl, g.eng)
