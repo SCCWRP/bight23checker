@@ -85,8 +85,8 @@ def main():
         sheet: pd.read_excel(
             excel_path, 
             sheet_name = sheet,
-            skiprows = current_app.excel_offset
-            #na_values = ['']
+            skiprows = current_app.excel_offset,
+            na_values = ['']
         )
         
         for sheet in pd.ExcelFile(excel_path).sheet_names
@@ -116,13 +116,6 @@ def main():
     
     print("match(all_dfs)")
     #print(match(all_dfs))
-
-    # print("match_dataset")
-    # print(match_dataset)
-    # print("match_report")
-    # print(match_report)
-    # print("all_dfs")
-    # print(all_dfs)
 
     #NOTE if all tabs in all_dfs matched a database table, but there is still no match_dataset
     # then the problem probably lies in __init__.py
@@ -166,11 +159,12 @@ def main():
     #  We want to limit the manual cleaning of the data that the user has to do
     #  This function will strip whitespace on character fields and fix columns to match lookup lists if they match (case insensitive)
 
-    print("preprocessing and cleaning data")
+    # COMMENT OUT PRE PROCESS ROUTINE SINCE LAST BIGHT CYCLE THEY DIDNT WANT US MESSING WITH THEIR DATA
+    #print("preprocessing and cleaning data")
     # We are not sure if we want to do this
     # some projects like bight prohibit this
-    all_dfs = clean_data(all_dfs)
-    print("DONE preprocessing and cleaning data")
+    #all_dfs = clean_data(all_dfs)
+    #print("DONE preprocessing and cleaning data")
     
     # write all_dfs again to the same excel path
     # Later, if the data is clean, the loading routine will use the tab names to load the data to the appropriate tables
