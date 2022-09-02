@@ -127,7 +127,6 @@ def main():
     # an assert statement makes sense because in this would be an issue on our side rather than the user's
 
 
-
     print("DONE - Running match tables routine")
 
     session['datatype'] = match_dataset
@@ -199,8 +198,6 @@ def main():
         if ((sheet not in current_app.tabs_to_ignore) and (not sheet.startswith('lu_')))
     }
 
-
-    
     
     # ----------------------------------------- #
 
@@ -231,8 +228,10 @@ def main():
     errs.extend(core_output['core_errors'])
     warnings.extend(core_output['core_warnings'])
 
+
     # clear up some memory space, i never wanted to store the core checks output in memory anyways 
     # other than appending it to the errors/warnings list
+    # collect is gc.collect()
     del core_output
     collect()
 
