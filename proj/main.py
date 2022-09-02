@@ -97,7 +97,10 @@ def main():
     assert len(all_dfs) > 0, f"submissionid - {session.get('submissionid')} all_dfs is empty"
     
     for tblname in all_dfs.keys():
+        # lowercase the column names
         all_dfs[tblname].columns = [x.lower() for x in all_dfs[tblname].columns]
+        # drop system fields from the dataframes
+        all_dfs[tblname] = all_dfs[tblname].drop(list(set(all_dfs[tblname].columns).intersection(set(current_app.system_fields))), axis = 1)
 
     print("DONE - building 'all_dfs' dictionary")
     
@@ -196,6 +199,8 @@ def main():
         if ((sheet not in current_app.tabs_to_ignore) and (not sheet.startswith('lu_')))
     }
 
+
+    
     
     # ----------------------------------------- #
 
