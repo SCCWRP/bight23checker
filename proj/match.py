@@ -128,10 +128,12 @@ def match(all_dfs):
 
     
     
-    # the values of the datasets dictionary are themselves dictionaries
-    # would look like {'tables': ['tbl1','tbl2'], 'function': some_function}
-    #match_dataset = [k for k,v in datasets.items() if set(v.get('tables')) == set(all_dfs.keys())]
+    # I am not quite sure why we now do it so that the tables list matches the matched_tables list rather than the keys of the dictionary
+    # But we will use this to get rid of the tox summary tab if they are submitting tox data with a summary
+    # match_dataset = [k for k,v in datasets.items() if set(v.get('tables')) == set(all_dfs.keys())]
     match_dataset = [k for k,v in datasets.items() if set(v.get('tables')) == set(matched_tables)]
+
+    
 
     assert len(match_dataset) < 2, "matched 2 or more different datasets, which should never happen"
 
@@ -139,8 +141,7 @@ def match(all_dfs):
         print("No dataset matched")
 
         # TODO We can make a routine to find the closest match - Robert
-        # Also Robert - lets be real that isnt going to happen unless a user brings up that point that it would help
-        # meaning we are probably going to be implementing that feature in production
+        # that probably isnt going to happen unless a user brings up that point that it would help
         # https://preview.redd.it/nvrpt44due141.jpg?auto=webp&s=ff39d49780b44fab66bb0bbd6fb0e9af0244974d
 
         match_dataset = ""
@@ -148,6 +149,20 @@ def match(all_dfs):
         # first have to confirm it found something before extracting that key of the match dataset variable
         # which is the name of the dataset
         match_dataset = match_dataset[0]
+
+
+
+    # drop from all_dfs whatever was not matched
+    if match_dataset == 'toxicity':
+        for sheetname in list(set(all_dfs.keys()) - set(matched_tables)):
+            del all_dfs[sheetname]
+
+        # also another thing for the sake of toxicity data
+        match_report = [r for r in match_report if r.get('closest_tbl') != current_app.config.get("TOXSUMMARY_TABLENAME")]
+
+
+    print("match report")
+    print(match_report)
     
     # As stated earlier, this is to be used later by the browser to display error messages as associated with the excel tab name
     # Rather than the database tablename which it matched
