@@ -99,7 +99,13 @@ def field_trawl_and_grab(all_dfs):
 
     # ------- LOGIC CHECKS ------- #
     # Check - Each Trawl record must have a corresponding stationoccupation record
-    tmp = occupation.merge(trawl.assign(present = 'yes'), on = ['staitonid','sampledate','samplingorganization'], how = 'left')
+    tmp = occupation.merge(
+        trawl.assign(present = 'yes'), 
+        left_on = ['stationid','occupationdate','samplingorganization'], 
+        right_on = ['stationid','sampledate','samplingorganization'], 
+        how = 'right',
+        suffixes = ('_occ','')
+    )
     badrows = tmp[pd.isnull(tmp.present)].tmp_row.tolist()
     trawl_args.update({
       "badrows": badrows,
@@ -111,7 +117,13 @@ def field_trawl_and_grab(all_dfs):
     
     
     # Check - Each Grab record must have a corresponding stationoccupation record
-    tmp = occupation.merge(grab.assign(present = 'yes'), on = ['staitonid','sampledate','samplingorganization'], how = 'left')
+    tmp = occupation.merge(
+        grab.assign(present = 'yes'), 
+        left_on = ['stationid','occupationdate','samplingorganization'], 
+        right_on = ['stationid','sampledate','samplingorganization'], 
+        how = 'right',
+        suffixes = ('_occ','')
+    )
     badrows = tmp[pd.isnull(tmp.present)].tmp_row.tolist()
     grab_args.update({
       "badrows": badrows,

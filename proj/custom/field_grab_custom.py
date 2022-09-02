@@ -93,8 +93,8 @@ def field_grab(all_dfs):
         grab.assign(present = 'yes'), 
         left_on = ['stationid','occupationdate','samplingorganization'], 
         right_on = ['stationid','sampledate','samplingorganization'], 
-        how = 'left',
-        suffixes = ('','_grab')
+        how = 'right',
+        suffixes = ('_occ','')
     )
     
     badrows = tmp[pd.isnull(tmp.present)].tmp_row.tolist()
@@ -345,7 +345,7 @@ def field_grab(all_dfs):
     print(grab.loc[grab.grabdistancetonominaltarget > 100])
     grab_args.update({
         "badrows": grab.loc[grab.grabdistancetonominaltarget > 100].tmp_row.tolist(),
-        "badcolumn": 'TargetLatitude,TargetLongitude',
+        "badcolumn": 'Latitude,Longitude',
         "error_type": "Undefined Warning",
         "error_message" : 'Grab Distance to Nominal Target > 100m'
     })
@@ -396,7 +396,7 @@ def field_grab(all_dfs):
         "badrows": grab[(grab['grabfail'].isin(lu_gf.grabfail.tolist())) & (grab['comments'].isnull())].tmp_row.tolist(),
         "badcolumn": 'Comments',
         "error_type": "Undefined Error",
-        "error_message" : 'A comment is required for that stationfail option. Please see: <a href=http://checker.sccwrp.org/checker/scraper?action=help&layer=lu_grabfails target=_blank>GrabFail lookup</a>.'
+        "error_message" : f'A comment is required for that stationfail option. Please see: <a href=/{current_app.script_root}/scraper?action=help&layer=lu_grabfails target=_blank>GrabFail lookup</a>.'
     })
     errs = [*errs, checkData(**grab_args)]
     

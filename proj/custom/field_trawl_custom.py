@@ -92,18 +92,18 @@ def field_trawl(all_dfs):
         trawl.assign(present = 'yes'), 
         left_on = ['stationid','occupationdate','samplingorganization'], 
         right_on = ['stationid','sampledate','samplingorganization'], 
-        how = 'left',
-        suffixes = ('','_trawl')
+        how = 'right',
+        suffixes = ('_occ','')
     )
 
     badrows = tmp[pd.isnull(tmp.present)].tmp_row.tolist()
-    trawl_args.update({
+    occupation_args.update({
       "badrows": badrows,
       "badcolumn": "StationID,SampleDate,SamplingOrganization",
       "error_type" : "Logic Error",
-      "error_message" : "Each Trawl record must have a corresponding Occupation record. Records are matched on StationID, SampleDate, and SamplingOrganization."
+      "error_message" : "Each Trawl record must have a corresponding Occupation record. Records are matched on StationID, SampleDate (OccupationDate), and SamplingOrganization."
     })
-    errs = [*errs, checkData(**trawl_args)]
+    errs = [*errs, checkData(**occupation_args)]
     
     del tmp
     del badrows
@@ -112,7 +112,6 @@ def field_trawl(all_dfs):
     # Check the time formats on all time columns
     def checkTime(df, col, args, time_format = re.compile(r'([0-9]{1,2}):[0-5][0-9]:[0-5][0-9]'), custom_errmsg = None):
         """default to checking the 24 hour clock time"""
-    
         args.update({
             "badrows": df[~df[col.lower()].map(str).str.match(time_format)].tmp_row.tolist(),
             "badcolumn": col,
@@ -131,6 +130,7 @@ def field_trawl(all_dfs):
         checkTime(trawl, 'OnBottomTime', trawl_args)
     ]
     # ------- END LOGIC CHECKS ------- #
+    print('# ------- END LOGIC CHECKS ------- #')
 
 
     # ------- Occupation Checks ------- #
