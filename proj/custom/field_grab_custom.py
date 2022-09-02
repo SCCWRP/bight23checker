@@ -396,7 +396,7 @@ def field_grab(all_dfs):
         "badrows": grab[(grab['grabfail'].isin(lu_gf.grabfail.tolist())) & (grab['comments'].isnull())].tmp_row.tolist(),
         "badcolumn": 'Comments',
         "error_type": "Undefined Error",
-        "error_message" : 'A comment is required for that stationfail option. Please see: <a href=http://checker.sccwrp.org/checker/scraper?action=help&layer=lu_grabfails target=_blank>GrabFail lookup</a>.'
+        "error_message" : f'A comment is required for that stationfail option. Please see: <a href=/{current_app.script_root}/scraper?action=help&layer=lu_grabfails target=_blank>GrabFail lookup</a>.'
     })
     errs = [*errs, checkData(**grab_args)]
     
