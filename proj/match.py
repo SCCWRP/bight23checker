@@ -18,7 +18,7 @@ def match(all_dfs):
     match_tbls_sql = f"""
         SELECT table_name, column_name 
         FROM information_schema.columns 
-        WHERE table_name LIKE 'tbl_%%'
+        WHERE ((table_name LIKE 'tbl_%%') OR (table_name = '{current_app.config.get("TOXSUMMARY_TABLENAME")}'))
         AND column_name NOT IN ('{"','".join(system_fields)}')
         AND column_name NOT LIKE 'login_%%'
         ;"""

@@ -48,10 +48,14 @@ def load():
     valid_tables = pd.read_sql(
             # percent signs are escaped by doubling them, not with a backslash
             # percent signs need to be escaped because otherwise the python interpreter will think you are trying to create a format string
-            "SELECT table_name FROM information_schema.tables WHERE table_name LIKE 'tbl_%%'", eng
+            f"""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_name LIKE 'tbl_%%' OR table_name = '{current_app.config.get("TOXSUMMARY_TABLENAME")}' """, eng
         ) \
         .table_name \
         .values
+    
 
     assert all(sheet in valid_tables for sheet in all_dfs.keys()), \
         f"Sheetname in excel file {excel_path} not found in the list of tables that can be submitted to"
@@ -107,7 +111,7 @@ def load():
 
 
     # We have to make an exception for toxsummary, since the summary table gets added after the fact
-    assert set(current_app.datasets.get(session.get('datatype')).get('tables')) == set(all_dfs.keys() - set(['tbl_toxicitysummaryresults'])), \
+    assert set(current_app.datasets.get(session.get('datatype')).get('tables')) == set(all_dfs.keys() - set([current_app.config.get("TOXSUMMARY_TABLENAME")])), \
             f"""There is a mismatch between the table names listed in __init__.py current_app.datasets
             and the keys of all_dfs (datatype: {session.get('datatype')}"""
     
@@ -115,7 +119,7 @@ def load():
     # Now go through each tab and load to the database
     tables_to_load = current_app.datasets.get(session.get('datatype')).get('tables') \
         if not session.get('datatype') == 'toxicity' \
-        else [*current_app.datasets.get(session.get('datatype')).get('tables'), 'tbl_toxicitysummaryresults']
+        else [*current_app.datasets.get(session.get('datatype')).get('tables'), current_app.config.get("TOXSUMMARY_TABLENAME")]
 
     for tbl in tables_to_load:
         # Below comment applied to one project where the tables had foreign key relationships
@@ -126,9 +130,10 @@ def load():
         # These columns are needed in all submission tables, but they are often overlooked
         g.eng.execute(
             f"""
-            ALTER TABLE "{tbl}" ADD COLUMN IF NOT EXISTS submissionid int4 NOT NULL;
+            ALTER TABLE "{tbl}" ADD COLUMN IF NOT EXISTS submissionid int4;
             ALTER TABLE "{tbl}" ADD COLUMN IF NOT EXISTS warnings VARCHAR(5000);
             ALTER TABLE "{tbl}" ADD COLUMN IF NOT EXISTS login_email VARCHAR(50);
+            ALTER TABLE "{tbl}" ADD COLUMN IF NOT EXISTS login_agency VARCHAR(50);
             """
         )
         all_dfs[tbl].to_geodb(tbl, g.eng)

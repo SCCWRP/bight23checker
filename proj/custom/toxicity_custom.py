@@ -68,7 +68,7 @@ def toxicity(all_dfs):
         "is_core_error": False,
         "error_message": ""
     }
-    eng  = g.eng
+    
 
     ## LOGIC ##
     print("Starting Toxicity Logic Checks")
@@ -705,8 +705,9 @@ def toxicity(all_dfs):
         toxsummary = toxsummary.drop_duplicates(subset = ['stationid','toxbatch','fieldreplicate','pvalue'],keep='first')
         toxsummary.reset_index(inplace = True, drop = True)
         toxsummary.drop('tmp_row', axis = 1, inplace = True)
-        print("toxsummary")
-        print(toxsummary)
+        analysis_table_cols = pd.read_sql(f"""SELECT column_name FROM information_schema.columns WHERE table_name = '{current_app.config.get("TOXSUMMARY_TABLENAME")}';""", eng)
+
+        
 
 
         ## SUMMARY TABLE CHECKS ##
@@ -764,7 +765,10 @@ def toxicity(all_dfs):
 
         # ## END SUMMARY TABLE CHECKS ##
 
-
+        # Drop the columns that are in the dataframe, but not in the database table
+        #toxsummary.drop(list(set(toxsummary.columns) - set(analysis_table_cols)), axis = 1, inplace = True)
+        print("toxsummary")
+        print(toxsummary)
 
 
 
