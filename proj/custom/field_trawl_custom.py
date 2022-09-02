@@ -538,7 +538,7 @@ def field_trawl(all_dfs):
         "badrows": trawl[(trawl['trawlfail'].isin(lu_tf.trawlfailure.tolist())) & (trawl['comments'].isnull())].tmp_row.tolist(),
         "badcolumn": 'Comments',
         "error_type": "Undefined Error",
-        "error_message" : 'A comment is required for that stationfail option. Please see: <a href=http://checker.sccwrp.org/checker/scraper?action=help&layer=lu_trawlfails target=_blank>TrawlFail lookup</a>.'
+        "error_message" : f'A comment is required for that stationfail option. Please see: <a href=/{current_app.script_root}/scraper?action=help&layer=lu_trawlfails target=_blank>TrawlFail lookup</a>.'
     })
     errs = [*errs, checkData(**trawl_args)]
 

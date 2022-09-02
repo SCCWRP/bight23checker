@@ -251,8 +251,8 @@ def invert(all_dfs):
                     "error_type": "Undefined Warning",
                     "is_core_error": False,
                     "error_message":
-                        '%s was caught in a depth range (%sm - %sm) that does not include the range it is typically found (%sm - %sm). Please verify the species is correct. Check <a href=http://checker.sccwrp.org/checker/scraper?action=help&layer=lu_invertspeciesreplaceondepth target=_blank>lu_invertspeciesreplaceondepth</a> for more information.' %(
-                            tam.invertspecies[i], int(tam.startdepth[i]), int(tam.enddepth[i]), tam.mindepth[i], tam.maxdepth[i])
+                        '%s was caught in a depth range (%sm - %sm) that does not include the range it is typically found (%sm - %sm). Please verify the species is correct. Check <a href=/{}/scraper?action=help&layer=lu_invertspeciesreplaceondepth target=_blank>lu_invertspeciesreplaceondepth</a> for more information.' %(
+                            tam.invertspecies[i], int(tam.startdepth[i]), int(tam.enddepth[i]), tam.mindepth[i], tam.maxdepth[i], current_app.script_root)
                 }
                 warnings = [*warnings,checkData(**trawlinvertebrateabundance_args)]
 
@@ -292,8 +292,8 @@ def invert(all_dfs):
                     "error_type": "Undefined Warning",
                     "is_core_error": False,
                     "error_message":
-                        '%s was caught in a depth range (%sm - %sm) that does not include the range it is typically found (%sm - %sm). Please verify the species is correct. Check <a href=http://checker.sccwrp.org/checker/scraper?action=help&layer=lu_invertspeciesreplaceondepth target=_blank>lu_invertspeciesreplaceondepth</a> for more information.' % (
-                            tbm.invertspecies[i], int(tbm.startdepth[i]), int(tbm.enddepth[i]), tbm.mindepth[i], tbm.maxdepth[i])
+                        '%s was caught in a depth range (%sm - %sm) that does not include the range it is typically found (%sm - %sm). Please verify the species is correct. Check <a href=/%s/scraper?action=help&layer=lu_invertspeciesreplaceondepth target=_blank>lu_invertspeciesreplaceondepth</a> for more information.' % (
+                            tbm.invertspecies[i], int(tbm.startdepth[i]), int(tbm.enddepth[i]), tbm.mindepth[i], tbm.maxdepth[i], current_app.script_root)
                 }
                 warnings = [*warnings,checkData(**trawlinvertebratebiomass_args)]
 
@@ -313,7 +313,7 @@ def invert(all_dfs):
         "error_type": "Undefined Warning",
         "is_core_error": False,
         "error_message":
-            'The species you entered is possibly a synonym. Please verify by checking the lookup list: <a href=http://checker.sccwrp.org/checker/scraper?action=help&layer=lu_invertsynonyms target=_blank>lu_invertsynonyms</a>'
+            f'The species you entered is possibly a synonym. Please verify by checking the lookup list: <a href=/{current_app.script_root}/scraper?action=help&layer=lu_invertsynonyms target=_blank>lu_invertsynonyms</a>'
     }
     warnings = [*warnings, checkData(**trawlinvertebrateabundance_args)]
 
@@ -328,7 +328,7 @@ def invert(all_dfs):
         "error_type": "Undefined Warning",
         "is_core_error": False,
         "error_message":
-            'The species you entered is possibly a synonym. Please verify by checking the lookup list: <a href=http://checker.sccwrp.org/checker/scraper?action=help&layer=lu_invertsynonyms target=_blank>lu_invertsynonyms</a>'
+            f'The species you entered is possibly a synonym. Please verify by checking the lookup list: <a href=/{current_app.script_root}/scraper?action=help&layer=lu_invertsynonyms target=_blank>lu_invertsynonyms</a>'
     }
     warnings = [*warnings, checkData(**trawlinvertebratebiomass_args)]
 
@@ -423,7 +423,7 @@ def invert(all_dfs):
                     "error_type": "Undefined Warning",
                     "is_core_error": False,
                     "error_message":
-                        '%s was caught in a depth range (%sm - %sm) that does not include the range it is typically found (%sm - %sm). Please verify the species is correct. Check <a href=http://checker.sccwrp.org/checker/scraper?action=help&layer=lu_invertspeciesdepthrange target=_blank>lu_invertspeciesdepthrange</a> for more information.' % (tam.invertspecies[i], int(tam.startdepth[i]), int(tam.enddepth[i]), tam.mindepth[i], tam.maxdepth[i])
+                        '%s was caught in a depth range (%sm - %sm) that does not include the range it is typically found (%sm - %sm). Please verify the species is correct. Check <a href=/%s/scraper?action=help&layer=lu_invertspeciesdepthrange target=_blank>lu_invertspeciesdepthrange</a> for more information.' % (tam.invertspecies[i], int(tam.startdepth[i]), int(tam.enddepth[i]), tam.mindepth[i], tam.maxdepth[i],current_app.script_root)
                 }
                 warnings = [*warnings, checkData(**trawlinvertebrateabundance_args)]
 
@@ -439,7 +439,7 @@ def invert(all_dfs):
         "error_type": "Undefined Error",
         "is_core_error": False,
         "error_message":
-            'Holoplanktonic or infaunal species. See lookup list: <a href=http://checker.sccwrp.org/checker/scraper?action=help&layer=lu_invertspeciesnotallowed target=_blank>lu_invertspeciesnotallowed</a>'
+            f'Holoplanktonic or infaunal species. See lookup list: <a href=/{current_app.script_root}/scraper?action=help&layer=lu_invertspeciesnotallowed target=_blank>lu_invertspeciesnotallowed</a>'
     }
     errs = [*errs, checkData(**trawlinvertebrateabundance_args)]
 

@@ -185,10 +185,10 @@ def field_trawl_and_grab(all_dfs):
     errs = [*errs, checkData(**trawl_args)]
     
     # Depth units should be in meters, not feet
-    badrows = (grab[['depthunits','tmp_row']].where(grab['depthunits'].isin(['ft','f'])).dropna()).tmp_row.tolist()
+    badrows = (grab[['stationwaterdepthunits','tmp_row']].where(grab['stationwaterdepthunits'].isin(['ft','f'])).dropna()).tmp_row.tolist()
     grab_args.update({
         "badrows": badrows,
-        "badcolumn": 'DepthUnits',
+        "badcolumn": 'StationWaterDepthUnits',
         "error_type" : "Undefined Error",
         "error_message" : "DepthUnits should be in meters, not feet"
     })
@@ -260,7 +260,7 @@ def field_trawl_and_grab(all_dfs):
     if len((occupation[(occupation.stationid.isin(estuaries.stationid))]))!=0 :
         # for matching stationids, make sure Estuary and Brackish Estuary salinity has a value
         print('## Make sure Estuary and Brackish Estuary salinity value is non-empty ##')
-        strats = pd.merge(occupation[['stationid','salinity']],estuaries, how = 'left', on='stationid')
+        strats = pd.merge(occupation[['stationid','salinity','tmp_row']],estuaries, how = 'left', on='stationid')
         occupation_args.update({
             "badrows": strats[pd.isnull(strats.salinity)].tmp_row.tolist(),
             "badcolumn": 'Salinity',
@@ -283,7 +283,7 @@ def field_trawl_and_grab(all_dfs):
     occupation_args.update({
         "badrows": sofat[sofat['targetlatitude'].isnull()].tmp_row.tolist(),
         "badcolumn": 'StationID',
-        "error_type": 'Undefined Warning',
+        "error_type": 'Logic Error',
         "error_message": 'StationOccupation distance to target check - Could not find StationID in field assignment table.'
     })
     errs = [*errs, checkData(**occupation_args)]
@@ -306,7 +306,7 @@ def field_trawl_and_grab(all_dfs):
         "error_type": 'Undefined Warning',
         "error_message": 'Distance from Occupation Latitude/Longitude in submission to Target Latitude/Longitude in field assignment table is greater than 100 meters.'
     })
-    errs = [*errs, checkData(**occupation_args)]
+    warnings = [*warnings, checkData(**occupation_args)]
     
 
     # Matthew M- If StationOccupation/Station Fail != "None or No Fail/Temporary" then Abandoned should be set to "Yes"
@@ -323,7 +323,7 @@ def field_trawl_and_grab(all_dfs):
     occupation_args.update({
         "badrows": occupation[(~occupation.stationfail.isin(lu_sf1.tolist())) & ~occupation['abandoned'].isin(['Yes', 'yes'])].tmp_row.tolist(),
         "badcolumn": 'StationFail',
-        "error_type": 'Undefined Warning',
+        "error_type": 'Undefined Error',
         "error_message": 'If StationOccupation/StationFail is set to anything other than None or Temporary then Abandoned should be set to Yes.'
     })
     errs = [*errs, checkData(**occupation_args)]
@@ -335,7 +335,7 @@ def field_trawl_and_grab(all_dfs):
     occupation_args.update({
         "badrows": occupation[(occupation.stationfail.isin(lu_sf1.tolist())) & occupation['abandoned'].isin(['Yes', 'yes'])].tmp_row.tolist(),
         "badcolumn": 'StationFail',
-        "error_type": 'Undefined Warning',
+        "error_type": 'Undefined Error',
         "error_message": 'If StationOccupation/StationFail is set to None or Temporary then Abandoned should be set to No.'
     })
     errs = [*errs, checkData(**occupation_args)]
@@ -575,7 +575,7 @@ def field_trawl_and_grab(all_dfs):
         "badrows": trawl[(trawl['trawlfail'].isin(lu_tf.trawlfailure.tolist())) & (trawl['comments'].isnull())].tmp_row.tolist(),
         "badcolumn": 'Comments',
         "error_type": "Undefined Error",
-        "error_message" : 'A comment is required for that stationfail option. Please see: <a href=http://checker.sccwrp.org/checker/scraper?action=help&layer=lu_trawlfails target=_blank>TrawlFail lookup</a>.'
+        "error_message" : f'A comment is required for that stationfail option. Please see: <a href=/{current_app.script_root}/scraper?action=help&layer=lu_trawlfails target=_blank>TrawlFail lookup</a>.'
     })
     errs = [*errs, checkData(**trawl_args)]
 
@@ -621,7 +621,7 @@ def field_trawl_and_grab(all_dfs):
     print(grab.loc[grab.grabdistancetonominaltarget > 100])
     grab_args.update({
         "badrows": grab.loc[grab.grabdistancetonominaltarget > 100].tmp_row.tolist(),
-        "badcolumn": 'TargetLatitude,TargetLongitude',
+        "badcolumn": 'Latitude,Longitude',
         "error_type": "Undefined Warning",
         "error_message" : 'Grab Distance to Nominal Target > 100m'
     })
@@ -668,12 +668,12 @@ def field_trawl_and_grab(all_dfs):
     print("grab.comments")
     print(grab['comments'])
     print(grab[(grab['grabfail'].isin(lu_gf.grabfail.tolist()))& (grab['comments'].isnull())])
-    checkData(grab[(grab['grabfail'].isin(lu_gf.grabfail.tolist())) & (grab['comments'].isnull())].tmp_row.tolist(), 'Comments', 'Undefined Error', 'error', 'A comment is required for that stationfail option. Please see: <a href=http://checker.sccwrp.org/checker/scraper?action=help&layer=lu_grabfails target=_blank>GrabFail lookup</a>.', grab)
+    checkData(grab[(grab['grabfail'].isin(lu_gf.grabfail.tolist())) & (grab['comments'].isnull())].tmp_row.tolist(), 'Comments', 'Undefined Error', 'error', f'A comment is required for that stationfail option. Please see: <a href=/{current_app.script_root}/scraper?action=help&layer=lu_grabfails target=_blank>GrabFail lookup</a>.', grab)
     grab_args.update({
         "badrows": grab[(grab['grabfail'].isin(lu_gf.grabfail.tolist())) & (grab['comments'].isnull())].tmp_row.tolist(),
         "badcolumn": 'Comments',
         "error_type": "Undefined Error",
-        "error_message" : 'A comment is required for that stationfail option. Please see: <a href=http://checker.sccwrp.org/checker/scraper?action=help&layer=lu_grabfails target=_blank>GrabFail lookup</a>.'
+        "error_message" : f'A comment is required for that stationfail option. Please see: <a href=/{current_app.script_root}/scraper?action=help&layer=lu_grabfails target=_blank>GrabFail lookup</a>.'
     })
     errs = [*errs, checkData(**grab_args)]
     

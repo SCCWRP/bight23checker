@@ -159,7 +159,7 @@ def debris(all_dfs):
         "badcolumn": "debristype",
         "error_type": "Undefined Error",
         "is_core_error": False,
-        "error_message": "DebrisType is invalid please check the list: <a href=http://http://checker.sccwrp.org/checker/scraper?action=help&layer=lu_debristypes=_blank>lu_debristypes</a>"
+        "error_message": f"DebrisType is invalid please check the list: <a href=/{current_app.script_root}/checker/scraper?action=help&layer=lu_debristypes=_blank>lu_debristypes</a>"
     }
     errs = [*errs, checkData(**trawldebris_args)] 
     

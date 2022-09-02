@@ -229,7 +229,7 @@ def fish(all_dfs):
                     "badrows": tam.iloc[i].tmp_row.tolist(),
                     "badcolumn": "FishSpecies",
                     "error_type": "Undefined Warning",
-                    "error_message": '{} was caught in a depth range ({}m - {}m) that does not include the range it is typically found ({}m - {}m). Please verify the species is correct. Check <a href=http://checker.sccwrp.org/checker/scraper?action=help&layer=lu_fishspeciesdepthrange target=_blank>lu_fishspeciesdepthrange</a> for more information.'.format(tam.fishspecies[i],int(tam.startdepth[i]),int(tam.enddepth[i]),tam.minimumdepth[i],tam.maximumdepth[i])
+                    "error_message": '{} was caught in a depth range ({}m - {}m) that does not include the range it is typically found ({}m - {}m). Please verify the species is correct. Check <a href=/{}/scraper?action=help&layer=lu_fishspeciesdepthrange target=_blank>lu_fishspeciesdepthrange</a> for more information.'.format(tam.fishspecies[i],int(tam.startdepth[i]),int(tam.enddepth[i]),tam.minimumdepth[i],tam.maximumdepth[i],current_app.script_root)
                 })
                 warnings = [*warnings, checkData(**trawlfishabundance_args)]
 
