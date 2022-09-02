@@ -106,15 +106,21 @@ def load():
 
 
 
-
-    assert set(current_app.datasets.get(session.get('datatype')).get('tables')) == set(all_dfs.keys()), \
+    # We have to make an exception for toxsummary, since the summary table gets added after the fact
+    assert set(current_app.datasets.get(session.get('datatype')).get('tables')) == set(all_dfs.keys() - set(['tbl_toxicitysummaryresults'])), \
             f"""There is a mismatch between the table names listed in __init__.py current_app.datasets
             and the keys of all_dfs (datatype: {session.get('datatype')}"""
     
 
     # Now go through each tab and load to the database
-    for tbl in current_app.datasets.get(session.get('datatype')).get('tables'):
-        print(f"Loading Data to {tbl}. Be sure that the tables are in the correct order in __init__.py datasets")
+    tables_to_load = current_app.datasets.get(session.get('datatype')).get('tables') \
+        if not session.get('datatype') == 'toxicity' \
+        else [*current_app.datasets.get(session.get('datatype')).get('tables'), 'tbl_toxicitysummaryresults']
+
+    for tbl in tables_to_load:
+        # Below comment applied to one project where the tables had foreign key relationships
+        # We may or may not want to also apply that to bight
+        # print(f"Loading Data to {tbl}. Be sure that the tables are in the correct order in __init__.py datasets")
         print("If foreign key relationships are set, the tables need to be loadede in a particular order")
         
         # These columns are needed in all submission tables, but they are often overlooked

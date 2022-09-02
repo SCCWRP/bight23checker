@@ -187,6 +187,7 @@ def main():
             index=False
         )
     writer.save()
+    writer.close()
     
     # Yes this is weird but if we write the all_dfs back to the excel file, and read it back in,
     # this ensures 100% that the data is loaded exactly in the same state as it was in when it was checked
@@ -295,28 +296,15 @@ def main():
         errs = [e for e in errs if len(e) > 0]
         warnings = [w for w in warnings if len(w) > 0]
 
-        # commenting out errs and warnings print statements
-        #print("errs")
-        #print(errs)
-        #print("warnings")
-        #print(warnings)
+        # A certain routine needs to run for tox
+        # If there were errors on the summary table dataframe, then the tox summary has to be added to the all_dfs variable
+        if current_app.config.get("TOXSUMMARY_TABLENAME") in session['table_to_tab_map']:
+            all_dfs[current_app.config.get("TOXSUMMARY_TABLENAME")] = pd.read_excel(session.get('excel_path'), sheet_name=current_app.config.get("TOXSUMMARY_TABLENAME"))
+                
 
         print("DONE - Custom Checks")
 
     # End Custom Checks section    
-
-    # Begin Visual Map Checks:
-
-    # Run only if they passed Core Checks
-    if errs == []:
-        # There are visual map checks for SAV, BRUV, Fish and Vegetation:
-
-        map_func = current_app.datasets.get(match_dataset).get('map_func')
-        if map_func is not None:
-            map_output = map_func(all_dfs, current_app.datasets.get(match_dataset).get('spatialtable'))
-            f = open(os.path.join(session.get('submission_dir'),f'{match_dataset}_map.html'),'w')
-            f.write(map_output._repr_html_())
-            f.close()
 
     # ---------------------------------------------------------------- #
 
@@ -355,7 +343,8 @@ def main():
     # Mark up the excel workbook
     print("Marking Excel file")
     print(session.get('excel_path'))
-
+    print(errs)
+    print(warnings)
     # mark_workbook function returns the file path to which it saved the marked excel file
     session['marked_excel_path'] = mark_workbook(
         all_dfs = all_dfs, 

@@ -1,13 +1,14 @@
 # Dont touch this file! This is intended to be a template for implementing new custom checks
 
 from inspect import currentframe
-from flask import current_app, g
+from flask import current_app, g, session
 from .functions import checkData, multivalue_lookup_check
 import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine
 import copy
 from scipy import stats
+import os
 
 def toxicity(all_dfs):
     
@@ -389,6 +390,9 @@ def toxicity(all_dfs):
         })
         errs = [*errs, checkData(**toxresults_args)] 
         
+        # Check #3 
+        # A LAB IS ASSIGNED BOTH STATIONS AND TEST SPECIES. CHECK TO SEE IF THE SUBMISSION MATCHES BOTH.
+        # This check was commented out in the old checker
         
         # 4. QACODE CHECK - A SINGLE QACODE IS REQUIRED BUT MULTIPLE QACODES ARE POSSIBLE (MANY TO MANY). author - Jordan Golemo
         print("QACODE CHECK - A SINGLE QACODE IS REQUIRED BUT MULTIPLE QACODES ARE POSSIBLE (MANY TO MANY)")
@@ -404,7 +408,7 @@ def toxicity(all_dfs):
         # merge wq and batch on toxbatch to get species from batch
         dfwq = pd.merge(toxwq[['toxbatch','parameter','result','matrix']], toxbatch[['toxbatch', 'species']], how = 'left', on = 'toxbatch')
         
-        
+        # For EE amd MG, and the parameter is Temperature, result should be between 13 and 17
         print(dfwq.loc[(dfwq['species'].isin(['Eohaustorius estuarius','Mytilus galloprovincialis','EE','MG'])) & (dfwq['parameter'] == 'Temperature') & ((dfwq['result'] < 13) | (dfwq['result'] > 17))])
         badrows = dfwq.loc[(dfwq['species'].isin(['Eohaustorius estuarius','Mytilus galloprovincialis','EE','MG'])) & (dfwq['parameter'] == 'Temperature') & ((dfwq['result'] < 13) | (dfwq['result'] > 17))].index.tolist()
         toxwq_args.update({
@@ -415,7 +419,7 @@ def toxicity(all_dfs):
         })
         warnings = [*warnings, checkData(**toxwq_args)]
         
-        
+        # For EE amd MG, and the parameter is Salinity, result should be between 30 and 34
         print(dfwq.loc[(dfwq['species'].isin(['Eohaustorius estuarius','Mytilus galloprovincialis','EE','MG'])) & (dfwq['parameter'] == 'Salinity') & ((dfwq['result'] < 30) | (dfwq['result'] > 34))])
         badrows = dfwq.loc[(dfwq['species'].isin(['Eohaustorius estuarius','Mytilus galloprovincialis','EE','MG'])) & (dfwq['parameter'] == 'Salinity') & ((dfwq['result'] < 30) | (dfwq['result'] > 34))].index.tolist()
         toxwq_args.update({
@@ -426,7 +430,7 @@ def toxicity(all_dfs):
         })
         warnings = [*warnings, checkData(**toxwq_args)]
         
-        
+        # For EE, and the parameter Dissolved Oxygen, result should be less than 7.5
         print(dfwq.loc[(dfwq['species'].isin(['Eohaustorius estuarius','EE'])) & (dfwq['parameter'] == 'Dissolved Oxygen') & (dfwq['result'] < 7.5)])
         badrows = dfwq.loc[(dfwq['species'].isin(['Eohaustorius estuarius','EE'])) & (dfwq['parameter'] == 'Dissolved Oxygen') & (dfwq['result'] < 7.5)].index.tolist()
         toxwq_args.update({
@@ -437,7 +441,7 @@ def toxicity(all_dfs):
         })
         warnings = [*warnings, checkData(**toxwq_args)]
 
-            
+        # For EE, and the parameter pH, result should be between 7.7 and 8.3
         print(dfwq.loc[(dfwq['species'].isin(['Eohaustorius estuarius','EE'])) & (dfwq['parameter'] == 'pH') & ((dfwq['result'] < 7.7) | (dfwq['result'] > 8.3))])
         badrows = dfwq.loc[(dfwq['species'].isin(['Eohaustorius estuarius','EE'])) & (dfwq['parameter'] == 'pH') & ((dfwq['result'] < 7.7) | (dfwq['result'] > 8.3))].index.tolist()
         toxwq_args.update({
@@ -545,37 +549,8 @@ def toxicity(all_dfs):
     ### SUMMARY TABLE START ###
     if len(errs) == 0:
         # summary must not be a groupby otherwise below functions wont work
-        # all_dataframes[1] is the toxicity results data
-        ### CRITICAL ALL VALUES IN THE RESULT FIELD MUST BE INTEGER TO RUN MEAN
-        ### DONT RUN THIS) FUNCTION IF THERE ARE DATA TYPE ERRORS IN RESULT COLUMN
         print("Creating Toxicity Summary Results Table")
-        print("Creating Toxicity Summary Results Table")
-        #sql = "select tbl_grabevent.stationid,tbl_grabevent.latitude,tbl_grabevent.longitude,tbl_grabevent.stationwaterdepth,tbl_grabevent.stationwaterdepthunits,field_assignment_table.areaweight,field_assignment_table.stratum,tbl_grabevent.shape from field_assignment_table inner join tbl_grabevent on field_assignment_table.stationid = tbl_grabevent.stationid" - bug issue with grab returning multiple records per station moved statement to use occupation instead
-        #sql = "select tbl_stationoccupation.stationid,tbl_stationoccupation.occupationlatitude as latitude,tbl_stationoccupation.occupationlongitude as longitude,tbl_stationoccupation.occupationdepth as stationwaterdepth,tbl_stationoccupation.occupationdepthunits as stationwaterdepthunits,field_assignment_table.areaweight,field_assignment_table.stratum,tbl_stationoccupation.shape from field_assignment_table inner join tbl_stationoccupation on field_assignment_table.stationid = tbl_stationoccupation.stationid"
-        sql = "select tbl_stationoccupation.stationid,tbl_stationoccupation.occupationlatitude as latitude,tbl_stationoccupation.occupationlongitude as longitude,tbl_stationoccupation.occupationdepth as stationwaterdepth,tbl_stationoccupation.occupationdepthunits as stationwaterdepthunits,field_assignment_table.areaweight,field_assignment_table.stratum,tbl_stationoccupation.shape from field_assignment_table inner join tbl_stationoccupation on field_assignment_table.stationid = tbl_stationoccupation.stationid where tbl_stationoccupation.collectiontype = 'Grab' and tbl_stationoccupation.stationfail = 'None or No Failure'"
-        print(sql)
 
-        ### CRITICAL - SUMMARY TABLE CANNOT BE BUILT IF STATIONID SUBMITTED LACKS FIELD DATA (no grabevent data) - bug #7
-        ### CHECK
-        #df_sql = pd.read_sql_query(sql,eng)
-        # lowercase column names
-        #df_sql.columns = [x.lower() for x in df_sql.columns]
-        #print(df_sql)
-        #df_sql.drop_duplicates(subset=['stationid'], inplace=True)
-        #print("DEBUGGING: search field stations against lab submission")	
-        #get_unique_stations = result.groupby('stationid').apply(','.join)
-        #print(result.loc[~result['stationid'].isin(df_sql['stationid'])])
-        #no_field_stations = result.loc[~result['stationid'].isin(df_sql['stationid'])].stationid.tolist()
-        #if len(summary_stations) >= 1:
-        #	print("we have stations in results that arent in field table")
-        #	print(summary_stations)
-        #else:
-        #	print("all stations match we can run toxicity summary")
-        #	print(summary_stations)
-        ### DONE CHECKING 
-        ###
-        #if not no_field_stations:
-                    #df_match = pd.merge(result,df_sql, on=['stationid'], how='left')
         df_match = copy.deepcopy(toxresults)
         print(df_match.head())
         print(df_match.columns)
@@ -592,13 +567,7 @@ def toxicity(all_dfs):
                 grp['coefficientvariance'] = 0
             return grp
         
-        #summary = summary.groupby(['stationid','toxbatch','fieldreplicate']).apply(getCalculatedValues) - working - in beta no database though
-        # doesnt check against database only results !IMPORTANT
-        #summary = result.groupby(['stationid','toxbatch','fieldreplicate']).apply(getCalculatedValues)
-        # checks against database merges with results stationid has to be in database !IMPORTANT
-
         grouping_columns = ['stationid','toxbatch','sampletypecode','samplecollectdate','treatment','concentration']
-        #grouping_columns = ['stationid','toxbatch','sampletypecode','fieldreplicate']
 
         print("1")
         print(list(df_match.groupby(grouping_columns)))
@@ -607,37 +576,28 @@ def toxicity(all_dfs):
         print("summary")
         print(toxsummary)
 
-        print("2")
         # get all control records
         cneg = toxsummary[grouping_columns + ['mean']].where(toxsummary['sampletypecode'] == 'CNEG')
-        print("3")
         # get all non control records
         nocneg = toxsummary[grouping_columns + ['mean']].where(toxsummary['sampletypecode'] != 'CNEG')
 
         # get all reference toxicant records just save them for now
-        print("4")
-        reference_toxicants = toxsummary.loc[toxsummary['matrix'].isin(['Reference Toxicant'])]
         # drop all reference toxicants from the summary dataframe - not a part of summary results
-        print("5")
+        
         toxsummary = toxsummary.loc[~toxsummary['matrix'].isin(['Reference Toxicant'])]
 
         cneg = cneg.dropna()
-        print("6")
+        
         nocneg = nocneg.dropna()
-        print("7")
+        
 
         cneg['unique'] = np.nan
         nocneg['unique'] = np.nan
 
-        print("8")
         control_mean = cneg.groupby(grouping_columns + ['mean'])['unique'].nunique().reset_index()
-        print("9")
-        result_mean = nocneg.groupby(grouping_columns + ['mean'])['unique'].nunique().reset_index()
-
-        print("10")
+        
         control_mean_dict = control_mean.set_index('toxbatch')['mean'].to_dict()
 
-        print("11")
         # copy control_mean dataframe column mean to controlvalue
         control_mean['controlvalue'] = control_mean['mean']
         toxsummary = toxsummary.merge(control_mean[['toxbatch','controlvalue']], how = 'left', on = ['toxbatch'])
@@ -688,21 +648,21 @@ def toxicity(all_dfs):
             #if(grp['species'] == 'EE'): - coded values
             if(grp['species'] == 'Eohaustorius estuarius'):
                 if(grp['mean'] < 90):
-                        if (grp['pctcontrol'] < 82):
-                                if (grp['pctcontrol'] < 59):
-                                        grp['sqocategory'] = 'High Toxicity'
-                                else:
-                                        if (grp['sigeffect'] == 'NSC'):
-                                                grp['sqocategory'] = 'Low Toxicity'
-                                        else:
-                                                grp['sqocategory'] = 'Moderate Toxicity'
+                    if (grp['pctcontrol'] < 82):
+                        if (grp['pctcontrol'] < 59):
+                            grp['sqocategory'] = 'High Toxicity'
                         else:
-                                if (grp['sigeffect'] == 'NSC'):
-                                        grp['sqocategory'] = 'Nontoxic'
-                                else:
-                                        grp['sqocategory'] = 'Low Toxicity'
+                            if (grp['sigeffect'] == 'NSC'):
+                                grp['sqocategory'] = 'Low Toxicity'
+                            else:
+                                grp['sqocategory'] = 'Moderate Toxicity'
+                    else:
+                        if (grp['sigeffect'] == 'NSC'):
+                            grp['sqocategory'] = 'Nontoxic'
+                        else:
+                            grp['sqocategory'] = 'Low Toxicity'
                 else:
-                        grp['sqocategory'] = 'Nontoxic'
+                    grp['sqocategory'] = 'Nontoxic'
             #elif (grp['species'] == 'MG'): - coded values
             elif (grp['species'] == 'Mytilus galloprovincialis'):
                 if (grp['mean'] < 80):
@@ -711,35 +671,49 @@ def toxicity(all_dfs):
                                 grp['sqocategory'] = 'High Toxicity'
                         else:
                             if (grp['sigeffect'] == 'NSC'):
-                                    grp['sqocategory'] = 'Low Toxicity'
+                                grp['sqocategory'] = 'Low Toxicity'
                             else:
-                                    grp['sqocategory'] = 'Moderate Toxicity'
+                                grp['sqocategory'] = 'Moderate Toxicity'
                     else:
                         if (grp['sigeffect'] == 'NSC'):
-                                grp['sqocategory'] = 'Nontoxic'
+                            grp['sqocategory'] = 'Nontoxic'
                         else:
-                                grp['sqocategory'] = 'Low Toxicity'
+                            grp['sqocategory'] = 'Low Toxicity'
                 else:
-                        grp['sqocategory'] = 'Nontoxic'
+                    grp['sqocategory'] = 'Nontoxic'
+            
             return grp
-        #print("calling getSQO")
-        #summary = summary.apply(getSQO, axis=1)
-        #print("print summary")
-        #print(summary['sqocategory'])
 
-        #summary.drop('result', axis=1, inplace=True)
-        #summary.drop('labrep', axis=1, inplace=True)
-        # group on the following columns and reset as a dataframe rather than groupby object
-        #summary = summary.groupby(['stationid','lab','sampletypecode','toxbatch','species','concentration','endpoint','resultunits','sqocategory','mean','n','stddev','pctcontrol','sigeffect','qacode']).size().to_frame(name = 'count').reset_index()
+        print("calling getSQO")
+        toxsummary = toxsummary.apply(getSQO, axis=1)
+
         ### SUMMARY TABLE END ###
     
     
-    
+
+        # ORGANIZE SUMMARY OUTPUT
+        # results no database fields
+        
+        # with database fields
+        # rename a few columns to match with existing b13 column names
+        toxsummary.rename(columns={"resultunits": "units"}, inplace=True)
+        # set p and tstat values if they are empty to -88
+        toxsummary['tstat'].fillna(-88,inplace=True)
+        toxsummary['pvalue'].fillna(-88,inplace=True)
+
+        # get summary dataframe with error columns before it is replaced - bug fix number 37 below for duplicate summary rows
+        toxsummary = toxsummary.drop_duplicates(subset = ['stationid','toxbatch','fieldreplicate','pvalue'],keep='first')
+        toxsummary.reset_index(inplace = True, drop = True)
+        toxsummary.drop('tmp_row', axis = 1, inplace = True)
+        print("toxsummary")
+        print(toxsummary)
+
+
         ## SUMMARY TABLE CHECKS ##
         print("Starting Toxicity Summary Result Checks")
         toxsummary_args = {
             "dataframe": toxsummary,
-            "tablename" : "analysis_toxsummaryresults",
+            "tablename" : current_app.config.get("TOXSUMMARY_TABLENAME"),
             "badrows": [],
             "badcolumn": "",
             "error_type": "",
@@ -758,24 +732,29 @@ def toxicity(all_dfs):
         })
         warnings = [*warnings, checkData(**toxsummary_args)]
 
+        print("toxsummary[(toxsummary['species'].isin(['Eohaustorius estuarius','EE'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['mean'] < 90)]")
+        print(toxsummary[(toxsummary['species'].isin(['Eohaustorius estuarius','EE'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['mean'] < 90)])
         toxsummary_args.update({
-            "badrows": toxsummary.loc[(toxsummary['species'].isin(['Eohaustorius estuarius','EE'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['mean'] < 90)].index.tolist(),
+            "badrows": toxsummary[(toxsummary['species'].isin(['Eohaustorius estuarius','EE'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['mean'] < 90)].index.tolist(),
             "badcolumn": "mean",
             "error_type": "Undefined Error",
             "error_message": 'Does not meet control acceptability criterion; mean control value < 90'
         })
         errs = [*errs, checkData(**toxsummary_args)]
         
+        print("toxsummary[(toxsummary['species'].isin(['Mytilus galloprovinialis','MG'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['mean'] < 70)]")
+        print(toxsummary[(toxsummary['species'].isin(['Mytilus galloprovinialis','MG'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['mean'] < 70)])
         toxsummary_args.update({
-            "badrows": toxsummary.loc[(toxsummary['species'].isin(['Mytilus galloprovinialis','MG'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['mean'] < 70)].index.tolist(),
+            "badrows": toxsummary[(toxsummary['species'].isin(['Mytilus galloprovinialis','MG'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['mean'] < 70)].index.tolist(),
             "badcolumn": "mean",
             "error_type": "Undefined Error",
             "error_message": 'Does not meet control acceptability criterion; mean control value < 70'
         })
         errs = [*errs, checkData(**toxsummary_args)]
-        
+        print("toxsummary[(toxsummary['species'].isin(['Eohaustorius estuarius','EE'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['coefficientvariance'] > 11.9)]")
+        print(toxsummary[(toxsummary['species'].isin(['Eohaustorius estuarius','EE'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['coefficientvariance'] > 11.9)])
         toxsummary_args.update({
-            "badrows": toxsummary.loc[(toxsummary['species'].isin(['Eohaustorius estuarius','EE'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['coefficientvariance'] > 11.9)].index.tolist(),
+            "badrows": toxsummary[(toxsummary['species'].isin(['Eohaustorius estuarius','EE'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['coefficientvariance'] > 11.9)].index.tolist(),
             "badcolumn": "mean",
             "error_type": "Undefined Error",
             "error_message": 'Does not meet control acceptability criterion; coefficient value > 11.9'
@@ -785,30 +764,33 @@ def toxicity(all_dfs):
 
         # ## END SUMMARY TABLE CHECKS ##
 
-        # ORGANIZE SUMMARY OUTPUT
-        # results no database fields
-        
-        # with database fields
-        # rename a few columns to match with existing b13 column names
-        toxsummary.rename(columns={"resultunits": "units"}, inplace=True)
-        # set p and tstat values if they are empty to -88
-        toxsummary['tstat'].fillna(-88,inplace=True)
-        toxsummary['pvalue'].fillna(-88,inplace=True)
-        # group on the following columns and reset as a dataframe rather than groupby object
-        print("toxsummary start")
 
-        # get summary dataframe with error columns before it is replaced - bug fix number 37 below for duplicate summary rows
-        toxsummary = toxsummary.drop_duplicates(subset = ['stationid','toxbatch','fieldreplicate','pvalue'],keep='first')
+
+
+
+
+        # write tox summary to the submission excel file
+        writer = pd.ExcelWriter(session.get('excel_path'), engine = 'openpyxl', mode = 'a')
+        toxsummary.to_excel(writer, index = False, sheet_name=current_app.config.get("TOXSUMMARY_TABLENAME"))
+        writer.save()
+        writer.close()
+
+        # The session table to tab map must be updated so that the excel markup routine can find the newly created sheet
+        # it also must be updated so that the javascript can correctly build the error report for the user to see in the browser
+        session['table_to_tab_map'][current_app.config.get("TOXSUMMARY_TABLENAME")] = current_app.config.get("TOXSUMMARY_TABLENAME")
+
 
         print("summary end")
         ## END SUMMARY TABLE CHECKS ##
 
-        print("toxsummary")
-        print(toxsummary)
-        print(toxsummary.columns)
-        for c in toxsummary.columns:
-            print(f"column: {c}")
-            print(toxsummary[c])
+        # For now leave it in since the toxsummary doesnt go through match routine
+        # we might need this later for debugging and troubleshooting
+        # print("toxsummary")
+        # print(toxsummary)
+        # print(toxsummary.columns)
+        # for c in toxsummary.columns:
+        #     print(f"column: {c}")
+        #     print(toxsummary[c])
 
 
     return {'errors': errs, 'warnings': warnings}
