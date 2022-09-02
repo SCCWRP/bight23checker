@@ -158,6 +158,7 @@ def match(all_dfs):
             del all_dfs[sheetname]
 
         # also another thing for the sake of toxicity data
+        # Dont include the summary tab in the match report, it gets re calculated anyways
         match_report = [r for r in match_report if r.get('closest_tbl') != current_app.config.get("TOXSUMMARY_TABLENAME")]
 
 
