@@ -169,6 +169,7 @@ def invert(all_dfs):
         'anomaly',
         'lu_invertanomalies',
         'anomaly',
+        eng,
         displayfieldname="Anomaly"
     )
     trawlinvertebrateabundance_args.update(tmpargs)
@@ -181,6 +182,7 @@ def invert(all_dfs):
         'abundancequalifier',
         'lu_trawlqualifier',
         'qualifier',
+        eng,
         displayfieldname="AbundanceQualifier"
     )
     trawlinvertebrateabundance_args.update(tmpargs)
@@ -191,6 +193,7 @@ def invert(all_dfs):
         'biomassqualifier',
         'lu_trawlqualifier',
         'qualifier',
+        eng,
         displayfieldname="BiomassQualifier"
     )
     trawlinvertebratebiomass_args.update(tmpargs)
@@ -409,28 +412,32 @@ def invert(all_dfs):
             td, 
             on=['stationid', 'sampledate', 'samplingorganization', 'trawlnumber']
         )
-    if not tam.empty:
-        tam['inrange'] = tam.apply(lambda x: False if (max(x.startdepth, x.enddepth) < x.mindepth) | (
-            min(x.startdepth, x.enddepth) > x.maxdepth) else True, axis=1)
-        for i in range(len(tam)):
-            if tam['inrange'][i] == False:
-                badrows = tam.iloc[i].tmp_row.tolist()
-                trawlinvertebrateabundance_args = {
-                    "dataframe": trawlinvertebrateabundance,
-                    "tablename": 'tbl_trawlinvertebrateabundance',
-                    "badrows": badrows,
-                    "badcolumn": "invertspecies",
-                    "error_type": "Undefined Warning",
-                    "is_core_error": False,
-                    "error_message":
-                        '%s was caught in a depth range (%sm - %sm) that does not include the range it is typically found (%sm - %sm). Please verify the species is correct. Check <a href=/%s/scraper?action=help&layer=lu_invertspeciesdepthrange target=_blank>lu_invertspeciesdepthrange</a> for more information.' % (tam.invertspecies[i], int(tam.startdepth[i]), int(tam.enddepth[i]), tam.mindepth[i], tam.maxdepth[i],current_app.script_root)
-                }
-                warnings = [*warnings, checkData(**trawlinvertebrateabundance_args)]
 
+    if not tam.empty:
+        tam['inrange'] = tam.apply(
+            lambda x: 
+            False if (max(x.startdepth, x.enddepth) < x.mindepth) | (min(x.startdepth, x.enddepth) > x.maxdepth) else True, axis=1
+        )
+        badrecords = tam[tam.inrange == False]
+        
+        for i, row in badrecords.iterrows():
+            
+            trawlinvertebrateabundance_args = {
+                "dataframe": trawlinvertebrateabundance,
+                "tablename": 'tbl_trawlinvertebrateabundance',
+                "badrows": [row.tmp_row],
+                "badcolumn": "invertspecies",
+                "error_type": "Undefined Warning",
+                "is_core_error": False,
+                "error_message":
+                    '%s was caught in a depth range (%sm - %sm) that does not include the range it is typically found (%sm - %sm). Please verify the species is correct. Check <a href=/%s/scraper?action=help&layer=lu_invertspeciesdepthrange target=_blank>lu_invertspeciesdepthrange</a> for more information.' % (tam.invertspecies[i], int(tam.startdepth[i]), int(tam.enddepth[i]), tam.mindepth[i], tam.maxdepth[i], current_app.script_root)
+            }
+            warnings = [*warnings, checkData(**trawlinvertebrateabundance_args)]
+        print("done with for loop")
     # Jordan - Species - Check list of non-trawl taxa (next tab)
     invalid_species = eng.execute("SELECT species AS invertspecies FROM lu_invertspeciesnotallowed;")
     invs = pd.DataFrame(invalid_species.fetchall()); invs.columns= invalid_species.keys()
-    badrows = trawlinvertebrateabundance[trawlinvertebrateabundance.invertspecies.isin(invs.invertspecies.tolist())].tmp_row.tolist(),
+    badrows = trawlinvertebrateabundance[trawlinvertebrateabundance.invertspecies.isin(invs.invertspecies.tolist())].tmp_row.tolist()
     trawlinvertebrateabundance_args = {
         "dataframe": trawlinvertebrateabundance,
         "tablename": 'tbl_trawlinvertebrateabundance',
@@ -474,8 +481,8 @@ def invert(all_dfs):
     ]
     print(single_records[single_records.anomaly != 'None'])
     badrows = single_records[single_records.anomaly != 'None'].tmp_row.tolist()
-    trawlinvertebrateabundance = {
-        "dataframe": trawlinvertebrateabundance_args,
+    trawlinvertebrateabundance_args = {
+        "dataframe": trawlinvertebrateabundance,
         "tablename": 'tbl_trawlinvertebrateabundance',
         "badrows": badrows,
         "badcolumn": "anomaly",

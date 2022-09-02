@@ -21,7 +21,8 @@ def collect_error_messages(errs):
     for k in ('columns','rows','table','error_message'):
         assert all([k in x.keys() for x in errs]), f"function - collect_warnings - '{k}' not found in keys of a dictionary in the errs list"
     
-
+    print('in collect error messages')
+    print("errs")
     output = [
         {
             # This will be written to a json and stored in the submission directory
@@ -36,8 +37,8 @@ def collect_error_messages(errs):
         for r in e['rows']
     ]
 
-    #print("output from generic.py before groupby: ")
-    #print(output)
+    # print("output from generic.py before groupby: ")
+    # print(output)
 
     output = DataFrame(output).groupby(['row_number', 'table']) \
         .apply(
@@ -45,8 +46,8 @@ def collect_error_messages(errs):
             lambda x: '; '.join( list(x['message']) ) 
         ).to_dict() 
 
-    #print("output from generic.py after groupby: ")
-    #print(output)
+    # print("output from generic.py after groupby: ")
+    # print(output)
     
     return [{'row_number': k[0], 'table': k[1], 'message': v} for k, v in output.items()]
 
