@@ -2,7 +2,7 @@ from .chemistry_custom import chemistry
 from .toxicity_custom import toxicity
 from .infauna_initial_custom import infauna_initial
 from .infauna_reid_custom import infauna_reid
-from .infauna_analysis_custom import infauna_analysis
+from .infauna_final_custom import infauna_final
 from .field_trawl_custom import field_trawl
 from .field_grab_custom import field_grab
 from .field_trawl_and_grab_custom import field_trawl_and_grab
