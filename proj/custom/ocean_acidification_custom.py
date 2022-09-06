@@ -97,7 +97,7 @@ def ocean_acidification(all_dfs):
     ctd.sampletime = ctd.sampletime.apply(lambda x: str(x).strip())
     bottle.sampletime = bottle.sampletime.apply(lambda x: str(x).strip())
     
-    timepattern = re.compile(r'[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$')
+    timepattern = re.compile(r'([0-9]{1,2}):[0-5][0-9]:[0-5][0-9]$')
 
     # check time format
     badrows = ctd[ctd.sampletime.apply(lambda x: not bool(re.match(timepattern, x)) if not pd.isnull(x) else False)].tmp_row.tolist()
@@ -119,24 +119,30 @@ def ocean_acidification(all_dfs):
     })
     errs.append(checkData(**bottle_args))
 
-    badrows = ctd[ctd.sampletime.apply(lambda x: bool(int(re.match(timepattern, x).groups()[0]) > 23))].tmp_row.tolist()
-    ctd_args.update({
-        "badrows": badrows,
-        "badcolumn": "sampletime",
-        "error_type": "Formatting Error",
-        "error_message": "The sampletime here doesnt match the 24 hour clock format HH:MM:SS"
-    })
-    errs.append(checkData(**ctd_args))
-    
-    badrows = bottle[bottle.sampletime.apply(lambda x: bool(int(re.match(timepattern, x).groups()[0]) > 23))].tmp_row.tolist()
-    bottle_args.update({
-        "badrows": badrows,
-        "badcolumn": "sampletime",
-        "error_type": "Formatting Error",
-        "error_message": "The sampletime here doesnt match the 24 hour clock format HH:MM:SS"
-    })
-    errs.append(checkData(**bottle_args))
-    
+    # clean up the errors list
+    errs = [e for e in errs if len(e) > 0]
+    if len(errs) == 0:
+        print("ctd.sampletime")
+        print(ctd.sampletime)
+        print(ctd.sampletime.apply(lambda x: re.match(timepattern, x).groups() ) )
+        badrows = ctd[ctd.sampletime.apply(lambda x: bool(int(re.match(timepattern, x).groups()[0]) > 23))].tmp_row.tolist()
+        ctd_args.update({
+            "badrows": badrows,
+            "badcolumn": "sampletime",
+            "error_type": "Formatting Error",
+            "error_message": "The sampletime here doesnt match the 24 hour clock format HH:MM:SS"
+        })
+        errs.append(checkData(**ctd_args))
+        
+        badrows = bottle[bottle.sampletime.apply(lambda x: bool(int(re.match(timepattern, x).groups()[0]) > 23))].tmp_row.tolist()
+        bottle_args.update({
+            "badrows": badrows,
+            "badcolumn": "sampletime",
+            "error_type": "Formatting Error",
+            "error_message": "The sampletime here doesnt match the 24 hour clock format HH:MM:SS"
+        })
+        errs.append(checkData(**bottle_args))
+        
     
     # clean up the errors list
     errs = [e for e in errs if len(e) > 0]
@@ -301,23 +307,23 @@ def ocean_acidification(all_dfs):
         print("Now checking ranges on depth, temperature, salinity, density, and pH")
         # depth check
         print(ctd[(ctd.depth < 0)|(ctd.depth > 200)][['season','agency','sampledate','sampletime','station','depth']])
-        errs.append(checkData('tbl_oactd', ctd[(ctd.depth < 0)|(ctd.depth > 200)].tmp_row.tolist(),'Depth','Range Warning', 'Depth value is outside of what would be considered a normal range of values, (0 to 200)'))
+        warnings.append(checkData('tbl_oactd', ctd[(ctd.depth < 0)|(ctd.depth > 200)].tmp_row.tolist(),'Depth','Range Warning', 'Depth value is outside of what would be considered a normal range of values, (0 to 200)'))
         # temperature check
         print(ctd[(ctd.temperature < 0)|(ctd.temperature > 20)][['season','agency','sampledate','sampletime','station','temperature']])
-        errs.append(checkData('tbl_oactd', ctd[(ctd.temperature < 0)|(ctd.temperature > 20)].tmp_row.tolist(),'Temperature','Range Warning', 'Temperature value outside of what would be considered a normal range (e.g. 0-15).'))
+        warnings.append(checkData('tbl_oactd', ctd[(ctd.temperature < 0)|(ctd.temperature > 20)].tmp_row.tolist(),'Temperature','Range Warning', 'Temperature value outside of what would be considered a normal range (e.g. 0-15).'))
         # salinity check
         print(ctd[(ctd.salinity < 33.0)|(ctd.salinity > 33.7)][['season','agency','sampledate','sampletime','station','salinity']])
-        errs.append(checkData('tbl_oactd', ctd[(ctd.salinity < 33.0)|(ctd.salinity > 33.7)].tmp_row.tolist(),'Salinity','Range Warning', 'Salinity value outside of what would be condsidered a normal range (e.g. 33.2-33.5).'))
+        warnings.append(checkData('tbl_oactd', ctd[(ctd.salinity < 33.0)|(ctd.salinity > 33.7)].tmp_row.tolist(),'Salinity','Range Warning', 'Salinity value outside of what would be condsidered a normal range (e.g. 33.2-33.5).'))
         # density check
         print(ctd[(ctd.density < 20)|(ctd.density > 30)][['season','agency','sampledate','sampletime','station','density']])
-        errs.append(checkData('tbl_oactd', ctd[(ctd.density < 20)|(ctd.density > 30)].tmp_row.tolist(),'Density','Range Warning', 'Density value outside of what would be considered a normal range (e.g. 20-30).'))
+        warnings.append(checkData('tbl_oactd', ctd[(ctd.density < 20)|(ctd.density > 30)].tmp_row.tolist(),'Density','Range Warning', 'Density value outside of what would be considered a normal range (e.g. 20-30).'))
         # pH check
         print(ctd[(ctd.ph < 7.5)|(ctd.ph > 8.2)][['season','agency','sampledate','sampletime','station','ph']])
-        errs.append(checkData('tbl_oactd', ctd[(ctd.ph < 7.5)|(ctd.ph > 8.2)].tmp_row.tolist(), 'pH','Range Warning', 'pH value outside of what would be considered a normal range (e.g. 7.5-8.2).'))
+        warnings.append(checkData('tbl_oactd', ctd[(ctd.ph < 7.5)|(ctd.ph > 8.2)].tmp_row.tolist(), 'pH','Range Warning', 'pH value outside of what would be considered a normal range (e.g. 7.5-8.2).'))
 
         
 
-
+    print("End of OA Custom Checks")
 
 
     return {'errors': errs, 'warnings': warnings}
