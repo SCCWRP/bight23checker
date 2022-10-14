@@ -139,7 +139,7 @@ def match(all_dfs):
     #  then core checks etc. will run, but the app will crash, since there is a tab that does not match any table
     # We now will require a dataset to match all the tablenames in the match report. Note that the tablename will be empty if no table was matched for a certain tab
     # In this case, 
-    match_dataset = [k for k,v in datasets.items() if set(v.get('tables')) == [x.get('tablename') for x in match_report]]
+    match_dataset = [k for k,v in datasets.items() if set(v.get('tables')) == set([x.get('tablename') for x in match_report])]
 
     
 
