@@ -75,6 +75,10 @@ def main():
 
     # build all_dfs where we will store their data
     print("building 'all_dfs' dictionary")
+    ignored_tabs = [
+        *current_app.tabs_to_ignore, 
+        *(current_app.config.get("EXCEL_TABS_CREATED_BY_CHECKER") if current_app.config.get("EXCEL_TABS_CREATED_BY_CHECKER") else []) 
+    ]
     all_dfs = {
 
         # Some projects may have descriptions in the first row, which are not the column headers
@@ -91,7 +95,7 @@ def main():
         
         for sheet in pd.ExcelFile(excel_path).sheet_names
         
-        if ((sheet not in current_app.tabs_to_ignore) and (not sheet.startswith('lu_')))
+        if ((sheet not in ignored_tabs) and (not sheet.startswith('lu_')))
     }
     
     assert len(all_dfs) > 0, f"submissionid - {session.get('submissionid')} all_dfs is empty"
