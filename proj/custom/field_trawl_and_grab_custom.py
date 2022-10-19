@@ -291,10 +291,18 @@ def field_trawl_and_grab(all_dfs):
 
     # Calculates distance between SO Lat/Lon and FAT Lat/Lon according to StationIDs
     print("Calculates distance between so lat/lon and fat lat/lon according to stationids:")
-    sofat.dropna(inplace=True)
+
+    # Need to specify the subset - it was dropping records it wasnt supposed to before
+    sofat.dropna(subset=['targetlatitude','targetlongitude'], inplace=True)
     sofat['targetlatitude'] = sofat['targetlatitude'].apply(lambda x: float(x))
     sofat['targetlongitude'] = sofat['targetlongitude'].apply(lambda x: float(x))
+    
+
+    # https://stackoverflow.com/questions/29545704/fast-haversine-approximation-python-pandas
+    # haversine apparently uses a projection other than WGS84 which may cause small errors but none significant enough to affect this check
+    # plus this check is just a warning
     sofat['dists'] = haversine_np(sofat['occupationlongitude'],sofat['occupationlatitude'],sofat['targetlongitude'],sofat['targetlatitude'])
+
     print(sofat['dists'])
     # Raises Warning for Distances calculated above > 100M
     print("Raises warning for distances calculated above > 100m:")
