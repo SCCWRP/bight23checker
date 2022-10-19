@@ -361,7 +361,7 @@ def toxicity(all_dfs):
         # 1. CHECK IF SAMPLES WERE TESTED WITHIN 28 DAY HOLDING TIME
         print("## CHECK IF SAMPLES WERE TESTED WITHIN 28 DAY HOLDING TIME ##")
         # merge result and batch on toxbatch but include teststartdate
-        df28 = pd.merge(toxresults, toxbatch[['toxbatch', 'teststartdate']], how = 'left', on = 'toxbatch')
+        df28 = pd.merge(toxresults, toxbatch[['toxbatch', 'teststartdate']].drop_duplicates(), how = 'left', on = 'toxbatch')
         # change the following field types to pandas datetime so they can be calculated (we arent changing submitted data)
         df28['teststartdate'] = pd.to_datetime(df28['teststartdate'])
         df28['samplecollectdate'] = pd.to_datetime(df28['samplecollectdate'])
@@ -369,14 +369,33 @@ def toxicity(all_dfs):
         df28['checkdate'] = df28['teststartdate'] - df28['samplecollectdate']
         # locate any records with a greater than 28 period
         print(df28.loc[df28['checkdate'].dt.days > 28])
-        badrows = df28.loc[df28['checkdate'].dt.days > 28].tmp_row.tolist()
+
+
         toxresults_args.update({
-            "badrows": badrows,
+            "badrows": df28.loc[df28['checkdate'].dt.days > 28].tmp_row.tolist(),
             "badcolumn": "sampletypecode",
             "error_type": "Undefined Error",
             "error_message": "Samples must be tested within a 28 day holding time."
         })
         errs = [*errs, checkData(**toxresults_args)] 
+        
+        toxresults_args.update({
+            "badrows": df28.loc[df28['checkdate'].dt.days < 0].tmp_row.tolist(),
+            "badcolumn": "sampletypecode",
+            "error_type": "Logic Error",
+            "error_message": "You have entered a SampleCollectDate that comes after the corresponding TestStartDate specified in the batch tab"
+        })
+        errs = [*errs, checkData(**toxresults_args)] 
+        
+        toxresults_args.update({
+            "badrows": df28[(df28['sampletypecode'] == 'RFNH3') & (df28['checkdate'].dt.days != 0)].tmp_row.tolist(),
+            "badcolumn": "sampletypecode",
+            "error_type": "Logic Error",
+            "error_message": "For Reference Toxicant batches, the samplecollectdate (In results tab) must be the same as the teststartdate (In the batch tab)"
+        })
+        errs = [*errs, checkData(**toxresults_args)] 
+
+
 
         # 2. REFERENCE TOXICANT IN THE MATRIX FIELD MUST HAVE DATA IN CONCENTRATION FIELD. CAN'T BE -88.
         print("## REFERENCE TOXICANT IN THE MATRIX FIELD MUST HAVE DATA IN CONCENTRATION FIELD. CANT BE -88 ##")
@@ -756,7 +775,7 @@ def toxicity(all_dfs):
         print(toxsummary[(toxsummary['species'].isin(['Eohaustorius estuarius','EE'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['coefficientvariance'] > 11.9)])
         toxsummary_args.update({
             "badrows": toxsummary[(toxsummary['species'].isin(['Eohaustorius estuarius','EE'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['coefficientvariance'] > 11.9)].index.tolist(),
-            "badcolumn": "mean",
+            "badcolumn": "coefficientvariance",
             "error_type": "Undefined Error",
             "error_message": 'Does not meet control acceptability criterion; coefficient value > 11.9'
         })
