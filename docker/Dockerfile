@@ -44,6 +44,8 @@ RUN R CMD INSTALL --no-multiarch --with-keep.source SQOUnified
 RUN mkdir -p /var/www/checker/
 #WORKDIR /var/www/checker/
 
+RUN pip3 install geopy
+
 #CMD ["uwsgi","-s","/tmp/empachecker.sock","--uid","www-data","--gid","www-data","--manage-script-name","--mount","/checker=run:app","--chmod-socket=666"]
 
 
