@@ -232,7 +232,7 @@ def field_trawl_and_grab(all_dfs):
         })
         warnings = [*warnings, checkData(**occupation_args)]
     else:
-        trawlstations = pd.read_sql(f"SELECT DISTINCT stationid FROM field_assignment_table WHERE trawlagency = '{sampling_organization}'", eng).stationid.tolist()
+        trawlstations = pd.read_sql(f"SELECT DISTINCT stationid FROM field_assignment_table WHERE trawlagency = '{sampling_organization[0]}'", eng).stationid.tolist()
         badrows = occupation[(occupation.collectiontype != 'Grab') & (~occupation.stationid.isin(trawlstations))].tmp_row.tolist()
         occupation_args.update({
             "badrows": badrows,
@@ -242,7 +242,7 @@ def field_trawl_and_grab(all_dfs):
         })
         warnings = [*warnings, checkData(**occupation_args)]
         
-        grabstations = pd.read_sql(f"SELECT DISTINCT stationid FROM field_assignment_table WHERE grabagency = '{sampling_organization}'", eng).stationid.tolist()
+        grabstations = pd.read_sql(f"SELECT DISTINCT stationid FROM field_assignment_table WHERE grabagency = '{sampling_organization[0]}'", eng).stationid.tolist()
         badrows = occupation[(occupation.collectiontype == 'Grab') & (~occupation.stationid.isin(grabstations))].tmp_row.tolist()
         occupation_args.update({
             "badrows": badrows,
