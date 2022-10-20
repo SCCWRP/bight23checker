@@ -193,7 +193,8 @@ def field_trawl(all_dfs):
             "error_message" : "More than one agency detected"
         })
         warnings = [*warnings, checkData(**occupation_args)]
-    else:
+    elif len(sampling_organization) == 1:
+        sampling_organization = sampling_organization[0]
         trawlstations = pd.read_sql(f"SELECT DISTINCT stationid FROM field_assignment_table WHERE trawlagency = '{sampling_organization}'", eng).stationid.tolist()
         badrows = occupation[(occupation.collectiontype != 'Grab') & (~occupation.stationid.isin(trawlstations))].tmp_row.tolist()
         occupation_args.update({
@@ -213,7 +214,8 @@ def field_trawl(all_dfs):
             "error_message" : f"The organization {sampling_organization} was not assigned to grab at this station"
         })
         warnings = [*warnings, checkData(**occupation_args)]
-
+    else: 
+        raise Exception("No sampling organization detected")
 
     # Check StationOccupation/Salinity - if the station is an Estuary or Brackish Estuary then the salinity is required
     estuaries = pd.read_sql("SELECT stationid, stratum FROM field_assignment_table WHERE stratum IN ('Estuaries', 'Brackish Estuaries');", eng)
