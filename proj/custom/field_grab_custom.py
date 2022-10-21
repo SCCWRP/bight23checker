@@ -89,12 +89,12 @@ def field_grab(all_dfs):
     print('# ------- LOGIC CHECKS ------- #')
     
     # Check - Each Grab record must have a corresponding stationoccupation record
-    tmp = occupation.merge(
-        grab.assign(present = 'yes'), 
-        left_on = ['stationid','occupationdate','samplingorganization'], 
-        right_on = ['stationid','sampledate','samplingorganization'], 
-        how = 'right',
-        suffixes = ('_occ','')
+    tmp = grab.merge(
+        occupation.assign(present = 'yes'), 
+        left_on = ['stationid','sampledate','samplingorganization'], 
+        right_on = ['stationid','occupationdate','samplingorganization'], 
+        how = 'left',
+        suffixes = ('', '_occ')
     )
     
     badrows = tmp[pd.isnull(tmp.present)].tmp_row.tolist()
