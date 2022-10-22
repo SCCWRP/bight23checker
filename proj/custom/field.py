@@ -16,6 +16,17 @@ import numpy as np
 
 def fieldchecks(occupation, eng, trawl = None, grab = None):
     
+    current_function_name = str(currentframe().f_code.co_name)
+    print("current_function_name")
+    print(current_function_name)
+
+    print("occupation")
+    print(occupation)
+    print("grab")
+    print(grab)
+    print("trawl")
+    print(trawl)
+    
     # define errors and warnings list
     # These will be returned from the function at the end
     errs = []
@@ -36,9 +47,12 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
 
 
     # ------- LOGIC CHECKS ------- #
-    # Check - Each Trawl record must have a corresponding stationoccupation record
+    print("# ------- LOGIC CHECKS ------- #")
+    
 
-    if trawl:
+    if trawl is not None:
+        # Check - Each Trawl record must have a corresponding stationoccupation record
+        print("# Check - Each Trawl record must have a corresponding stationoccupation record")
         tmp = trawl.merge(
             occupation.assign(present = 'yes'), 
             left_on = ['stationid','sampledate','samplingorganization'], 
@@ -48,20 +62,21 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         )
         badrows = tmp[pd.isnull(tmp.present)].tmp_row.tolist()
         trawl_args.update({
-        "badrows": badrows,
-        "badcolumn": "StationID,SampleDate,SamplingOrganization",
-        "error_type" : "Logic Error",
-        "error_message" : "Each Trawl record must have a corresponding Occupation record. Records are matched on StationID, SampleDate, and SamplingOrganization."
+            "badrows": badrows,
+            "badcolumn": "StationID,SampleDate,SamplingOrganization",
+            "error_type" : "Logic Error",
+            "error_message" : "Each Trawl record must have a corresponding Occupation record. Records are matched on StationID, SampleDate, and SamplingOrganization."
         })
         errs = [*errs, checkData(**trawl_args)]
     
-    if grab:
+    if grab is not None:
         # Check - Each Grab record must have a corresponding stationoccupation record
+        print("# Check - Each Grab record must have a corresponding stationoccupation record")
         tmp = grab.merge(
             occupation.assign(present = 'yes'), 
             left_on = ['stationid','sampledate','samplingorganization'], 
             right_on = ['stationid','occupationdate','samplingorganization'], 
-            how = 'right',
+            how = 'left',
             suffixes = ('','_occ')
         )
         badrows = tmp[pd.isnull(tmp.present)].tmp_row.tolist()
@@ -76,6 +91,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         del badrows
 
 
+    print("# Check the time formats on all time columns")
     # Check the time formats on all time columns
     def checkTime(df, col, args, time_format = re.compile(r'([0-9]{1,2}):[0-5][0-9]:[0-5][0-9]'), custom_errmsg = None):
         """default to checking the 24 hour clock time"""
@@ -88,21 +104,24 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         })
         return checkData(**args)
     
+    print("# Grab and trawl may possibly be NoneTypes")
     # Grab and trawl may possibly be NoneTypes
     errs = [
         *errs, 
         checkTime(occupation, 'OccupationTime', occupation_args),
-        checkTime(trawl, 'OverTime', trawl_args) if trawl else {} ,
-        checkTime(trawl, 'StartTime', trawl_args) if trawl else {},
-        checkTime(trawl, 'EndTime', trawl_args) if trawl else {},
-        checkTime(trawl, 'DeckTime', trawl_args) if trawl else {},
-        checkTime(trawl, 'OnBottomTime', trawl_args) if trawl else {},
-        checkTime(grab, 'SampleTime', grab_args) if grab else {}
+        checkTime(trawl, 'OverTime', trawl_args) if trawl is not None else {} ,
+        checkTime(trawl, 'StartTime', trawl_args) if trawl is not None else {},
+        checkTime(trawl, 'EndTime', trawl_args) if trawl is not None else {},
+        checkTime(trawl, 'DeckTime', trawl_args) if trawl is not None else {},
+        checkTime(trawl, 'OnBottomTime', trawl_args) if trawl is not None else {},
+        checkTime(grab, 'SampleTime', grab_args) if grab is not None else {}
     ]
     # ------- END LOGIC CHECKS ------- #
 
 
+    print("# ------- Occupation Checks ------- #")
     # ------- Occupation Checks ------- #
+    
     ## Kristin - StationOccupation/Trawl/Grab check DepthUnits field make sure nobody has entered feet instead of meters
 	## (this is an error not a warning). Generic lookup list allows it, but Dario doesnt want users to be able to enter feet. 
     # Depth units should be in meters, not feet
@@ -115,7 +134,8 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     })
     errs = [*errs, checkData(**occupation_args)]
 
-    if trawl:
+    if trawl is not None:
+        print("# Depth units should be in meters, not feet")
         # Depth units should be in meters, not feet
         badrows = (trawl[['depthunits','tmp_row']].where(trawl['depthunits'].isin(['ft','f'])).dropna()).tmp_row.tolist()
         trawl_args.update({
@@ -126,7 +146,8 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         })
         errs = [*errs, checkData(**trawl_args)]
     
-    if grab:
+    if grab is not None:
+        print("# Depth units should be in meters, not feet")
         # Depth units should be in meters, not feet
         badrows = (grab[['stationwaterdepthunits','tmp_row']].where(grab['stationwaterdepthunits'].isin(['ft','f'])).dropna()).tmp_row.tolist()
         grab_args.update({
@@ -138,6 +159,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         errs = [*errs, checkData(**grab_args)]
 
 
+    print("# Comment required if the station was abandoned")
     # Comment required if the station was abandoned
     badrows = occupation[['abandoned', 'comments','tmp_row']].where(occupation['abandoned'].isin(['Yes'])).dropna(axis = 0, how = 'all').loc[pd.isnull(occupation['comments'])].tmp_row.tolist()
     occupation_args.update({
@@ -148,7 +170,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     })
     errs = [*errs, checkData(**occupation_args)]
 
-    # Comment required for certain stationfail values
+    print("# Comment required for certain stationfail values")
     lu_sf = pd.read_sql("select stationfail from lu_stationfails where commentrequired = 'Yes'", eng)
     stationfail_matches = pd.merge(occupation[['stationfail','comments','tmp_row']],lu_sf, on=['stationfail'], how='inner') 
     stationfail_matches['comments'].replace('', pd.NA, inplace=True)
@@ -163,8 +185,8 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     errs = [*errs, checkData(**occupation_args)]
 
 
-    # Make sure agency was assigned to that station for the corresponding collection type - Grab or Trawl
-    # There should only be one sampling organization per submission - this is just a warning
+    print("# Make sure agency was assigned to that station for the corresponding collection type - Grab or Trawl")
+    print("# There should only be one sampling organization per submission - this is just a warning")
     sampling_organization = occupation.samplingorganization.unique() 
     if len(sampling_organization) > 1:
         occupation_args.update({
@@ -198,12 +220,12 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     else: 
         raise Exception("No sampling organization detected")
 
-    # Check StationOccupation/Salinity - if the station is an Estuary or Brackish Estuary then the salinity is required
+    print("# Check StationOccupation/Salinity - if the station is an Estuary or Brackish Estuary then the salinity is required")
     estuaries = pd.read_sql("SELECT stationid, stratum FROM field_assignment_table WHERE stratum IN ('Estuaries', 'Brackish Estuaries');", eng)
 
-    # Only run if they submitted data for estuaries
+    print("# Only run if they submitted data for estuaries")
     if len((occupation[(occupation.stationid.isin(estuaries.stationid))]))!=0 :
-        # for matching stationids, make sure Estuary and Brackish Estuary salinity has a value
+        print("# for matching stationids, make sure Estuary and Brackish Estuary salinity has a value")
         print('## Make sure Estuary and Brackish Estuary salinity value is non-empty ##')
         strats = pd.merge(occupation[['stationid','salinity','tmp_row']],estuaries, how = 'left', on='stationid')
         occupation_args.update({
@@ -216,8 +238,8 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
 
 
 
-    # Jordan - Station Occupation Latitude/Longitude should be no more than 100M from Field Assignment Table Target Latitude/Longitude otherwise warning
-    # Merges SO dataframe and FAT dataframe according to StationIDs
+    print("# Jordan - Station Occupation Latitude/Longitude should be no more than 100M from Field Assignment Table Target Latitude/Longitude otherwise warning")
+    print("# Merges SO dataframe and FAT dataframe according to StationIDs")
     so = occupation[['stationid','occupationlatitude','occupationlongitude','tmp_row']]
     fat = pd.read_sql("SELECT * FROM field_assignment_table", eng)
     sofat = pd.merge(so, fat, how = 'left', on ='stationid')
@@ -295,7 +317,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     ### END OCCUPATION CHECKS ###
     
     
-    if trawl:
+    if trawl is not None:
         # ------- Trawl Checks ------- #
         # Eric Hermoso - (TrawlOverDistance) - Distance from net start (Trawl/OverLat/OverLon) to end (Trawl/StartLat/StartLon) in meters.
         print('New calculated field (TrawlOverDistance) - Distance from net start (Trawl/OverLat/OverLon) to end (Trawl/StartLat/StartLon) in meters.')
@@ -536,7 +558,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
 
     # ------- END Trawl Checks ------- #
 
-    if grab:
+    if grab is not None:
         # ------- Grab Checks ------- #
         print("Starting Grab Checks")
         ## jordan golemo - New calculated field (GrabDistanceToNominalTarget) . Look at Field Assignment Table target latitude/longitude. How are far off is Grab/Lat/Lon to target.
