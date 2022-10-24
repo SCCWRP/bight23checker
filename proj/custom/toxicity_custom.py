@@ -385,7 +385,8 @@ def toxicity(all_dfs):
             "error_type": "Logic Error",
             "error_message": "You have entered a SampleCollectDate that comes after the corresponding TestStartDate specified in the batch tab"
         })
-        errs = [*errs, checkData(**toxresults_args)] 
+        # errs = [*errs, checkData(**toxresults_args)] 
+        warnings.append(checkData(**toxresults_args))
         
         toxresults_args.update({
             "badrows": df28[(df28['sampletypecode'] == 'RFNH3') & (df28['checkdate'].dt.days != 0)].tmp_row.tolist(),
@@ -393,7 +394,8 @@ def toxicity(all_dfs):
             "error_type": "Logic Error",
             "error_message": "For Reference Toxicant batches, the samplecollectdate (In results tab) must be the same as the teststartdate (In the batch tab)"
         })
-        errs = [*errs, checkData(**toxresults_args)] 
+        # errs = [*errs, checkData(**toxresults_args)] 
+        warnings.append(checkData(**toxresults_args))
 
 
 
@@ -648,7 +650,8 @@ def toxicity(all_dfs):
                 result_both = result_both.dropna()
                 t, p = stats.ttest_ind(cneg_result, result_both, equal_var = False)
                 print("pvalue t: %s, p: %s" % (t,p))
-                summary.loc[index, 'tstat'] = t
+                
+                summary.loc[index, 'tstat'] = 100 if str(t).lower() == 'inf' else t
                 single_tail = p/2
                 #summary.loc[index, 'pvalue'] = p/2 #we divide by 2 to make it a 1 tailed
                 summary.loc[index, 'pvalue'] = single_tail #we divide by 2 to make it a 1 tailed
@@ -718,6 +721,7 @@ def toxicity(all_dfs):
         toxsummary.rename(columns={"resultunits": "units"}, inplace=True)
         # set p and tstat values if they are empty to -88
         toxsummary['tstat'].fillna(-88,inplace=True)
+        toxsummary = toxsummary.replace(np.inf, 1000)
         toxsummary['pvalue'].fillna(-88,inplace=True)
 
         # get summary dataframe with error columns before it is replaced - bug fix number 37 below for duplicate summary rows
