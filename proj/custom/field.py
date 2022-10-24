@@ -232,13 +232,14 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     print("# There should only be one sampling organization per submission - this is just a warning")
     sampling_organizations = occupation.samplingorganization.unique() 
     if len(sampling_organizations) >= 1:
-        occupation_args.update({
-            "badrows": occupation[occupation.samplingorganization == occupation.samplingorganization.min()].tmp_row.tolist(),
-            "badcolumn": 'SamplingOrganization',
-            "error_type" : "Undefined Warning",
-            "error_message" : "More than one agency detected"
-        })
-        warnings = [*warnings, checkData(**occupation_args)]
+        if len(sampling_organizations) > 1:
+            occupation_args.update({
+                "badrows": occupation[occupation.samplingorganization == occupation.samplingorganization.min()].tmp_row.tolist(),
+                "badcolumn": 'SamplingOrganization',
+                "error_type" : "Undefined Warning",
+                "error_message" : "More than one agency detected"
+            })
+            warnings = [*warnings, checkData(**occupation_args)]
         
         for organization in sampling_organizations:
             trawlstations = pd.read_sql(f"SELECT DISTINCT stationid FROM field_assignment_table WHERE trawlagency = '{organization}'", eng).stationid.tolist()
