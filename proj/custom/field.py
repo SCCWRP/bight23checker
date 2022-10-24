@@ -49,46 +49,89 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     # ------- LOGIC CHECKS ------- #
     print("# ------- LOGIC CHECKS ------- #")
     
+    # If its a field grab submission, there should be only grab collectiontype records.
+    if trawl is None:
+        occupation_args.update({
+            "badrows": occupation[occupation.collectiontype != 'Grab'].index.tolist(),
+            "badcolumn": "CollectionType",
+            "error_type" : "Logic Error",
+            "error_message" : "This is a Field Occupation/Grab submission, but there are records that do not have a collection type of 'Grab'"
+        })
+        errs.append(checkData(**occupation_args))
+    
+    # If its a field trawl submission, there should be only trawl collectiontype records.
+    if grab is None:
+        occupation_args.update({
+            "badrows": occupation[~occupation.collectiontype.isin(['Trawl 5 Minutes', 'Trawl 10 Minutes'])].index.tolist(),
+            "badcolumn": "CollectionType",
+            "error_type" : "Logic Error",
+            "error_message" : "This is a Field Occupation/Trawl submission, but there are records that do not have a collection type of 'Trawl 5 Minutes' or 'Trawl 10 Minutes'"
+        })
+        errs.append(checkData(**occupation_args))
+
 
     if trawl is not None:
         # Check - Each Trawl record must have a corresponding stationoccupation record
-        print("# Check - Each Trawl record must have a corresponding stationoccupation record")
-        tmp = trawl.merge(
-            occupation.assign(present = 'yes'), 
-            left_on = ['stationid','sampledate','samplingorganization'], 
-            right_on = ['stationid','occupationdate','samplingorganization'], 
-            how = 'left',
-            suffixes = ('','_occ')
-        )
-        badrows = tmp[pd.isnull(tmp.present)].tmp_row.tolist()
-        trawl_args.update({
-            "badrows": badrows,
-            "badcolumn": "StationID,SampleDate,SamplingOrganization",
-            "error_type" : "Logic Error",
-            "error_message" : "Each Trawl record must have a corresponding Occupation record. Records are matched on StationID, SampleDate, and SamplingOrganization."
-        })
-        errs = [*errs, checkData(**trawl_args)]
+        print("# Check - Each Trawl record must have a corresponding stationoccupation record") 
+        print("with collection type 'Trawl 5 Minutes' or 'Trawl 10 Minutes'")
+        tmpocc = occupation[occupation.collectiontype.isin(['Trawl 5 Minutes', 'Trawl 10 Minutes'])].assign(present = 'yes')
+        if not tmpocc.empty:
+            tmp = trawl.merge(
+                tmpocc, 
+                left_on = ['stationid','sampledate','samplingorganization'], 
+                right_on = ['stationid','occupationdate','samplingorganization'], 
+                how = 'left',
+                suffixes = ('','_occ')
+            )
+            badrows = tmp[pd.isnull(tmp.present)].tmp_row.tolist()
+            trawl_args.update({
+                "badrows": badrows,
+                "badcolumn": "StationID,SampleDate,SamplingOrganization",
+                "error_type" : "Logic Error",
+                "error_message" : "Each Trawl record must have a corresponding Occupation record (with a Trawl collectiontype). Records are matched on StationID, SampleDate, and SamplingOrganization."
+            })
+            errs = [*errs, checkData(**trawl_args)]
+        else:
+            occupation_args.update({
+                "badrows": occupation.index.tolist(),
+                "badcolumn": "CollectionType",
+                "error_type" : "Logic Error",
+                "error_message" : "There are no records with a collectiontype of 'Trawl 5/10 Minutes' although this is a Field Trawl submission"
+            })
+            errs.append(checkData(**occupation_args))
     
     if grab is not None:
         # Check - Each Grab record must have a corresponding stationoccupation record
         print("# Check - Each Grab record must have a corresponding stationoccupation record")
-        tmp = grab.merge(
-            occupation.assign(present = 'yes'), 
-            left_on = ['stationid','sampledate','samplingorganization'], 
-            right_on = ['stationid','occupationdate','samplingorganization'], 
-            how = 'left',
-            suffixes = ('','_occ')
-        )
-        badrows = tmp[pd.isnull(tmp.present)].tmp_row.tolist()
-        grab_args.update({
-        "badrows": badrows,
-        "badcolumn": "StationID,SampleDate,SamplingOrganization",
-        "error_type" : "Logic Error",
-        "error_message" : "Each Grab record must have a corresponding Occupation record. Records are matched on StationID, SampleDate, and SamplingOrganization."
-        })
-        errs = [*errs, checkData(**grab_args)]
-        del tmp
-        del badrows
+        print("with collection type Grab")
+        tmpocc = occupation[occupation.collectiontype == 'Grab'].assign(present = 'yes')
+        if not tmpocc.empty:
+            tmp = grab.merge(
+                tmpocc, 
+                left_on = ['stationid','sampledate','samplingorganization'], 
+                right_on = ['stationid','occupationdate','samplingorganization'], 
+                how = 'left',
+                suffixes = ('','_occ')
+            )
+            badrows = tmp[pd.isnull(tmp.present)].tmp_row.tolist()
+            grab_args.update({
+                "badrows": badrows,
+                "badcolumn": "StationID,SampleDate,SamplingOrganization",
+                "error_type" : "Logic Error",
+                "error_message" : "Each Grab record must have a corresponding Occupation record (with a Grab collectiontype). Records are matched on StationID, SampleDate, and SamplingOrganization."
+            })
+            errs = [*errs, checkData(**grab_args)]
+            del tmp
+            del badrows
+        else:
+            occupation_args.update({
+                "badrows": occupation.index.tolist(),
+                "badcolumn": "CollectionType",
+                "error_type" : "Logic Error",
+                "error_message" : "There are no records with a collectiontype of 'Grab' although this is a Field Grab submission"
+            })
+            errs.append(checkData(**occupation_args))
+
 
 
     print("# Check the time formats on all time columns")
@@ -187,8 +230,8 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
 
     print("# Make sure agency was assigned to that station for the corresponding collection type - Grab or Trawl")
     print("# There should only be one sampling organization per submission - this is just a warning")
-    sampling_organization = occupation.samplingorganization.unique() 
-    if len(sampling_organization) > 1:
+    sampling_organizations = occupation.samplingorganization.unique() 
+    if len(sampling_organizations) >= 1:
         occupation_args.update({
             "badrows": occupation[occupation.samplingorganization == occupation.samplingorganization.min()].tmp_row.tolist(),
             "badcolumn": 'SamplingOrganization',
@@ -196,27 +239,27 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             "error_message" : "More than one agency detected"
         })
         warnings = [*warnings, checkData(**occupation_args)]
-    elif len(sampling_organization) == 1:
-        sampling_organization = sampling_organization[0]
-        trawlstations = pd.read_sql(f"SELECT DISTINCT stationid FROM field_assignment_table WHERE trawlagency = '{sampling_organization[0]}'", eng).stationid.tolist()
-        badrows = occupation[(occupation.collectiontype != 'Grab') & (~occupation.stationid.isin(trawlstations))].tmp_row.tolist()
-        occupation_args.update({
-            "badrows": badrows,
-            "badcolumn": 'StationID,SamplingOrganization',
-            "error_type" : "Undefined Warning",
-            "error_message" : f"The organization {sampling_organization} was not assigned to trawl at this station"
-        })
-        warnings = [*warnings, checkData(**occupation_args)]
         
-        grabstations = pd.read_sql(f"SELECT DISTINCT stationid FROM field_assignment_table WHERE grabagency = '{sampling_organization[0]}'", eng).stationid.tolist()
-        badrows = occupation[(occupation.collectiontype == 'Grab') & (~occupation.stationid.isin(grabstations))].tmp_row.tolist()
-        occupation_args.update({
-            "badrows": badrows,
-            "badcolumn": 'StationID,SamplingOrganization',
-            "error_type" : "Undefined Warning",
-            "error_message" : f"The organization {sampling_organization} was not assigned to grab at this station"
-        })
-        warnings = [*warnings, checkData(**occupation_args)]
+        for organization in sampling_organizations:
+            trawlstations = pd.read_sql(f"SELECT DISTINCT stationid FROM field_assignment_table WHERE trawlagency = '{organization}'", eng).stationid.tolist()
+            badrows = occupation[(occupation.collectiontype != 'Grab') & (~occupation.stationid.isin(trawlstations))].tmp_row.tolist()
+            occupation_args.update({
+                "badrows": badrows,
+                "badcolumn": 'StationID,SamplingOrganization',
+                "error_type" : "Undefined Warning",
+                "error_message" : f"The organization {organization} was not assigned to trawl at this station"
+            })
+            warnings = [*warnings, checkData(**occupation_args)]
+            
+            grabstations = pd.read_sql(f"SELECT DISTINCT stationid FROM field_assignment_table WHERE grabagency = '{organization}'", eng).stationid.tolist()
+            badrows = occupation[(occupation.collectiontype == 'Grab') & (~occupation.stationid.isin(grabstations))].tmp_row.tolist()
+            occupation_args.update({
+                "badrows": badrows,
+                "badcolumn": 'StationID,SamplingOrganization',
+                "error_type" : "Undefined Warning",
+                "error_message" : f"The organization {organization} was not assigned to grab at this station"
+            })
+            warnings = [*warnings, checkData(**occupation_args)]
     else: 
         raise Exception("No sampling organization detected")
 
@@ -399,8 +442,9 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         warnings = [*warnings, checkData(**trawl_args)]
 
         print("## Trawl end depth is greater than 10 percent of occupation depth ##")
+        badrows = [int(x) for x in merge_trawl_occupation.loc[(abs(merge_trawl_occupation['occupationdepth'] - merge_trawl_occupation['enddepth'])/merge_trawl_occupation['enddepth']*100) > 10 ].tmp_row.unique()]
         trawl_args.update({
-            "badrows": merge_trawl_occupation.loc[(abs(merge_trawl_occupation['occupationdepth'] - merge_trawl_occupation['enddepth'])/merge_trawl_occupation['enddepth']*100) > 10 ].tmp_row.tolist(),
+            "badrows": badrows,
             "badcolumn": "EndDepth",
             "error_type": "Undefined Warning",
             "error_message" : 'Trawl end depth is greater than 10 percent of occupation depth.'
@@ -418,7 +462,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         print(trawl_occupation_time)
         trawl_args.update({
             "badrows": trawl_occupation_time.loc[(trawl_occupation_time['collectiontype']=='Trawl 10 Minutes')&(trawl_occupation_time['trawldistance']< 650)].tmp_row.tolist(),
-            "badcolumn": 'TrawlDistance',
+            "badcolumn": 'StartLatitude,StartLongitude,EndLatitude,EndLongitude',
             "error_type": "Undefined Warning",
             "error_message" : 'A 10 minute trawl should be greater than 650 m'
         })
@@ -426,26 +470,28 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         
         print("## CHECK 5 MINUTE TRAWL THE DISTANCE SHOULD BE GREATER THAN 325 METERS ##")
         trawl_args.update({
-            "badrows": trawl_occupation_time.loc[(trawl_occupation_time['collectiontype']==5)&(trawl_occupation_time['trawldistance'] < 325)].tmp_row.tolist(),
-            "badcolumn": 'TrawlDistance',
+            "badrows": trawl_occupation_time.loc[(trawl_occupation_time['collectiontype']=='Trawl 5 Minutes')&(trawl_occupation_time['trawldistance'] < 325)].tmp_row.tolist(),
+            "badcolumn": 'StartLatitude,StartLongitude,EndLatitude,EndLongitude',
             "error_type": "Undefined Warning",
             "error_message" : 'A 5 minute trawl should be greater than 325 m'
         })
         warnings = [*warnings, checkData(**trawl_args)]
         
         print("## CHECK 10 MINUTE TRAWL SHOULD NOT RUN LONGER THAN 16 MINUTES OR SHORTER THAN 8 ##")
+        badrows = [int(x) for x in trawl_occupation_time.loc[(trawl_occupation_time['collectiontype']=='Trawl 10 Minutes')&((trawl_occupation_time['trawltime'] < 8)|(trawl_occupation_time['trawltime'] > 16))].tmp_row.unique()]
         trawl_args.update({
-            "badrows": trawl_occupation_time.loc[(trawl_occupation_time['collectiontype']=='Trawl 10 Minutes')&((trawl_occupation_time['trawltime'] < 8)|(trawl_occupation_time['trawltime'] > 16))].tmp_row.tolist(),
-            "badcolumn": 'TrawlTime',
+            "badrows": badrows,
+            "badcolumn": 'StartTime,EndTime',
             "error_type": "Undefined Warning",
             "error_message" : 'A 10 minute trawl should be between 8 and 16 minutes'
         })
         warnings = [*warnings, checkData(**trawl_args)]
         
         print("## CHECK 5 MINUTE TRAWL SHOULD NOT RUN LONGER THAN 8 MINUTES OR SHORTER THAN 4 MINUTES ##")
+        badrows = [int(x) for x in trawl_occupation_time.loc[(trawl_occupation_time['collectiontype']=='Trawl 5 Minutes')&((trawl_occupation_time['trawltime'] < 4)|(trawl_occupation_time['trawltime']> 8))].tmp_row.unique()]
         trawl_args.update({
-            "badrows": trawl_occupation_time.loc[(trawl_occupation_time['collectiontype']=='Trawl 5 Minutes')&((trawl_occupation_time['trawltime'] < 4)&(trawl_occupation_time['trawltime']> 8))].tmp_row.tolist(),
-            "badcolumn": 'TrawlTime',
+            "badrows": badrows,
+            "badcolumn": 'StartTime,EndTime',
             "error_type": "Undefined Warning",
             "error_message" : 'A 5 minute trawl should be between 4 and 8 minutes'
         })
