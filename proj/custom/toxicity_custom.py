@@ -728,7 +728,7 @@ def toxicity(all_dfs):
         toxsummary = toxsummary.drop_duplicates(subset = ['stationid','toxbatch','fieldreplicate','pvalue'],keep='first')
         toxsummary.reset_index(inplace = True, drop = True)
         toxsummary.drop('tmp_row', axis = 1, inplace = True)
-        analysis_table_cols = pd.read_sql(f"""SELECT column_name FROM information_schema.columns WHERE table_name = '{current_app.config.get("TOXSUMMARY_TABLENAME")}';""", eng)
+        
 
         
 
@@ -790,11 +790,37 @@ def toxicity(all_dfs):
 
         # Drop the columns that are in the dataframe, but not in the database table
         #toxsummary.drop(list(set(toxsummary.columns) - set(analysis_table_cols)), axis = 1, inplace = True)
+
+        fielddata = pd.read_sql(
+            """
+                SELECT 
+                    tbl_stationoccupation.stationid,
+                    tbl_stationoccupation.occupationlatitude as latitude,
+                    tbl_stationoccupation.occupationlongitude as longitude,tbl_stationoccupation.occupationdepth as stationwaterdepth,
+                    tbl_stationoccupation.occupationdepthunits as stationwaterdepthunits,
+                    field_assignment_table.areaweight,
+                    field_assignment_table.stratum
+                FROM field_assignment_table 
+                    INNER JOIN tbl_stationoccupation 
+                    ON field_assignment_table.stationid = tbl_stationoccupation.stationid 
+                WHERE 
+                    tbl_stationoccupation.collectiontype = 'Grab' 
+                    AND tbl_stationoccupation.stationfail = 'None or No Failure'
+            """,
+            eng
+        )
+
+        toxsummary = toxsummary.merge(fielddata, how = 'left', on = 'stationid')
+
+        analysis_table_cols = pd.read_sql(f"""SELECT column_name FROM information_schema.columns WHERE table_name = '{current_app.config.get("TOXSUMMARY_TABLENAME")}';""", eng).column_name.tolist()
+        toxsummary.drop(
+            list(set(toxsummary.columns) - set(analysis_table_cols)),
+            axis = 'columns',
+            inplace = True
+        )
+
         print("toxsummary")
         print(toxsummary)
-
-
-
 
         # write tox summary to the submission excel file
         writer = pd.ExcelWriter(session.get('excel_path'), engine = 'openpyxl', mode = 'a')
@@ -819,5 +845,6 @@ def toxicity(all_dfs):
         #     print(f"column: {c}")
         #     print(toxsummary[c])
 
+        
 
     return {'errors': errs, 'warnings': warnings}
