@@ -265,6 +265,8 @@ def main():
     if errs == []: 
         print("Custom Checks")
         print(f"Datatype: {match_dataset}")
+        print(f"{match_dataset} function:")
+        print(eval(match_dataset))
 
         # custom output should be a dictionary where errors and warnings are the keys and the values are a list of "errors" 
         # (structured the same way as errors are as seen in core checks section)

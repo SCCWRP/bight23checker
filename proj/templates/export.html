@@ -1,0 +1,12 @@
+<html>
+<body>
+<h3>Export data tool for {{ agency }}:</h3>
+{# <a href="{{ url_for('data_query', export_file = export_file) }}" target="_blank">Click to download export</a>#}
+{# 
+    Decided to mess with it to get the export link working
+    It is working, but the dataframes are written to the excel file with the index column
+#}
+<a href="{{request.script_root}}/{{export_link}}" target="_blank">Click to download export</a>
+<h3>Submit downloaded file to checker: <a href="{{request.script_root}}" target="_blank">Data checker</a></h3>
+</body>
+</html>
