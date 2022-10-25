@@ -49,8 +49,8 @@ def template_file():
         # add another folder within /export folder for returning data to user (either in browser or via excel file)
         # probably better to not store all these queries in an excel file for storage purposes - use timestamp if this is an issue
         # name after agency and table for now
-        export_file = os.path.join(os.getcwd(), "export", "data_query", f'{agencycode}-export.xlsx')
-        export_link = f'/export?filename={agencycode}-export.xlsx'
+        export_name = f'{agencycode}-export.xlsx'
+        export_file = os.path.join(os.getcwd(), "export", "data_query", export_name)
         export_writer = pd.ExcelWriter(export_file, engine='xlsxwriter')
         eng = g.eng
 
@@ -80,7 +80,7 @@ def template_file():
 	                                stationdepth as occupationdepth,
                                     stationdepthunits as occupationdepthunits,
 	                                occupationlat as occupationlatitude, 
-	                                occupationlon as occupationolongitude,
+	                                occupationlon as occupationlongitude,
 	                                datum as occupationdatum,
 	                                stationcomments as comments
                                 FROM mobile_occupation_trawl
@@ -201,18 +201,18 @@ def template_file():
             else jsonify(message = "file not found")
     
     with export_writer:
-        occupation_df.to_excel(export_writer, sheet_name = "occupation")
-        trawl_df.to_excel(export_writer, sheet_name = "trawl")
-        grab_df.to_excel(export_writer, sheet_name = "grab")
+        occupation_df.to_excel(export_writer, sheet_name = "occupation", index = False)
+        trawl_df.to_excel(export_writer, sheet_name = "trawl", index = False)
+        grab_df.to_excel(export_writer, sheet_name = "grab", index = False)
     
 
-    return render_template('export.html', export_file=export_file, export_link=export_link, agency=agency)
+    return render_template('export.html', export_name=export_name, agency=agency)
 
-# Nick L - didn't quite get this working yet
+
 # idea is to serve export.html above, then have this route serve the exported file
-# @download.route('/export/data_query/<export_file>', methods = ['GET','POST'])
-# def data_query(export_file):
-#     return send_from_directory('export/data_query', export_file)
+@download.route('/export/data_query/<export_name>', methods = ['GET','POST'])
+def data_query(export_name):
+    return send_from_directory(os.path.join(os.getcwd(), "export", "data_query"), export_name, as_attachment=True)
 
 
 # def template_file():
