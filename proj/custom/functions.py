@@ -9,7 +9,6 @@ def checkData(tablename, badrows, badcolumn, error_type, error_message = "Error"
     # See comments on the get_badrows function
     # doesnt have to be used but it makes it more convenient to plug in a check
     # that function can be used to get the badrows argument that would be used in this function
-    
     if len(badrows) > 0:
         if q is not None:
             # This is the case where we run with multiprocessing

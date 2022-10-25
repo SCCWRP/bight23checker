@@ -112,14 +112,14 @@ def fish(all_dfs):
     badrows = trawlfishabundance[
         trawlfishabundance.anomaly.apply(
             lambda x: 
-            not set([substring.strip() for substring in x.split(',')]).issubset(set(pd.read_sql("SELECT DISTINCT anomaly FROM lu_fishanomalies", eng).anomaly.tolist()))
+            not set([substring.strip() for substring in str(x).split(',')]).issubset(set(pd.read_sql("SELECT DISTINCT anomaly FROM lu_fishanomalies", eng).anomaly.tolist()))
         )
     ].index.tolist()
     trawlfishabundance_args.update({
         "badrows": badrows,
         "badcolumn": "Anomaly",
         "error_type": "Lookup Error",
-        "error_message": f"You are required to enter at least one <a href=/{current_app.script_root}/scraper?action=help&layer=lu_fishanomalies target=_blank>fish anomaly</a>. If entering multiple anomalies, they must be separated by commas."
+        "error_message": f"You are required to enter at least one fish anomaly, and they must all be found in the <a href=/{current_app.script_root}/scraper?action=help&layer=lu_fishanomalies target=_blank>lookup list</a>. If entering multiple anomalies, they must be separated by commas."
     })
     errs = [*errs, checkData(**trawlfishabundance_args)]
     
@@ -129,23 +129,30 @@ def fish(all_dfs):
     badrows = trawlfishabundance[
         trawlfishabundance.abundancequalifier.apply(
             lambda x: 
-            not set([substring.strip() for substring in x.split(',')]).issubset(set(pd.read_sql("SELECT DISTINCT qualifier FROM lu_trawlqualifier", eng).qualifier.tolist()))
+            not set([substring.strip() for substring in str(x).split(',')]).issubset(set(pd.read_sql("SELECT DISTINCT qualifier FROM lu_trawlqualifier", eng).qualifier.tolist()))
         )
     ].index.tolist()
     trawlfishabundance_args.update({
         "badrows": badrows,
-        "badcolumn": "Qualifier",
+        "badcolumn": "AbundanceQualifier",
         "error_type": "Lookup Error",
-        "error_message": f"You are required to enter at least one <a href=/{current_app.script_root}/scraper?action=help&layer=lu_trawlqualifier target=_blank>qualifier code</a>. If entering multiple anomalies, they must be separated by commas."
+        "error_message": f"You are required to enter at least one qualifier code, and they must all be found in the <a href=/{current_app.script_root}/scraper?action=help&layer=lu_trawlqualifier target=_blank>lookup list</a>. If entering multiple qualifiers, they must be separated by commas."
     })
     errs = [*errs, checkData(**trawlfishabundance_args)]
 
     print("Fish Custom Checks")
-    print("Comment required for anomalies")
+    print("Comment required for anomalies Skeletal, Tumor or Lesion")
     badrows = trawlfishabundance[
         trawlfishabundance[['anomaly','comments']] \
             .replace(np.NaN,'').replace(pd.NA,'').apply(
-                lambda x: (str(x.anomaly) != 'None')&(str(x.comments) == ''), 
+                lambda x: 
+                ( 
+                    len(set([s.strip() for s in str(x.anomaly).split(',')]).intersection(set(['Deformity (Skeletal)','Tumor','Lesion']))) > 0
+                )
+                &
+                (
+                    str(x.comments) == ''
+                ), 
                 axis=1
             )
         ] \
@@ -154,7 +161,7 @@ def fish(all_dfs):
         "badrows": badrows,
         "badcolumn": "Comments",
         "error_type": "Undefined Error",
-        "error_message": "A comment is required for records that have anomalies"
+        "error_message": "A comment is required for records that have anomalies 'Deformity (Skeletal)', 'Tumor', or 'Lesion'"
     })
     errs = [*errs, checkData(**trawlfishabundance_args)]
 
@@ -223,15 +230,20 @@ def fish(all_dfs):
         tam['inrange'] = tam.apply(lambda x: not ((max(x.startdepth,x.enddepth)<x.minimumdepth)|(min(x.startdepth,x.enddepth)>x.maximumdepth)), axis = 1)
         print("Done creating inrange column")
 
-        for i in range(len(tam)):
-            if tam['inrange'][i] == False:
-                trawlfishabundance_args.update({
-                    "badrows": tam.iloc[i].tmp_row.tolist(),
-                    "badcolumn": "FishSpecies",
-                    "error_type": "Undefined Warning",
-                    "error_message": '{} was caught in a depth range ({}m - {}m) that does not include the range it is typically found ({}m - {}m). Please verify the species is correct. Check <a href=/{}/scraper?action=help&layer=lu_fishspeciesdepthrange target=_blank>lu_fishspeciesdepthrange</a> for more information.'.format(tam.fishspecies[i],int(tam.startdepth[i]),int(tam.enddepth[i]),tam.minimumdepth[i],tam.maximumdepth[i],current_app.script_root)
-                })
-                warnings = [*warnings, checkData(**trawlfishabundance_args)]
+        print("tam")
+        print(tam)
+        for i in tam[tam.inrange == False].index.tolist():
+            # The way the check is written, is so that each species gets its own error message
+            # So badrows will always be an individual value in this case
+            # So it is an integer. Therefore we need to put it in a list so it can work with the checkData function
+            badrows = [tam.iloc[i].tmp_row.tolist()]
+            trawlfishabundance_args.update({
+                "badrows": badrows,
+                "badcolumn": "FishSpecies",
+                "error_type": "Undefined Warning",
+                "error_message": '{} was caught in a depth range ({}m - {}m) that does not include the range it is typically found ({}m - {}m). Please verify the species is correct. Check <a href=/{}/scraper?action=help&layer=lu_fishspeciesdepthrange target=_blank>lu_fishspeciesdepthrange</a> for more information.'.format(tam.fishspecies[i],int(tam.startdepth[i]),int(tam.enddepth[i]),tam.minimumdepth[i],tam.maximumdepth[i],current_app.script_root)
+            })
+            warnings = [*warnings, checkData(**trawlfishabundance_args)]
 
 
 
@@ -241,7 +253,7 @@ def fish(all_dfs):
     #    "Composite weight" should be only mismatch.  Error message - Orphan records for biomass vs abundance.
     # Its a problem if the record is in biomass but not abundance
     matchcols = ['stationid','sampledate','samplingorganization','fishspecies']
-    trawlfishabundance_args.update({
+    trawlfishbiomass_args.update({
         "badrows": mismatch(trawlfishbiomass, trawlfishabundance, matchcols),
         "badcolumn": ",".join(matchcols),
         "error_type": "Logic Error",
