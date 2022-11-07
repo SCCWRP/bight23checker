@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ report_title }}</title>
+</head>
+<body>
+<h1>{{ report_title }}</h1>
+{% for table in tables %}
+            {{ table|safe }}
+{% endfor %}
+</body>
+</html>

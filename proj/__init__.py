@@ -9,6 +9,7 @@ from .main import upload
 from .login import homepage
 from .load import finalsubmit
 from .download import download
+from .report import report_bp
 from .scraper import scraper
 from .templater import templater # for dynamic lookup lists called into template before output to user
 
@@ -147,4 +148,4 @@ app.register_blueprint(finalsubmit)
 app.register_blueprint(download)
 app.register_blueprint(scraper)
 app.register_blueprint(templater)
-
+app.register_blueprint(report_bp)
