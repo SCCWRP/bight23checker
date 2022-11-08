@@ -7,12 +7,16 @@
 
 from inspect import currentframe
 from flask import current_app, g
-from .functions import checkData, haversine_np, check_distance, check_time
+from .functions import checkData, haversine_np, check_distance, check_time, check_strata_grab, check_strata_trawl
 import pandas as pd
 import re
 from shapely.geometry import Point, LineString
 import numpy as np
-
+from arcgis.gis import GIS
+from arcgis.features import GeoAccessor, GeoSeriesAccessor
+from arcgis.geometry.filters import within, contains
+from arcgis.geometry import lengths, areas_and_lengths, project
+import os
 
 def fieldchecks(occupation, eng, trawl = None, grab = None):
     
@@ -45,6 +49,22 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     trawl_args      = {**args, **{"dataframe": trawl,      "tablename": 'tbl_trawlevent'        } }
     grab_args       = {**args, **{"dataframe": grab,       "tablename": 'tbl_grabevent'         } }
 
+    # Initiates the parts needed for strata check
+    gis = GIS(os.environ.get("ARCGIS_API_URL"),os.environ.get("ARCGIS_API_USERNAME"),os.environ.get("ARCGIS_API_PASSWORD"))
+    # Query Strata Bight 2018
+    strata = gis.content.get(os.environ.get("BIGHT18_STRATA_LAYER_ID")).layers[0].query().sdf
+
+    # Turn the dataframe strata into a dictionary so we can look it up later when we check if points are in polygon
+    strata_lookup = {}
+    for tup, subdf in strata.groupby(['region','stratum']):
+        # For some reasons, the stratum in stations_grab_final is Bay, but it's Bays in the strata layer
+        if tup[1] == 'Bay':
+            tup = (tup[0], 'Bays')
+        strata_lookup[(tup[0],tup[1])] = subdf['SHAPE'].iloc[0]
+    
+    eng = g.eng
+    
+    field_assignment_table = pd.read_sql("SELECT * FROM field_assignment_table", eng)
 
     # ------- LOGIC CHECKS ------- #
     print("# ------- LOGIC CHECKS ------- #")
@@ -603,6 +623,18 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         })
         errs = [*errs, checkData(**trawl_args)]
 
+        # Check if trawl stations are in strata
+        print("Check if trawl stations are in strata")
+        badrows = check_strata_trawl(trawl, strata_lookup, field_assignment_table)
+        trawl_args.update({
+            "badrows": badrows,
+            "badcolumn": 'startlatitude,startlongitude, endlatitude, endlongitude',
+            "error_type": "Location Error",
+            "error_message" : f'This station has lat, long outside of the bight strata'
+        })
+        errs = [*errs, checkData(**trawl_args)]
+
+
     # ------- END Trawl Checks ------- #
 
     if grab is not None:
@@ -701,8 +733,18 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         })
         errs = [*errs, checkData(**grab_args)]
         
-        
+        # Check if trawl stations are in strata
+        print("# Check if grab stations are in strata")
+        badrows = check_strata_grab(grab, strata_lookup, field_assignment_table)
+        grab_args.update({
+            "badrows": badrows,
+            "badcolumn": 'latitude,longitude',
+            "error_type": "Location Error",
+            "error_message" : f'This station has lat, long outside of the bight strata'
+        })
+        errs = [*errs, checkData(**grab_args)]
         print("end grab CHECKS")
+
         ## end grab CHECKS ##
 
 

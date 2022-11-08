@@ -3,6 +3,10 @@ from pandas import isnull, DataFrame, to_datetime, read_sql
 import math
 import numpy as np
 from inspect import currentframe
+from arcgis.geometry.filters import within, contains
+from arcgis.geometry import Point, Polyline, Polygon, Geometry
+from arcgis.geometry import lengths, areas_and_lengths, project
+import pandas as pd
 
 def checkData(tablename, badrows, badcolumn, error_type, error_message = "Error", is_core_error = False, errors_list = [], q = None, **kwargs):
     
@@ -148,3 +152,79 @@ def multivalue_lookup_check(df, field, listname, listfield, dbconnection, displa
     }
 
     return args
+
+
+def check_strata_grab(grab, strata_lookup, field_assignment_table):
+    # Get the columns stratum, region from stations_grab_final, merged on stationid.
+    # We need these columns to look up for the polygon the stations are supposed to be in
+    grab = pd.merge(
+        grab, 
+        field_assignment_table.filter(items=['stationid','stratum','region']), 
+        how='left', 
+        on=['stationid']
+    )
+    # Make the points based on long, lat columns of grab
+    grab['SHAPE'] = grab.apply(
+        lambda row: Point({                
+            "x" :  row['longitude'], 
+            "y" :  row['latitude'], 
+            "spatialReference" : {'latestWkid': 4326, 'wkid': 4326}
+        }),
+        axis=1
+    )
+
+    # Since the points that we made in coordinate system 4326, we need to convert them to 3857
+    grab['SHAPE'] = pd.Series(project(geometries=grab['SHAPE'].tolist(), in_sr=4326, out_sr=3857))
+
+    # Now we check if the points are in associated polygon or not. Assign True if they are in
+    grab['is_station_in_strata'] = grab.apply(
+        lambda row: strata_lookup.get((row['region'], row['stratum'])).contains(row['SHAPE'])
+        if strata_lookup.get((row['region'], row['stratum']), None) is not None
+        else
+        'cannot_find_lookup_strata',
+        axis=1
+    )
+
+    # Now we get the bad rows
+    badrows = grab.assign(tmp_row=grab.index).query("is_station_in_strata == False").tmp_row.tolist()
+    return badrows
+
+def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
+    # Get the columns stratum, region from stations_grab_final, merged on stationid.
+    # We need these columns to look up for the polygon the stations are supposed to be in
+    trawl = pd.merge(
+        trawl, 
+        field_assignment_table.filter(items=['stationid','stratum','region']), 
+        how='left', 
+        on=['stationid']
+    )
+
+    # Make the points based on long, lat columns of grab
+    trawl['SHAPE'] = trawl.apply(
+        lambda row: Polyline({                
+            "paths" : [
+                [
+                    [row['startlongitude'], row['startlatitude']], [row['endlongitude'], row['endlatitude']]
+                ]
+            ],
+            "spatialReference" : {"wkid" : 4326}
+        }),
+        axis=1
+    )
+
+    # Since the points that we made in coordinate system 4326, we need to convert them to 3857
+    trawl['SHAPE'] = pd.Series(project(geometries=trawl['SHAPE'].tolist(), in_sr=4326, out_sr=3857))
+
+    # Now we check if the points are in associated polygon or not. Assign True if they are in
+    trawl['is_station_in_strata'] = trawl.apply(
+        lambda row: strata_lookup.get((row['region'], row['stratum'])).contains(row['SHAPE'])
+        if strata_lookup.get((row['region'], row['stratum']), None) is not None
+        else
+        'cannot_find_lookup_strata',
+        axis=1
+    )
+
+    # Now we get the bad rows
+    badrows = trawl.assign(tmp_row=trawl.index).query("is_station_in_strata == False").tmp_row.tolist()
+    return badrows
+
