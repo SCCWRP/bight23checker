@@ -199,106 +199,7 @@ def invert(all_dfs):
     trawlinvertebratebiomass_args.update(tmpargs)
     errs = [*errs, checkData(**trawlinvertebratebiomass_args)]
 
-    # Jordan - Species - Check Southern California Association of Marine Invertebrate Taxonomists Edition 8 - Check species not found in this region or depth
-    print("Species - Check Southern California Association of Marine Invertebrate Taxonomists Edition 8 - Check species not found in this region or depth.")
-
-    print("1st. Get StartDepth and EndDepth for each unique StationID/SampleDate/SamplingOrganization record from tbl_trawlevent")
-    trawl_depths = eng.execute(
-        "SELECT stationid,sampledate,samplingorganization,trawlnumber,startdepth,enddepth FROM tbl_trawlevent;")
-    td = pd.DataFrame(trawl_depths.fetchall())
-    td.columns = trawl_depths.keys()
-    print(td)
-    # Get Invertebrate Species Depth Ranges
-    spcs_depth = eng.execute(
-        "select species AS invertspecies,depth,acceptablerange,resolution from lu_invertspeciesreplaceondepth;")
-    sd = pd.DataFrame(spcs_depth.fetchall()); sd.columns = spcs_depth.keys()
-    print(sd)
-
-    # Abundance: Merge Invertebrate Species and Trawl Depth Records on StationID/SampleDate/SamplingOrganization/TrawlNumber
-    tam = trawlinvertebrateabundance[
-        ['stationid', 'sampledate', 'samplingorganization','trawlnumber', 'invertspecies', 'tmp_row']
-    ]\
-        .merge(
-            sd,
-            on='invertspecies'
-        ).merge(
-            td,
-            on=['stationid', 'sampledate', 'samplingorganization', 'trawlnumber']
-        )
-    print(tam)
-
-    if not tam.empty:
-        # Abundance: Parse acceptablerange field to obtain lower and upper bounds for species depth
-        print("Abundance: Parse acceptablerange field to obtain lower and upper bounds for species depth")
-        tam['mindepth'] = tam.apply(lambda x: int(
-            re.search('.*?(?=-)', x.acceptablerange).group(0)), axis=1)
-        tam['maxdepth'] = tam.apply(lambda x: int(
-            re.search('(?<=-).*?(?= m)', x.acceptablerange).group(0)), axis=1)
-        # create boolean field 'inrange' that dictates whether a given species is found at the depth the trawl was completed
-        tam['inrange'] = tam.apply(
-            lambda x:
-            False
-            if (max(x.startdepth, x.enddepth) < x.mindepth) | (min(x.startdepth, x.enddepth) > x.maxdepth)
-            else True,
-            axis=1
-        )
-        # provide warning if species is not found in the trawls depth range
-        for i in range(len(tam)):
-            if tam['inrange'][i] == False:
-                badrows = tam.iloc[i].tmp_row.tolist()
-                trawlinvertebrateabundance_args = {
-                    "dataframe": trawlinvertebrateabundance,
-                    "tablename": 'tbl_trawlinvertebrateabundance',
-                    "badrows": badrows,
-                    "badcolumn": "invertspecies",
-                    "error_type": "Undefined Warning",
-                    "is_core_error": False,
-                    "error_message":
-                        '%s was caught in a depth range (%sm - %sm) that does not include the range it is typically found (%sm - %sm). Please verify the species is correct. Check <a href=/{}/scraper?action=help&layer=lu_invertspeciesreplaceondepth target=_blank>lu_invertspeciesreplaceondepth</a> for more information.' %(
-                            tam.invertspecies[i], int(tam.startdepth[i]), int(tam.enddepth[i]), tam.mindepth[i], tam.maxdepth[i], current_app.script_root)
-                }
-                warnings = [*warnings,checkData(**trawlinvertebrateabundance_args)]
-
-    # Biomass: Merge Invertebrate Species and Trawl Depth Records on StationID/SampleDate/SamplingOrganization/TrawlNumber
-    print("Biomass: Merge Invertebrate Species and Trawl Depth Records on StationID/SampleDate/SamplingOrganization/TrawlNumber")
-    tbm = trawlinvertebratebiomass[
-        ['stationid', 'sampledate', 'samplingorganization','trawlnumber', 'invertspecies', 'tmp_row']
-    ]\
-        .merge(
-            sd,
-            on='invertspecies'
-        ).merge(
-            td,
-            on=['stationid', 'sampledate', 'samplingorganization', 'trawlnumber']
-        )
-    print(tbm)
-    if not tbm.empty:
-        # Biomass: Parse acceptablerange field to obtain lower and upper bounds for species depth
-        tbm['mindepth'] = tbm.apply(lambda x: int(
-            re.search('.*?(?=-)', x.acceptablerange).group(0)), axis=1)
-        tbm['maxdepth'] = tbm.apply(lambda x: int(
-            re.search('(?<=-).*?(?= m)', x.acceptablerange).group(0)), axis=1)
-        # Biomass: create boolean field 'inrange' that dictates whether a given species is found at the depth the trawl was completed
-        # create boolean field 'inrange' that dictates whether a given species is found at the depth the trawl was completed
-        tbm['inrange'] = tbm.apply(lambda x: False if (max(x.startdepth, x.enddepth) < x.mindepth) | (
-            min(x.startdepth, x.enddepth) > x.maxdepth) else True, axis=1)
-        # provide warning if species is not found in the trawls depth range
-        for i in range(len(tbm)):
-            if tbm['inrange'][i] == False:
-                badrows = tbm.iloc[i].tmp_row.tolist()
-                print(badrows)
-                trawlinvertebratebiomass_args = {
-                    "dataframe": trawlinvertebratebiomass,
-                    "tablename": 'tbl_trawlinvertebratebiomass',
-                    "badrows": badrows,
-                    "badcolumn": "invertspecies",
-                    "error_type": "Undefined Warning",
-                    "is_core_error": False,
-                    "error_message":
-                        '%s was caught in a depth range (%sm - %sm) that does not include the range it is typically found (%sm - %sm). Please verify the species is correct. Check <a href=/%s/scraper?action=help&layer=lu_invertspeciesreplaceondepth target=_blank>lu_invertspeciesreplaceondepth</a> for more information.' % (
-                            tbm.invertspecies[i], int(tbm.startdepth[i]), int(tbm.enddepth[i]), tbm.mindepth[i], tbm.maxdepth[i], current_app.script_root)
-                }
-                warnings = [*warnings,checkData(**trawlinvertebratebiomass_args)]
+    
 
     # Jordan - Species - Check Southern California Association of Marine Invertebrate Taxonomists Edition 12 - Check old species name
     print("Species - Check Southern California Association of Marine Invertebrate Taxonomists Edition 12 - Check old species name")
@@ -500,6 +401,43 @@ def invert(all_dfs):
     #######################
     # BIOMASS ONLY CHECKS #
     #######################
+
+    # td = trawl depths - defined in beginning of abundance section
+    tbm = trawlinvertebratebiomass[
+        ['stationid', 'sampledate', 'samplingorganization', 'trawlnumber', 'invertspecies', 'tmp_row']
+    ]\
+        .merge(
+            depth_ranges, 
+            on='invertspecies'
+        ).merge(
+            td, 
+            on=['stationid', 'sampledate', 'samplingorganization', 'trawlnumber']
+        )
+
+    if not tbm.empty:
+        tbm['inrange'] = tbm.apply(
+            lambda x: 
+            False if (max(x.startdepth, x.enddepth) < x.mindepth) | (min(x.startdepth, x.enddepth) > x.maxdepth) else True, axis=1
+        )
+        badrecords = tbm[tbm.inrange == False]
+        
+        for i, row in badrecords.iterrows():
+            
+            trawlinvertebratebiomass_args = {
+                "dataframe": trawlinvertebratebiomass,
+                "tablename": 'tbl_trawlinvertebratebiomass',
+                "badrows": [row.tmp_row],
+                "badcolumn": "invertspecies",
+                "error_type": "Undefined Warning",
+                "is_core_error": False,
+                "error_message":
+                    '%s was caught in a depth range (%sm - %sm) that does not include the range it is typically found (%sm - %sm). Please verify the species is correct. Check <a href=/%s/scraper?action=help&layer=lu_invertspeciesdepthrange target=_blank>lu_invertspeciesdepthrange</a> for more information.' % (tam.invertspecies[i], int(tam.startdepth[i]), int(tam.enddepth[i]), tam.mindepth[i], tam.maxdepth[i], current_app.script_root)
+            }
+            warnings = [*warnings, checkData(**trawlinvertebratebiomass_args)]
+        print("done with for loop")
+
+
+
     print("# BIOMASS ONLY CHECKS #")
     print("Kristin - Check data to make sure minimum weight is not less than value of <0.1 kg")
     print(trawlinvertebratebiomass[trawlinvertebratebiomass.biomass == 0])
@@ -544,7 +482,6 @@ def invert(all_dfs):
     
     badrows = trawlinvertebratebiomass[
         (trawlinvertebratebiomass['biomass'] < .1) 
-        & ~(trawlinvertebratebiomass['biomassqualifier'].isin(['<']))
     ].index.tolist()
     
     trawlinvertebratebiomass_args = {
