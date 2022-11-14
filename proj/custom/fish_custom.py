@@ -122,6 +122,19 @@ def fish(all_dfs):
         "error_message": f"You are required to enter at least one fish anomaly, and they must all be found in the <a href=/{current_app.script_root}/scraper?action=help&layer=lu_fishanomalies target=_blank>lookup list</a>. If entering multiple anomalies, they must be separated by commas."
     })
     errs = [*errs, checkData(**trawlfishabundance_args)]
+
+    # Check species abundance totals and corresponding anomalies - warn if abundance for a fish with an anomaly is greater than one
+    print("# Check species abundance totals and corresponding anomalies - warn if abundance for a fish with an anomaly is greater than one")
+    badrows = trawlfishabundance[
+        (trawlfishabundance.anomaly != 'None') & (trawlfishabundance.abundance > 1)
+    ].index.tolist()
+    trawlfishabundance_args.update({
+        "badrows": badrows,
+        "badcolumn": "Abundance",
+        "error_type": "Undefined Warning",
+        "error_message": "There is an anomaly here, but the abundance is greater than 1. This is uncommon."
+    })
+    warnings.append(checkData(**trawlfishabundance_args))
     
     # 2. User is required to enter a QA Code, but multple anomalies are allowed to be entered
     print("Fish Custom Checks")
