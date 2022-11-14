@@ -7,6 +7,7 @@ from arcgis.geometry.filters import within, contains
 from arcgis.geometry import Point, Polyline, Polygon, Geometry
 from arcgis.geometry import lengths, areas_and_lengths, project
 import pandas as pd
+from flask import current_app
 
 def checkData(tablename, badrows, badcolumn, error_type, error_message = "Error", is_core_error = False, errors_list = [], q = None, **kwargs):
     
@@ -148,7 +149,7 @@ def multivalue_lookup_check(df, field, listname, listfield, dbconnection, displa
         "badrows": badrows,
         "badcolumn": displayfieldname,
         "error_type": "Lookup Error",
-        "error_message": f"One of the values here is not in the lookup list <a href=/scraper?action=help&layer={listname}>{listname}</a>"
+        "error_message": f"""One of the values here is not in the lookup list <a target = "_blank" href=/{current_app.script_root}/scraper?action=help&layer={listname}>{listname}</a>"""
     }
 
     return args
