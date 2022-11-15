@@ -386,16 +386,18 @@ def main():
 
 @upload.route('/map/<submissionid>/<datatype>')
 def getmap(submissionid, datatype):
-    datatype = str(datatype)
-    if datatype not in ('sav','bruv','fishseines','vegetation'):
-        return "Map not found"
+    print("ARCGIS API KEY")
+    print(os.environ.get("ARCGIS_API_KEY"))
+    ARCGIS_API_KEY = os.environ.get("ARCGIS_API_KEY")
+    # datatype = str(datatype)
+    # if datatype not in ('sav','bruv','fishseines','vegetation'):
+    #     return "Map not found"
 
-    map_path = os.path.join(os.getcwd(), "files", str(submissionid), f'{datatype}_map.html')
-    if os.path.exists(map_path):
-        html = open(map_path,'r').read()
-        return render_template(f'map_template.html', map=html)
-    else:
-        return "Map not found"
+    # map_path = os.path.join(os.getcwd(), "files", str(submissionid), f'{datatype}_map.html')
+    # if os.path.exists(map_path):
+    #     html = open(map_path,'r').read()
+    return render_template(f'map_template.html', ARCGIS_API_KEY=ARCGIS_API_KEY)
+
 
 
 

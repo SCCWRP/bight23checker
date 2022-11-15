@@ -233,9 +233,13 @@ const buildReport = (res) => {
         tabIDs = tabIDs
     )
 
-
+    console.log(document.getElementById("submission-type").innerText)
+    console.log(res.errs.length)
     // display the map if applicable
-    document.getElementById('visual-map').setAttribute('src',`/${script_root}/map/${res.submissionid}/${res.match_dataset}`)
+    if (document.getElementById("submission-type").innerText && res.errs.length > 0){
+        document.getElementById("map-report-header").classList.remove("hidden")
+        document.getElementById('visual-map').setAttribute('src',`/${script_root}/map/${res.submissionid}/${res.match_dataset}`)
+    }
 
 
 
