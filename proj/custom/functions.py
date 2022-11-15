@@ -187,8 +187,8 @@ def check_strata_grab(grab, strata_lookup, field_assignment_table):
     )
 
     # Now we get the bad rows
-    badrows = grab.assign(tmp_row=grab.index).query("is_station_in_strata == False").tmp_row.tolist()
-    return badrows
+    bad_df = grab.assign(tmp_row=grab.index).query("is_station_in_strata == False")
+    return bad_df
 
 def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
     # Get the columns stratum, region from stations_grab_final, merged on stationid.
@@ -226,6 +226,6 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
     )
 
     # Now we get the bad rows
-    badrows = trawl.assign(tmp_row=trawl.index).query("is_station_in_strata == False").tmp_row.tolist()
-    return badrows
+    bad_df = trawl.assign(tmp_row=trawl.index).query("is_station_in_strata == False")
+    return bad_df
 

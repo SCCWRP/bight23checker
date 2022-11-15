@@ -625,9 +625,9 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
 
         # Check if trawl stations are in strata
         print("Check if trawl stations are in strata")
-        badrows = check_strata_trawl(trawl, strata_lookup, field_assignment_table)
+        bad_df = check_strata_trawl(trawl, strata_lookup, field_assignment_table)
         trawl_args.update({
-            "badrows": badrows,
+            "badrows": bad_df.tmp_row.tolist(),
             "badcolumn": 'startlatitude,startlongitude, endlatitude, endlongitude',
             "error_type": "Location Error",
             "error_message" : f'This station has lat, long outside of the bight strata'
@@ -735,9 +735,9 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         
         # Check if trawl stations are in strata
         print("# Check if grab stations are in strata")
-        badrows = check_strata_grab(grab, strata_lookup, field_assignment_table)
+        bad_df = check_strata_grab(grab, strata_lookup, field_assignment_table)
         grab_args.update({
-            "badrows": badrows,
+            "badrows": bad_df.tmp_row.tolist(),
             "badcolumn": 'latitude,longitude',
             "error_type": "Location Error",
             "error_message" : f'This station has lat, long outside of the bight strata'
