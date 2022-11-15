@@ -233,8 +233,6 @@ const buildReport = (res) => {
         tabIDs = tabIDs
     )
 
-    console.log(document.getElementById("submission-type").innerText)
-    console.log(res.errs.length)
     // display the map if applicable
     if (document.getElementById("submission-type").innerText && res.errs.length > 0){
         document.getElementById("map-report-header").classList.remove("hidden")

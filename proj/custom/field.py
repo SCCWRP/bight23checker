@@ -626,6 +626,8 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         # Check if trawl stations are in strata
         print("Check if trawl stations are in strata")
         bad_df = check_strata_trawl(trawl, strata_lookup, field_assignment_table)
+        if len(bad_df) > 0:
+            current_app.bad_trawl_layer_id = '123456'
         trawl_args.update({
             "badrows": bad_df.tmp_row.tolist(),
             "badcolumn": 'startlatitude,startlongitude, endlatitude, endlongitude',
@@ -736,6 +738,10 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         # Check if trawl stations are in strata
         print("# Check if grab stations are in strata")
         bad_df = check_strata_grab(grab, strata_lookup, field_assignment_table)
+        
+        if len(bad_df) > 0:
+            current_app.bad_grab_layer_id = '7891011'
+        
         grab_args.update({
             "badrows": bad_df.tmp_row.tolist(),
             "badcolumn": 'latitude,longitude',

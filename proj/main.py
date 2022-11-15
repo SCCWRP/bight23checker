@@ -386,9 +386,14 @@ def main():
 
 @upload.route('/map/<submissionid>/<datatype>')
 def getmap(submissionid, datatype):
-    print("ARCGIS API KEY")
-    print(os.environ.get("ARCGIS_API_KEY"))
-    ARCGIS_API_KEY = os.environ.get("ARCGIS_API_KEY")
+    bad_trawl_layer_id = current_app.bad_trawl_layer_id if current_app.bad_trawl_layer_id is not None else None
+    bad_grab_layer_id = current_app.bad_grab_layer_id if current_app.bad_grab_layer_id is not None else None
+    
+    print("bad_trawl_layer_id")
+    print(bad_trawl_layer_id)
+    
+    print("bad_grab_layer_id")
+    print(bad_grab_layer_id)
     # datatype = str(datatype)
     # if datatype not in ('sav','bruv','fishseines','vegetation'):
     #     return "Map not found"
@@ -396,7 +401,7 @@ def getmap(submissionid, datatype):
     # map_path = os.path.join(os.getcwd(), "files", str(submissionid), f'{datatype}_map.html')
     # if os.path.exists(map_path):
     #     html = open(map_path,'r').read()
-    return render_template(f'map_template.html', ARCGIS_API_KEY=ARCGIS_API_KEY)
+    return render_template(f'map_template.html',bad_trawl_layer_id=bad_trawl_layer_id, bad_grab_layer_id=bad_grab_layer_id )
 
 
 
