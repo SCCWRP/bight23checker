@@ -8,6 +8,8 @@ from arcgis.geometry import Point, Polyline, Polygon, Geometry
 from arcgis.geometry import lengths, areas_and_lengths, project
 import pandas as pd
 from flask import current_app
+import json
+
 
 def checkData(tablename, badrows, badcolumn, error_type, error_message = "Error", is_core_error = False, errors_list = [], q = None, **kwargs):
     
@@ -43,35 +45,32 @@ def checkData(tablename, badrows, badcolumn, error_type, error_message = "Error"
 # checkLogic() returns indices of rows with logic errors
 def checkLogic(df1, df2, cols: list, error_type = "Logic Error", df1_name = "", df2_name = ""):
     ''' each record in df1 must have a corresponding record in df2'''
-    print(f"cols: {cols}")
-    print(f"df1 cols: {df1.columns.tolist()}")
-    print(set([x.lower() for x in cols]).issubset(set(df1.columns)))
-
-    print(f"df2 cols: {df2.columns.tolist()}")
+    print("checkLogic")
     assert \
     set([x.lower() for x in cols]).issubset(set(df1.columns)), \
     "({}) not in columns of {} ({})" \
     .format(
         ','.join([x.lower() for x in cols]), df1_name, ','.join(df1.columns)
     )
-    print("passed 1st assertion")
+
     assert \
     set([x.lower() for x in cols]).issubset(set(df2.columns)), \
     "({}) not in columns of {} ({})" \
     .format(
         ','.join([x.lower() for x in cols]), df2_name, ','.join(df2.columns)
     )
-    print("passed 2nd assertion")
-    # 'Kristin wrote this code in ancient times.'
-    # 'I still don't fully understand what it does.'
-    # all() returns whether all elements are true
-    print("before badrows")
-    badrows = df1[~df1[[x.lower() for x in cols]].isin(df2[[x.lower() for x in cols]].to_dict(orient='list')).all(axis=1)].index.tolist()
-    print(f"badrows: {badrows}")
-    print("after badrows")
-    #consider raising error if cols list is not str (see mp) --- ask robert though bc maybe nah
 
-    return(badrows)
+    # 'Kristin wrote this code in ancient times.'
+    badrows = df1[~df1[cols].isin(df2[cols].to_dict(orient='list')).all(axis=1)].index.tolist()
+
+    print("end checkLogic")
+
+    return {
+        "badrows": badrows,
+        "badcolumn": ','.join(cols),
+        "error_type": "Logic Error",
+        "error_message": f"""Each record in {df1_name} must have a matching record in {df2_name}. Records are matched on {','.join(cols)}"""
+    }
 
 def mismatch(df1, df2, mergecols):
     #dropping duplicates creates issue of marking incorrect rows
@@ -174,8 +173,10 @@ def check_strata_grab(grab, strata_lookup, field_assignment_table):
         axis=1
     )
 
-    # Since the points that we made in coordinate system 4326, we need to convert them to 3857
-    grab['SHAPE'] = pd.Series(project(geometries=grab['SHAPE'].tolist(), in_sr=4326, out_sr=3857))
+    # Assert if we are not able to find the lookup strata
+    # Strata lookup dictionary has (region, stratum) as keys, so if the region + stratum combination is not in the lookup list, we cannot match
+    not_in_field_assignment_table = [(x,y) for x,y in zip(grab['region'], grab['stratum']) if (x,y) not in strata_lookup.keys()]
+    assert len(not_in_field_assignment_table) == 0, f"{','.join(not_in_field_assignment_table)} these combos are not in the field_assignment_table" 
 
     # Now we check if the points are in associated polygon or not. Assign True if they are in
     grab['is_station_in_strata'] = grab.apply(
@@ -212,9 +213,11 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
         }),
         axis=1
     )
-
-    # Since the points that we made in coordinate system 4326, we need to convert them to 3857
-    trawl['SHAPE'] = pd.Series(project(geometries=trawl['SHAPE'].tolist(), in_sr=4326, out_sr=3857))
+    
+    # Assert if we are not able to find the lookup strata
+    # Strata lookup dictionary has (region, stratum) as keys, so if the region + stratum combination is not in the lookup list, we cannot match
+    not_in_field_assignment_table = [(x,y) for x,y in zip(trawl['region'], trawl['stratum']) if (x,y) not in strata_lookup.keys()]
+    assert len(not_in_field_assignment_table) == 0, f"{','.join(not_in_field_assignment_table)} these combos are not in the field_assignment_table" 
 
     # Now we check if the points are in associated polygon or not. Assign True if they are in
     trawl['is_station_in_strata'] = trawl.apply(
@@ -229,3 +232,33 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
     bad_df = trawl.assign(tmp_row=trawl.index).query("is_station_in_strata == False")
     return bad_df
 
+def export_sdf_to_json(path, sdf):
+    """
+    Save a spatial dataframe (either point or polyline) to json in a format that ArcGIS API Javascript can understand
+
+    Parameters:
+    path             : Path to save the JSON
+    sdf              : input spatial dataframe
+
+    """
+
+    if "paths" in sdf['SHAPE'].iloc[0].keys():
+        data = [
+            {
+                "type":"polyline",
+                "paths" : item.get('paths')[0]
+            }
+            for item in sdf['SHAPE']
+        ]
+    else:
+        data = [
+            {
+                "type":"point",
+                "longitude": item["x"],
+                "latitude": item["y"]
+            }
+            for item in sdf.get("SHAPE").tolist()
+        ]
+    
+    with open(path, "w", encoding="utf-8") as geojson_file:
+       json.dump(data, geojson_file)

@@ -6,8 +6,8 @@
 #  This function can take 3 dataframes as arguments, with default on each set to none. But the occupation dataframe must be required.
 
 from inspect import currentframe
-from flask import current_app, g
-from .functions import checkData, haversine_np, check_distance, check_time, check_strata_grab, check_strata_trawl
+from flask import current_app, g, session
+from .functions import checkData, haversine_np, check_distance, check_time, check_strata_grab, check_strata_trawl, export_sdf_to_json
 import pandas as pd
 import re
 from shapely.geometry import Point, LineString
@@ -54,6 +54,9 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     # Query Strata Bight 2018
     strata = gis.content.get(os.environ.get("BIGHT18_STRATA_LAYER_ID")).layers[0].query().sdf
 
+    # Convert from spatial reference from 3857 to 4326
+    strata['SHAPE'] = pd.Series(project(geometries=strata['SHAPE'].tolist(), in_sr=3857, out_sr=4326))
+    
     # Turn the dataframe strata into a dictionary so we can look it up later when we check if points are in polygon
     strata_lookup = {}
     for tup, subdf in strata.groupby(['region','stratum']):
@@ -626,8 +629,10 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         # Check if trawl stations are in strata
         print("Check if trawl stations are in strata")
         bad_df = check_strata_trawl(trawl, strata_lookup, field_assignment_table)
+
         if len(bad_df) > 0:
-            current_app.bad_trawl_layer_id = '123456'
+            export_sdf_to_json(os.path.join(session['submission_dir'], "bad_trawl.json"), bad_df)
+        
         trawl_args.update({
             "badrows": bad_df.tmp_row.tolist(),
             "badcolumn": 'startlatitude,startlongitude, endlatitude, endlongitude',
@@ -738,10 +743,10 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         # Check if trawl stations are in strata
         print("# Check if grab stations are in strata")
         bad_df = check_strata_grab(grab, strata_lookup, field_assignment_table)
-        
+
         if len(bad_df) > 0:
-            current_app.bad_grab_layer_id = '7891011'
-        
+            export_sdf_to_json(os.path.join(session['submission_dir'], "bad_grab.json"), bad_df)
+
         grab_args.update({
             "badrows": bad_df.tmp_row.tolist(),
             "badcolumn": 'latitude,longitude',

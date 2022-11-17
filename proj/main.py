@@ -1,4 +1,4 @@
-from flask import render_template, request, jsonify, current_app, Blueprint, session, g
+from flask import render_template, request, jsonify, current_app, Blueprint, session, g, send_from_directory
 from werkzeug.utils import secure_filename
 from gc import collect
 import os
@@ -382,29 +382,6 @@ def main():
 
     print("DONE with upload routine, returning JSON to browser")
     return jsonify(**returnvals)
-
-
-@upload.route('/map/<submissionid>/<datatype>')
-def getmap(submissionid, datatype):
-    bad_trawl_layer_id = current_app.bad_trawl_layer_id if current_app.bad_trawl_layer_id is not None else None
-    bad_grab_layer_id = current_app.bad_grab_layer_id if current_app.bad_grab_layer_id is not None else None
-    
-    print("bad_trawl_layer_id")
-    print(bad_trawl_layer_id)
-    
-    print("bad_grab_layer_id")
-    print(bad_grab_layer_id)
-    # datatype = str(datatype)
-    # if datatype not in ('sav','bruv','fishseines','vegetation'):
-    #     return "Map not found"
-
-    # map_path = os.path.join(os.getcwd(), "files", str(submissionid), f'{datatype}_map.html')
-    # if os.path.exists(map_path):
-    #     html = open(map_path,'r').read()
-    return render_template(f'map_template.html',bad_trawl_layer_id=bad_trawl_layer_id, bad_grab_layer_id=bad_grab_layer_id )
-
-
-
 
 # When an exception happens when the browser is sending requests to the upload blueprint, this routine runs
 @upload.errorhandler(Exception)
