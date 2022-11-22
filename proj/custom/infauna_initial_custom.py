@@ -43,16 +43,15 @@ def infauna_initial(all_dfs):
     # SampleTime should be written as a string, not a time value. -Jordan 2/19/2019
     infaunalabundance_initial['sampletime'] = infaunalabundance_initial['sampletime'].astype(str)		
     # Jordan - Check that time values for each sheet are in the proper format (hh:mm:ss)
-    print('Check that SampleTime field is in proper format (e.g. hh:mm:ss)')
+    
     print('Check that SampleTime field is in proper format (e.g. hh:mm:ss)')
     time_format = re.compile('\d{2}:\d{2}:\d{2}')
     # occupation time field
+    
     print('Checking SampleTime format...')
-    print('Checking SampleTime format...')
+    badrows = infaunalabundance_initial[~infaunalabundance_initial.sampletime.str.match(time_format)].tmp_row.tolist()
     print(infaunalabundance_initial[~infaunalabundance_initial.sampletime.str.match(time_format)])
-    badrows = infaunalabundance_initial[
-        ~infaunalabundance_initial.sampletime.str.match(time_format)
-    ].tmp_row.tolist()
+    
     infaunalabundance_initial_args = {
         "dataframe": infaunalabundance_initial,
         "tablename": 'tbl_infaunalabundance_initial',
@@ -67,12 +66,11 @@ def infauna_initial(all_dfs):
 
     print("## LOGIC ##")
     print("Starting Infauna Logic Checks")
+    
     #1. Each infaunal abundance record must have a corresponding record in the Sediment Grab Event Table where BenthicInfauna = Yes. Tables matched on StationID and SampleDate.
     print("Each infaunal abundance record must have corresponding record in Sediment Grab Event Table where BenthicInfauna = Yes. Tables matched on StationID and SampleDate")
-    grab_event_sql = "SELECT stationid, sampledate, benthicinfauna FROM tbl_grabevent WHERE benthicinfauna = 'Yes' ;"
-    grab_infauna_records = eng.execute(grab_event_sql)
-    gdf = pd.DataFrame(grab_infauna_records.fetchall());
-    gdf.columns = grab_infauna_records.keys()
+    gdf = pd.read_sql("SELECT stationid, sampledate, benthicinfauna FROM tbl_grabevent WHERE benthicinfauna = 'Yes'", eng)
+    
     # checkLogic on records not found in tbl_grabevent (based on stationID and sampledate)
     print(infaunalabundance_initial[~((infaunalabundance_initial.stationid.isin(gdf.stationid.tolist()))&(infaunalabundance_initial.sampledate.isin(gdf.sampledate.tolist())))])
     badrows = infaunalabundance_initial[
@@ -98,6 +96,21 @@ def infauna_initial(all_dfs):
     print("Custom Check: If Taxon = NoOrganismsPresent, Then abundance should equal 0.")
     print("All records that do not pass this check:")
     print(infaunalabundance_initial[(infaunalabundance_initial.taxon == 'NoOrganismsPresent')&(infaunalabundance_initial.abundance != 0)])
+    badrows = infaunalabundance_initial[
+        (infaunalabundance_initial.taxon == 'NoOrganismsPresent')&(infaunalabundance_initial.abundance != 0)
+    ].tmp_row.tolist()
+    infaunalabundance_initial_args = {
+        "dataframe": infaunalabundance_initial,
+        "tablename": 'tbl_infaunalabundance_initial',
+        "badrows": badrows,
+        "badcolumn": "abundance",
+        "error_type": "Undefined Error",
+        "is_core_error": False,
+        "error_message": "If Taxon = NoOrganismsPresent, Then abundance should equal 0."
+    }
+    errs = [*errs, checkData(**infaunalabundance_initial_args)]    
+    
+    
     #checkData(infaunalabundance_initial[(infaunalabundance_initial.taxon == 'NoOrganismsPresent')&(infaunalabundance_initial.abundance != 0)].tmp_row.tolist(),'Abundance','Undefined Error','error','You recorded Taxon as NoOrganismsPresent. Abundance should equal 0.',infaunalabundance_initial)
     #2. Abundance cannot have -88, must be 1 or greater.
     print("Abundance cannot have -88, must be 1 or greater.")

@@ -163,7 +163,6 @@ def template():
             table.replace("tbl_", ""): pd.DataFrame(
                 columns=
                 [
-                    *['projectid'],
                     *[
                         x for x in pd.read_sql(
                             f"""
@@ -171,7 +170,7 @@ def template():
                             """,
                             eng
                         ).columns.to_list()
-                        if x not in system_fields and x != 'projectid'
+                        if x not in system_fields
                     ]
                 ]
             ) for table in tbls

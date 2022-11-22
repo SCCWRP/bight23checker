@@ -69,7 +69,7 @@ def infauna_reid(all_dfs):
     print("Each infaunal abundance record must have corresponding record in Sediment Grab Event Table where BenthicInfauna = Yes. Tables matched on StationID and SampleDate")
     grab_event_sql = "SELECT stationid, sampledate, benthicinfauna FROM tbl_grabevent WHERE benthicinfauna = 'Yes' ;"
     grab_infauna_records = eng.execute(grab_event_sql)
-    gdf = pd.DataFrame(grab_infauna_records.fetchall());
+    gdf = pd.DataFrame(grab_infauna_records.fetchall())
     gdf.columns = grab_infauna_records.keys()
     # checkLogic on records not found in tbl_grabevent (based on stationID and sampledate)
     print(infaunalabundance_reid[~((infaunalabundance_reid.stationid.isin(gdf.stationid.tolist()))&(infaunalabundance_reid.sampledate.isin(gdf.sampledate.tolist())))])
@@ -92,10 +92,25 @@ def infauna_reid(all_dfs):
 
 
     print("## CUSTOM CHECKS ##")
+    
     #1. If Taxon = NoOrganismsPresent, Then abundance should equal 0.
     print("Custom Check: If Taxon = NoOrganismsPresent, Then abundance should equal 0.")
     print("All records that do not pass this check:")
     print(infaunalabundance_reid[(infaunalabundance_reid.taxon == 'NoOrganismsPresent')&(infaunalabundance_reid.abundance != 0)])
+    badrows = infaunalabundance_reid[
+        (infaunalabundance_reid.taxon == 'NoOrganismsPresent')&(infaunalabundance_reid.abundance != 0)
+    ].tmp_row.tolist()
+    infaunalabundance_reid_args = {
+        "dataframe": infaunalabundance_reid,
+        "tablename": 'tbl_infaunalabundance_reid',
+        "badrows": badrows,
+        "badcolumn": "abundance",
+        "error_type": "Undefined Error",
+        "is_core_error": False,
+        "error_message": "If Taxon = NoOrganismsPresent, Then abundance should equal 0."
+    }
+    errs = [*errs, checkData(**infaunalabundance_reid_args)]
+    
     #checkData(infaunalabundance_reid[(infaunalabundance_reid.taxon == 'NoOrganismsPresent')&(infaunalabundance_reid.abundance != 0)].tmp_row.tolist(),'Abundance','Undefined Error','error','You recorded Taxon as NoOrganismsPresent. Abundance should equal 0.',infaunalabundance_reid)
     #2. Abundance cannot have -88, must be 1 or greater.
     print("Abundance cannot have -88, must be 1 or greater.")
