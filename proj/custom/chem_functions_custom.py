@@ -158,3 +158,41 @@ def pyrethroid_analyte_logic_check(df, analytes, row_index_col = 'tmp_row'):
         "error_message": f"This batch contains both/all of {','.join(analytes)} which is not possible"
     }
 
+
+def check_req_analytes(df, mask, groupingcols, required_analytes, analyteclass):
+    assert 'tmp_row' in df.columns, \
+        "in check_req_analytes - tmp_row column not defined in the dataframe - incorrect rows may be reported - aborting"
+    assert set(groupingcols).issubset(set(df.columns)), \
+        f"in check_req_analytes - grouping columns {', '.join(groupingcols)} not a subset of the dataframe's columns"
+
+    assert "analytename" in df.columns, \
+        f"dataframe has no column named analytename (in check required analytes function"
+
+    # initialize return value here, if no errors are found, an empty list will get returned
+    arglist = []
+
+    tmp = df[mask].groupby(groupingcols).apply(lambda df: set(required_analytes) - set(df.analytename.unique()) )
+    if not tmp.empty:
+        tmp = tmp.reset_index(name = 'missing_analytes')
+        tmp = df.merge(tmp, on = groupingcols, how = 'inner')
+        tmp = tmp[tmp.missing_analytes != set()]
+        if not tmp.empty:
+            tmp.missing_analytes = tmp.missing_analytes.apply(lambda anlts: ','.join(anlts))
+            tmp = tmp \
+                .groupby([*groupingcols,'missing_analytes']) \
+                .apply(lambda df: df.tmp_row.tolist()) \
+                .reset_index(name = 'badrows')
+
+            arglist = tmp.apply(
+                lambda row:
+                {
+                    "badrows": row.badrows,
+                    "badcolumn": "AnalyteName",
+                    "error_type": "Missing Required Data",
+                    "error_message": f"""For the grouping of {', '.join(['{}: {}'.format(x, row[x]) for x in groupingcols])}, you are missing the following required Analytes (For the {analyteclass} Analyteclass): {row.missing_analytes}"""
+                },
+                axis = 1
+            ).tolist()
+
+    return arglist
+
