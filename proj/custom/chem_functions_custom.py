@@ -3,7 +3,6 @@ import numpy as np
 from inspect import currentframe
 import pandas as pd
 from flask import current_app
-import json
 
 # Typically filter condition should be the analytename restricted to certain values
 def chk_required_sampletypes(df, sampletypes, analyteclass, additional_grouping_cols = [], row_index_col = 'tmp_row'):
@@ -32,7 +31,13 @@ def chk_required_sampletypes(df, sampletypes, analyteclass, additional_grouping_
     assert isinstance(df, pd.DataFrame), "df arg is not a pandas DataFrame"
     assert isinstance(analyteclass, str)
 
-    tmpdf = df[df.analyteclass == analyteclass].groupby(grouping_columns).apply(
+    tmpdf = df[df.analyteclass == analyteclass]
+
+    # If it comes up empty, that analyteclass is not part of this submission, so there's nothing to check.
+    if tmpdf.empty:
+        return []
+
+    tmpdf = tmpdf.groupby(grouping_columns).apply(
         lambda subdf: 
         set(sampletypes) - set(subdf.sampletype.unique())
     ) 
@@ -145,7 +150,7 @@ def pyrethroid_analyte_logic_check(df, analytes, row_index_col = 'tmp_row'):
         badrows = tmp[tmp.analytename.isin(analytes)][row_index_col].tolist()
     else:
         badrows = []
-        
+
     return {
         "badrows": badrows,
         "badcolumn": "AnalysisBatchID, AnalyteName",

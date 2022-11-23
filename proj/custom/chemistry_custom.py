@@ -2,8 +2,9 @@
 
 from inspect import currentframe
 from flask import current_app, g
+from datetime import timedelta
 from .functions import checkData, checkLogic
-from .chem_functions_custom import chk_required_sampletypes, check_required_crm
+from .chem_functions_custom import chk_required_sampletypes, check_required_crm, pyrethroid_analyte_logic_check
 import pandas as pd
 
 def chemistry(all_dfs):
@@ -18,6 +19,9 @@ def chemistry(all_dfs):
     assert expectedtables.issubset(set(all_dfs.keys())), \
         f"""In function {current_function_name} - {expectedtables - set(all_dfs.keys())} not found in keys of all_dfs ({','.join(all_dfs.keys())})"""
 
+    # DB Connection
+    eng = g.eng
+
     # define errors and warnings list
     errs = []
     warnings = []
@@ -25,8 +29,23 @@ def chemistry(all_dfs):
     batch = all_dfs['tbl_chembatch']
     results = all_dfs['tbl_chemresults']
 
-    batch.tmp_row = batch.index
-    results.tmp_row = results.index
+    batch['tmp_row'] = batch.index
+    results['tmp_row'] = results.index
+
+    # Tack on analyteclass
+    results = results.merge(
+        pd.read_sql("""SELECT analyte AS analytename, analyteclass FROM lu_analytes""", eng),
+        on = 'analytename',
+        how = 'inner'
+    )
+
+    # Calculate percent recovery
+    results['percentrecovery'] = \
+        result.apply(
+            lambda x: 
+            float(x.result)/float(x.truevalue)*100 if ('spike' in x.sampletype.lower())|('reference' in x.sampletype.lower()) else -88, 
+            axis = 1
+        )
 
 
     batch_args = {
@@ -49,8 +68,6 @@ def chemistry(all_dfs):
         "error_message": ""
     }
 
-    eng = g.eng
-
     # ----- LOGIC CHECKS ----- # 
     # Batch and Results must have matching records on Lab, PreparationBatchID and SampleID
 
@@ -58,13 +75,13 @@ def chemistry(all_dfs):
     # checkLogic function will update the arguments
     # Check for records in batch but not results
     batch_args.update(
-        checkLogic(batch, results, ['lab','preparationbatchid','sampleid'], df1_name = 'Batch', df2_name = 'Results')
+        checkLogic(batch, results, ['lab','preparationbatchid'], df1_name = 'Batch', df2_name = 'Results')
     )
     errs.append(checkData(**batch_args))
 
     # Check for records in results but not batch
     results_args.update(
-        checkLogic(results, batch, ['lab','preparationbatchid','sampleid'], df1_name = 'Results', df2_name = 'Batch')
+        checkLogic(results, batch, ['lab','preparationbatchid'], df1_name = 'Results', df2_name = 'Batch')
     )
     errs.append(checkData(**results_args))
 
@@ -278,7 +295,7 @@ def chemistry(all_dfs):
     # TN: Method blank
     # TOC: Method blank, Reference Material
     error_args = []
-    requires_crm = ["Inorganics", "PAH", "PCB", "Chlorinated Hydrocarbons", "PBDE", "TOC"]
+    
     required_sampletypes = {
         "Inorganics": ['Method blank', 'Matrix spike', 'Blank Spike'],
         "PAH": ['Method blank', 'Matrix spike'],
@@ -297,6 +314,7 @@ def chemistry(all_dfs):
     for anltclass, smpltyps in required_sampletypes.items():
         error_args = [*error_args, *chk_required_sampletypes(results, smpltyps, anltclass)]
     
+    requires_crm = ["Inorganics", "PAH", "PCB", "Chlorinated Hydrocarbons", "PBDE", "TOC"]
     error_args = [*error_args, *check_required_crm(results, requires_crm)]
     
     for argset in error_args:
@@ -336,7 +354,7 @@ def chemistry(all_dfs):
 
     # Check - If SampleType=Method blank and Result=-88, then qualifier must be below MDL or none.
     results_args.update({
-        "badrows": results[(mb_mask & (results.result != -88)) & (~results.qualifier.isin('below method detection limit','none')) ].index.tolist(),
+        "badrows": results[(mb_mask & (results.result != -88)) & (~results.qualifier.isin(['below method detection limit','none'])) ].index.tolist(),
         "badcolumn": "Qualifier",
         "error_type": "Value Error",
         "error_message": "If SampleType=Method blank and Result=-88, then qualifier must be 'below method detection limit' or 'none'"
@@ -344,7 +362,7 @@ def chemistry(all_dfs):
     errs.append(checkData(**results_args))
 
     # Check - Holding times for AnalyteClasses: Inorganics, PAH, PCB, Chlorinated Hydrocarbons, PBDE, Pyrethroid, FIPRONIL, TOC/TN is 1 year (see notes)
-    holding_time_mask = (df.analysisdate - df.sampledate >= timedelta(days=365))
+    holding_time_mask = (results.analysisdate - results.sampledate >= timedelta(days=365))
     holding_time_classes = ['Inorganics', 'PAH', 'PCB', 'Chlorinated Hydrocarbons', 'PBDE', 'Pyrethroid', 'FIPRONIL', 'TOC', 'TN']
     results_args.update({
         "badrows": results[
@@ -390,8 +408,8 @@ def chemistry(all_dfs):
     # -----------------------------------------------------------------------------------------------------------------------------------#
     # Check - for PAH's, in the sediment matrix, the units must be ng/g dw (for CRM, ug/g dw or mg/kg dw are acceptable)
     pah_sed_mask = ((results.matrix == 'sediment') & (results.analyteclass == 'PAH'))
-    pah_unit_mask = (pah_sed_mask & (~results.sampletype.str.contains('Reference', case = False))) & (results.unit != 'ng/g dw')
-    pah_unit_crm_mask = (pah_sed_mask & (results.sampletype.str.contains('Reference', case = False))) & (results.unit.isin('ug/g dw', 'mg/kg dw'))
+    pah_unit_mask = (pah_sed_mask & (~results.sampletype.str.contains('Reference', case = False))) & (results.units != 'ng/g dw')
+    pah_unit_crm_mask = (pah_sed_mask & (results.sampletype.str.contains('Reference', case = False))) & (results.units.isin(['ug/g dw', 'mg/kg dw']))
     
     results_args.update({
         "badrows": results[pah_unit_mask].tmp_row.tolist(),
@@ -415,8 +433,8 @@ def chemistry(all_dfs):
     # Check - for Chlorinated Hydrocarbons, PBDE, PCB in the sediment matrix, the units must be ng/g dw (for CRM, ug/kg dw is also acceptable)
     # (for matrix = sediment)
     sed_mask = ((results.matrix == 'sediment') & (results.analyteclass.isin(['Chlorinated Hydrocarbons', 'PBDE', 'PCB'])))
-    unit_mask = (sed_mask & (~results.sampletype.str.contains('Reference', case = False))) & (results.unit != 'ng/g dw')
-    unit_crm_mask = (sed_mask & (results.sampletype.str.contains('Reference', case = False))) & (results.unit.isin('ng/g dw', 'ug/kg dw'))
+    unit_mask = (sed_mask & (~results.sampletype.str.contains('Reference', case = False))) & (results.units != 'ng/g dw')
+    unit_crm_mask = (sed_mask & (results.sampletype.str.contains('Reference', case = False))) & (results.units.isin(['ng/g dw', 'ug/kg dw']))
     
     results_args.update({
         "badrows": results[unit_mask].tmp_row.tolist(),
@@ -439,7 +457,7 @@ def chemistry(all_dfs):
 
     # -----------------------------------------------------------------------------------------------------------------------------------#
     # Check - for FIPRONIL and Pyrethroid, in the sediment matrix, the units must be ng/g dw
-    fip_pyre_mask = ((results.matrix == 'sediment') & (results.analyteclass.isin(['FIPRONIL','Pyrethroid']))) & (results.unit != 'ng/g dw')
+    fip_pyre_mask = ((results.matrix == 'sediment') & (results.analyteclass.isin(['FIPRONIL','Pyrethroid']))) & (results.units != 'ng/g dw')
     
     results_args.update({
         "badrows": results[fip_pyre_mask].tmp_row.tolist(),
@@ -453,12 +471,136 @@ def chemistry(all_dfs):
     # ----- END CUSTOM CHECKS - SEDIMENT RESULTS ----- #
 
     # If there are errors, dont waste time with the QA plan checks
-    if errs != []:
-        return {'errors': errs, 'warnings': warnings}
+    # For testing, let us not enforce this, or we will waste a lot of time cleaning data
+    # if errs != []:
+    #     return {'errors': errs, 'warnings': warnings}
+
+
 
     # -=======- BIGHT CHEMISTRY QA PLAN CHECKS -=======- #  
 
+    # ------- Table 5-3 - Inorganics, Non-tissue matrices (Sediment and labwater) -------#
     
+    # --- TABLE 5-3 Check #1 --- #
+    # Check - 15 Analytes must be in each grouping of AnalysisBatchID, SampleID, sampletype, and labreplicate
+    #   (if that batch is analyzing inorganics) (ERROR)
+
+    # The filter mask to be used throughout the whole table 5-3 checks
+    inorg_sed_mask = (results.analyteclass == 'Inorganics') & results.matrix.isin(['sediment','labwater'])
+
+    # NOTE Need to confirm with Ken and Charles that this is the correct grouping
+    tbl53_chk1_grouping_cols = ['analysisbatchid','sampleid','sampletype','labreplicate']
+    
+    req_analytes_tbl53 = pd.read_sql("SELECT * FROM lu_analytes WHERE analyteclass = 'Inorganics'", eng).analyte.tolist()
+
+    tmp = results[inorg_sed_mask].groupby(tbl53_chk1_grouping_cols).apply(lambda df: set(req_analytes_tbl53) - set(df.analytename.unique()) )
+    if not tmp.empty:
+        tmp = tmp.reset_index(name = 'missing_analytes')
+        tmp = results.merge(tmp, on = tbl53_chk1_grouping_cols, how = 'inner')
+        tmp = tmp[tmp.missing_analytes != set()]
+        if not tmp.empty:
+            tmp.missing_analytes = tmp.missing_analytes.apply(lambda anlts: ','.join(anlts))
+            tmp = tmp \
+                .groupby([*tbl53_chk1_grouping_cols,'missing_analytes']) \
+                .apply(lambda df: df.tmp_row.tolist()) \
+                .reset_index(name = 'badrows')
+
+            arglist = tmp.apply(
+                lambda row:
+                {
+                    "badrows": row.badrows,
+                    "badcolumn": "AnalyteName",
+                    "error_type": "Missing Required Data",
+                    "error_message": f"For the grouping of AnalysisBatchID: {row.analysisbatchid}, SampleID: {row.sampleid}, SampleType: {row.sampletype}, and LabReplicate: {row.labreplicate}, you are missing the following required Analytes (For the Inorganic Analyteclass): {row.missing_analytes}"
+                },
+                axis = 1
+            ).tolist()
+
+            for args in argslist:
+                results_args.update(args)
+                errs.append(checkData(**results_args))
+
+    # --- END TABLE 5-3 Check #1 --- #
+
+    # --- TABLE 5-3 Check #2 --- #
+    # Check - For Method blank sampletypes - Result < MDL or Result < 5% of measured concentration in samples (Warning)
+    argslist = MB_ResultLessThanMDL(results[inorg_sed_mask])
+    for args in argslist:
+        results_args.update(args)
+        warnings.append(checkData(**results_args))
+    # --- END TABLE 5-3 Check #2 --- #
+
+
+    # --- TABLE 5-3 Check #3 --- #
+    # Check - For the SampleType "Reference - ERA 540 Sed" - Result should match lu_chemcrm range
+    # In my understanding, its mainly for the reference material for inorganics in the sediment matrix, rather than a particular CRM
+    inorg_sed_ref_mask = inorg_sed_mask & results.sampletype.str.contains('Reference', case = False)
+    
+    crmvals = pd.read_sql(
+        f"""
+        SELECT analyte AS analytename, crm FROM lu_chemcrm 
+        WHERE analyte IN ('{"','".join(req_analytes_tbl53).replace(';','')}')
+        AND crmmatrix = 'sediment'
+        """,
+        eng
+    )
+    
+    checkdf = results[inorg_sed_ref_mask].merge(crmvals, on = 'analytename', how = 'inner')
+
+    checkdf['outsidecrmrange'] = checkdf.apply(
+        lambda row: (row.result < float(row.crm.split('-')[0].strip()) ) | (row.result > float(row.crm.split('-')[1].strip())),
+        axis = 1
+    )
+
+    badrows = checkdf[checkdf.outsidecrmrange].tmp_row.tolist()
+    results_args.update({
+        "badrows": badrows,
+        "badcolumn": "Result",
+        "error_type": "Value Error",
+        "error_message": f"The value here is outside the expected range of what we would expect for reference material (see the crm column of <a href=https://nexus.sccwrp.org/bight23checker/scraper?action=help&layer=lu_chemcrm target=_blank>lu_chemcrm</a>"
+    })
+    warnings.append(checkData(**results_args))
+    # --- END TABLE 5-3 Check #3 --- #
+
+
+
+    # --- TABLE 5-3 Check #4 --- #
+    # Check - 
+    checkdf = results[inorg_sed_mask & results.sampletype.str.contains('Matrix spike', case = False)] \
+        .groupby(['analysisbatchid']) \
+        .apply(
+            lambda df: 
+            all((df[df.labreplicate == 1].percentrecovery > 70) & (df[df.labreplicate == 1].percentrecovery < 130))
+            or all((df[df.labreplicate == 2].percentrecovery > 70) & (df[df.labreplicate == 2].percentrecovery < 130))
+        )
+    if not checkdf.empty:
+        checkdf = checkdf.reset_index(name = 'passed_within30_check')
+        checkdf = results.merge(checkdf, on = 'analysisbatchid', how = 'inner')
+        checkdf = checkdf[checkdf.sampletype.str.contains('Matrix spike', case = False)]
+        checkdf = checkdf[(~checkdf.passed_within30_check) & ((checkdf.percentrecovery < 70) | (checkdf.percentrecovery > 130))]
+
+        results_args.update({
+            "badrows": checkdf.tmp_row.tolist(),
+            "badcolumn": "Result",
+            "error_type": "Value Error",
+            "error_message": "Within this analysisbatch, at least one of the Matrix spike sets should have had all their percent recoveries within 30 percent"
+        })
+        warnings.append(checkData(**results_args))
+    
+    # --- END TABLE 5-3 Check #4 --- #
+
+
+    # --- TABLE 5-3 Check # --- #
+    # Check - 
+    
+    
+    # --- END TABLE 5-3 Check # --- #
+
+
+
+
+    # ------- END Table 5-3 - Inorganics, Non-tissue matrices (Sediment and labwater) -------#
+
 
 
     # -=======- END BIGHT CHEMISTRY QA PLAN CHECKS -=======- #  
