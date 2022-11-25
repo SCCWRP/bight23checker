@@ -632,6 +632,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
 
         if len(bad_df) > 0:
             export_sdf_to_json(os.path.join(session['submission_dir'], "bad_trawl.json"), bad_df)
+            export_sdf_to_json(os.path.join(session['submission_dir'], "bight_strata.json"), strata[strata['region'].isin(bad_df['region'])])
         
         trawl_args.update({
             "badrows": bad_df.tmp_row.tolist(),
@@ -743,9 +744,10 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         # Check if trawl stations are in strata
         print("# Check if grab stations are in strata")
         bad_df = check_strata_grab(grab, strata_lookup, field_assignment_table)
-
+        print(bad_df)
         if len(bad_df) > 0:
             export_sdf_to_json(os.path.join(session['submission_dir'], "bad_grab.json"), bad_df)
+            export_sdf_to_json(os.path.join(session['submission_dir'], "bight_strata.json"), strata[strata['region'].isin(bad_df['region'])])
 
         grab_args.update({
             "badrows": bad_df.tmp_row.tolist(),

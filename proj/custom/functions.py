@@ -233,15 +233,6 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
     return bad_df
 
 def export_sdf_to_json(path, sdf):
-    """
-    Save a spatial dataframe (either point or polyline) to json in a format that ArcGIS API Javascript can understand
-
-    Parameters:
-    path             : Path to save the JSON
-    sdf              : input spatial dataframe
-
-    """
-
     if "paths" in sdf['SHAPE'].iloc[0].keys():
         data = [
             {
@@ -250,6 +241,14 @@ def export_sdf_to_json(path, sdf):
             }
             for item in sdf['SHAPE']
         ]
+    elif "rings" in sdf['SHAPE'].iloc[0].keys():
+        data = [
+            {
+                "type":"polygon",
+                "rings" : item.get('rings')[0]
+            }
+            for item in sdf['SHAPE']
+        ]        
     else:
         data = [
             {
