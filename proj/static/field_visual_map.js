@@ -39,7 +39,7 @@ require([
         const view = new MapView({
             map: map,
             center: [-118.193741, 33.770050], //California
-            zoom: 16,
+            zoom: 10,
             container: "viewDiv"
         });
         
