@@ -37,12 +37,13 @@ def chk_required_sampletypes(df, sampletypes, analyteclass, additional_grouping_
     if tmpdf.empty:
         return []
 
+    print(tmpdf)
     tmpdf = tmpdf.groupby(grouping_columns).apply(
-        lambda subdf: 
+        lambda subdf:
         set(sampletypes) - set(subdf.sampletype.unique())
     ) 
-    assert not tmpdf.empty, \
-        f"for some reason, after grouping by {','.join(grouping_columns)}, the dataframe came up empty (in required sampletypes function)"
+
+    assert (len(tmpdf) > 0), f"for some reason, after grouping by {','.join(grouping_columns)}, the dataframe came up empty (in { str(currentframe().f_code.co_name)} function)"
     
     tmpdf = tmpdf.reset_index(name = 'missing_sampletypes')
 
@@ -72,7 +73,7 @@ def chk_required_sampletypes(df, sampletypes, analyteclass, additional_grouping_
 
 
 # Typically filter condition should be the analytename restricted to certain values
-def check_required_crm(df, analyteclasses, row_index_col = 'tmp_row'):
+def check_required_crm(df, analyteclasses, grouping_columns = ['analysisbatchid', 'analyteclass'], row_index_col = 'tmp_row'):
 
     # Goal: Construct a list of args (dictionary format) to be passed iteratively into the checkData function in chemistry_custom{
     # {
@@ -83,23 +84,29 @@ def check_required_crm(df, analyteclasses, row_index_col = 'tmp_row'):
     # }
     # Need to check analysis batches and analyteclasses that are missing CRM's. 
     # Only Analyteclasses which require CRM's should be in that analyteclasses list argument
-
+    
+    if df.empty:
+        return []
+    
+    tmpdf = df[df.analyteclass.isin(analyteclasses)]
+    if tmpdf.empty:
+        return []
+    
     assert isinstance(analyteclasses, list), "analyteclasses arg is not a list"
 
-    assert row_index_col in df.columns, \
+    assert row_index_col in tmpdf.columns, \
         f"{row_index_col} not found in the columns of the dataframe. \
         It is highly recommended you create a tmp_row column in the dataframe by resetting the index, \
         otherwise you run the risk of incorrectly reporting the rows that contain errors, \
         due to the nature of these checks which require merging and groupby operations with multiple dataframes"
 
-    grouping_columns = ['analysisbatchid', 'analyteclass']
 
-    tmpdf = df[df.analyteclass.isin(analyteclasses)].groupby(grouping_columns).apply(
+    tmpdf = tmpdf.groupby(grouping_columns).apply(
         lambda subdf: 
         not any(subdf.sampletype.apply(lambda x: 'reference' in str(x).lower()))
     )
     assert not tmpdf.empty, \
-        f"for some reason, after grouping by {','.join(grouping_columns)}, the dataframe came up empty (in required sampletypes function)"
+        f"for some reason, after grouping by {','.join(grouping_columns)}, the dataframe came up empty (in {str(currentframe().f_code.co_name)} function)"
     
     tmpdf = tmpdf.reset_index(name = 'missing_crm')
 
@@ -195,4 +202,107 @@ def check_req_analytes(df, mask, groupingcols, required_analytes, analyteclass):
             ).tolist()
 
     return arglist
+
+# Method blanks - result has to be less than MDL, or less than 5% of the measured concentration in the sample
+def MB_ResultLessThanMDL(dataframe):
+    """
+    dataframe should have the tmp_row column, and already be filtered according to the "table" (table 5-3, 5-4 etc)
+    This function is supposed to return a list of errors
+    """
+    print("IN MB_ResultLessThanMDL")
+
+    print("filter to methodblank samples and select only 5 needed columns")
+    methodblanks = dataframe[dataframe.sampletype == 'Method blank'][['analysisbatchid','matrix','analytename','mdl', 'result']]
+    print("filter to Results to merge with methodblanks")
+    res = dataframe[dataframe.sampletype == 'Result']
+
+    print('merge')
+    checkdf = res.merge(methodblanks, on = ['analysisbatchid','matrix','analytename'], how = 'inner', suffixes = ('','_mb'))
+
+    print('filter to rows with too high methodblank values')
+    checkdf = checkdf[
+        ~checkdf.apply(
+            lambda row: 
+            (row.result_mb < row.mdl_mb) | (row.result_mb < (0.05 * row.result)) 
+            , axis = 1
+        )
+    ]
+
+    if checkdf.empty:
+        return []
+    print('get bad rows for updating the args')
+    checkdf = checkdf.groupby(['analysisbatchid','analytename','sampleid']).apply(lambda df: df.tmp_row.tolist()).reset_index(name = 'badrows')
+
+    args = checkdf.apply(
+            lambda row:
+            {
+                "badrows": row.badrows,
+                "badcolumn": "Result",
+                "error_type": "Value Error",
+                "error_message": f"For the Analyte {row.analytename} in the AnalysisBatch {row.analysisbatchid}, the Method blank result value is either above the MDL, or above 5% of the measured concentration in the sample {row.sampleid}"
+            },
+            axis = 1
+        ).tolist()
+    print("done")
+    print("END MB_ResultLessThanMDL")
+
+    return args
+
+def check_sample_dups(df, analyteclass, sampletype):
+    # Each analysis batch needs some kind of duplicate
+    # Inorganics - Duplicate Matrix Spike or Sample Duplicate (Duplicate Results)
+    # Organics - Duplicate Matrix Spike
+    # Total Organic Carbon - Sample Duplicate (Duplicate Results)
+    # Total Nitrogen - Sample Duplicate (Duplicate Results)
+    print(str(currentframe().f_code.co_name))
+    args = []
+    
+    tmpdf = df[df.sampletype == sampletype]
+
+    if tmpdf.empty:
+        return []
+
+    tmpdf = tmpdf.groupby(['analysisbatchid','sampleid','sampletype']).apply(
+            lambda subdf:
+            all(subdf.groupby('analytename').apply(lambda d: set(d.labreplicate.tolist()) == {1,2}))
+        )\
+        .reset_index(name = 'has_dup') \
+        .groupby('analysisbatchid') \
+        .apply(
+            # checking if within a batch, there was at least one sampleid that had all their dupes
+            lambda subdf:
+            any(subdf.has_dup.values)
+        ) \
+        .reset_index(
+            # previous "passed" column would have disappeared
+            name = 'passed'
+        ) \
+        .merge(df, on = ['analysisbatchid'])
+
+    baddf = tmpdf[~tmpdf.passed]
+    if baddf.empty:
+        return[]
+    else:
+        baddf['errmsg'] = baddf.apply(
+            lambda row: 
+            f"""The AnalysisBatch {row.analysisbatchid} is missing a duplicate {sampletype}"""
+            , axis = 1
+        )
+        args = baddf.groupby(['analysisbatchid','errmsg']) \
+            .apply(lambda df: df.tmp_row.tolist()) \
+            .reset_index(name = 'badrows') \
+            .apply(
+                lambda row: 
+                {
+                    "badrows": row.badrows,
+                    "badcolumn": "AnalysisBatchID",
+                    "error_type": "Value Error",
+                    "error_message": row.errmsg
+                },
+                axis = 1
+            ).tolist()
+    
+    print(f"END {str(currentframe().f_code.co_name)}")
+    return args
+    
 
