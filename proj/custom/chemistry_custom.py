@@ -355,15 +355,15 @@ def chemistry(all_dfs):
 
             res['batch'] = res.apply(
                 lambda row: 
-                re.search(batch_extract, row.error_message).groups()[0]
-                if re.search(batch_extract, row.error_message)
+                re.search(batch_regex, row.error_message).groups()[0]
+                if re.search(batch_regex, row.error_message)
                 else '',
                 axis = 1
             )
             spike['batch'] = spike.apply(
                 lambda row: 
-                re.search(batch_extract, row.error_message).groups()[0]
-                if re.search(batch_extract, row.error_message)
+                re.search(batch_regex, row.error_message).groups()[0]
+                if re.search(batch_regex, row.error_message)
                 else '',
                 axis = 1
             )

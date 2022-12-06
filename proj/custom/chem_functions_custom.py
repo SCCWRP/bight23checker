@@ -257,7 +257,7 @@ def check_sample_dups(df, analyteclass, sampletype):
     print(str(currentframe().f_code.co_name))
     args = []
     
-    tmpdf = df[df.sampletype == sampletype]
+    tmpdf = df[(df.sampletype == sampletype) & (df.analyteclass == analyteclass)]
 
     if tmpdf.empty:
         return []

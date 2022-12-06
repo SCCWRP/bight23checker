@@ -279,6 +279,8 @@ def main():
             print("Error with custom checks")
             print(err)
             raise Exception(f"""Error calling custom checks function "{match_dataset}" - may not be defined, or was not imported correctly.""")
+        # Leaving this in out of fear of breaking the application
+        # All i know is if i leave it untouched, it wont affect anything
         except Exception as e:
             raise Exception(e)
         
