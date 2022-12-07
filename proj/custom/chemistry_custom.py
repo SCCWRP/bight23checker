@@ -336,11 +336,12 @@ def chemistry(all_dfs):
         
         print("Check for sample duplicates or matrix spike duplicates")
         if anltclass != 'Inorganics':
+            print('Non-Inorganics')
             # For Inorganics, they can have either or, so the way we deal with inorganics must be different
             error_args = [*error_args, *check_sample_dups(results, anltclass, 'Result')]
             error_args = [*error_args, *check_sample_dups(results, anltclass, 'Matrix spike')]
         else:
-
+            print('Inorganics')
             # Under the assumption of how we worded the error message. 
             # This will be to grab the batches that failed both the duplicate results and duplicate matrix spike check
             # Each batch has tp have at least one of those
@@ -349,33 +350,36 @@ def chemistry(all_dfs):
             resargs = check_sample_dups(results, anltclass, 'Result')
             spikeargs = check_sample_dups(results, anltclass, 'Matrix spike')
             
-            # make them into dataframes
-            res = pd.DataFrame(resargs)
-            spike = pd.DataFrame(spikeargs)
-
-            res['batch'] = res.apply(
-                lambda row: 
-                re.search(batch_regex, row.error_message).groups()[0]
-                if re.search(batch_regex, row.error_message)
-                else '',
-                axis = 1
-            )
-            spike['batch'] = spike.apply(
-                lambda row: 
-                re.search(batch_regex, row.error_message).groups()[0]
-                if re.search(batch_regex, row.error_message)
-                else '',
-                axis = 1
-            )
-
-            argsdf = res.merge(spike[['batch']], on = 'batch', how = 'inner')
-
-            if not argsdf.empty:
-                argsdf.error_message = argsdf.apply(
-                    lambda row: f"""The AnalysisBatch {row.batch} needs either a duplicate sample result or a duplicate matrix spike""",
+            # If one of the lists is empty, then it means every single batch had a duplicate, 
+            #  meaning the data is clean
+            if ( (len(resargs) > 0) and (len(spikeargs) > 0) ):
+                # make them into dataframes
+                res = pd.DataFrame(resargs)
+                res['batch'] = res.apply(
+                    lambda row: 
+                    re.search(batch_regex, row.error_message).groups()[0]
+                    if re.search(batch_regex, row.error_message)
+                    else '',
                     axis = 1
                 )
-                error_args = [*error_args, *argsdf.to_dict('records')]
+
+                spike = pd.DataFrame(spikeargs)
+                spike['batch'] = spike.apply(
+                    lambda row: 
+                    re.search(batch_regex, row.error_message).groups()[0]
+                    if re.search(batch_regex, row.error_message)
+                    else '',
+                    axis = 1
+                )
+
+                argsdf = res.merge(spike[['batch']], on = 'batch', how = 'inner')
+
+                if not argsdf.empty:
+                    argsdf.error_message = argsdf.apply(
+                        lambda row: f"""The AnalysisBatch {row.batch} needs either a duplicate sample result or a duplicate matrix spike""",
+                        axis = 1
+                    )
+                    error_args = [*error_args, *argsdf.to_dict('records')]
 
     
     requires_crm = ["Inorganics", "PAH", "PCB", "Chlorinated Hydrocarbons", "PBDE", "TOC"]
@@ -723,8 +727,8 @@ def chemistry(all_dfs):
 
 
     # --- TABLE 5-3 Check #5 and #6--- #
-    # Check - Duplicate Matrix spikes need < 20% RPD for AnalysisMethods ICPAES, EPA200.7 and EPA 6010B
-    print('# Check - Duplicate Matrix spikes need < 20% RPD for AnalysisMethods ICPAES, EPA200.7 and EPA 6010B')
+    # Check - Duplicate Matrix spikes (or Results) need < 20% RPD for AnalysisMethods ICPAES, EPA200.7 and EPA 6010B
+    print('# Check - Duplicate Matrix spikes (or Results) need < 20% RPD for AnalysisMethods ICPAES, EPA200.7 and EPA 6010B')
     
     # QUESTION - Mercury seems to often be analyzed with the method EPA245.7m - what is the RPD threshold on that?
     # Based on the bight 2018 checker, it looks like Bowen told us it had to be under 30 - thats what the old one does
@@ -732,9 +736,12 @@ def chemistry(all_dfs):
     methods_20rpd = ['ICPAES', 'EPA200.7', 'EPA6010B'] # methods that require 20% RPD
     methods_30rpd = ['ICPMS', 'EPA200.8', 'EPA6020Bm'] # methods that require 30% RPD
     
-    
-    checkdf = results[inorg_sed_mask & results.sampletype.str.contains('Matrix spike', case = False)]
-    checkdf = checkdf.groupby(['analysisbatchid', 'analysismethod', 'analytename','sampleid']).apply(
+    rpdcheckmask = (
+        inorg_sed_mask 
+        & results.sampletype.isin(['Matrix spike', 'Result'])
+    )
+    checkdf = results[rpdcheckmask]
+    checkdf = checkdf.groupby(['analysisbatchid', 'analysismethod', 'sampletype', 'analytename','sampleid']).apply(
         lambda subdf:
         abs((subdf.result.max() - subdf.result.min()) / ((subdf.result.max() + subdf.result.min()) / 2))
     )
@@ -742,22 +749,21 @@ def chemistry(all_dfs):
         checkdf = checkdf.reset_index(name = 'rpd')
         checkdf['errmsg'] = checkdf.apply(
             lambda row:
-            f"For the AnalysisMethod {row.analysismethod}, duplicate Matrix spikes should have an RPD under {20 if row.analysismethod in methods_20rpd else 30}%"
+            f"For the AnalysisMethod {row.analysismethod}, duplicate Matrix spikes or Results should have an RPD under {20 if row.analysismethod in methods_20rpd else 30}%"
             , axis = 1
         )
-        checkdf = results[inorg_sed_mask & results.sampletype.str.contains('Matrix spike', case = False)] \
+        checkdf = results[rpdcheckmask] \
             .merge(
                 checkdf[
                     # just merge records that failed the check
+                    # We never multiplied RPD by 100, so it should be expressed as a decimal here
                     checkdf.apply(
                         lambda x: 
-                        True 
-                        if ((x.rpd >= 20 and x.analysismethod in methods_20rpd) or (x.rpd >= 30 and x.analysismethod in methods_30rpd))
-                        else False
+                        ((x.rpd >= .20 and x.analysismethod in methods_20rpd) or (x.rpd >= .30))
                         ,axis = 1
                     )
                 ], 
-                on = ['analysisbatchid','analysismethod','analytename','sampleid'], 
+                on = ['analysisbatchid','analysismethod','sampletype','analytename','sampleid'], 
                 how = 'inner'
             )
         

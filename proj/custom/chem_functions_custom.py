@@ -256,10 +256,11 @@ def check_sample_dups(df, analyteclass, sampletype):
     # Total Nitrogen - Sample Duplicate (Duplicate Results)
     print(str(currentframe().f_code.co_name))
     args = []
-    
+
     tmpdf = df[(df.sampletype == sampletype) & (df.analyteclass == analyteclass)]
 
     if tmpdf.empty:
+        print(f"END {str(currentframe().f_code.co_name)}")
         return []
 
     tmpdf = tmpdf.groupby(['analysisbatchid','sampleid','sampletype']).apply(
@@ -279,15 +280,19 @@ def check_sample_dups(df, analyteclass, sampletype):
         ) \
         .merge(df, on = ['analysisbatchid'])
 
+
     baddf = tmpdf[~tmpdf.passed]
+
     if baddf.empty:
-        return[]
+        print(f"END {str(currentframe().f_code.co_name)}")
+        return []
     else:
         baddf['errmsg'] = baddf.apply(
             lambda row: 
             f"""The AnalysisBatch {row.analysisbatchid} is missing a duplicate {sampletype}"""
             , axis = 1
         )
+
         args = baddf.groupby(['analysisbatchid','errmsg']) \
             .apply(lambda df: df.tmp_row.tolist()) \
             .reset_index(name = 'badrows') \
