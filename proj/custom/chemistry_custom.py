@@ -1249,9 +1249,9 @@ def chemistry(all_dfs):
 
 
     # --- TABLE 5-6 Check #2 --- #
-    # Check - Duplicate Matrix spikes/Results must have RPD < 30% (WARNING)
-    print('# Check - Duplicate Matrix spikes/Results must have RPD < 30% (WARNING)')
-    checkdf = results[results.analyteclass.isin(['TOC','TN']) & results.sampletype.str.contains('Matrix spike', case = False)]
+    # Check - Duplicate Results must have RPD < 30% (WARNING)
+    print('# Check - Duplicate Results must have RPD < 30% (WARNING)')
+    checkdf = results[results.analyteclass.isin(['TOC','TN']) & results.sampletype == 'Result']
     if not checkdf.empty:
         checkdf = checkdf.groupby(['analysisbatchid', 'analytename','sampleid']).apply(
             lambda subdf:
@@ -1264,11 +1264,11 @@ def chemistry(all_dfs):
                 f"Duplicate Matrix spikes should have an RPD under 30% (for TOC and TN)"
                 , axis = 1
             )
-            checkdf = results[results.analyteclass.isin(['TOC','TN']) & results.sampletype.str.contains('Matrix spike', case = False)] \
+            checkdf = results[results.analyteclass.isin(['TOC','TN']) & results.sampletype == 'Result'] \
                 .merge(
                     checkdf[
                         # just merge records that failed the check
-                        checkdf.rpd.apply(lambda x: x >= 30)
+                        checkdf.rpd.apply(lambda x: x >= .30)
                     ], 
                     on = ['analysisbatchid','analytename','sampleid'], 
                     how = 'inner'
