@@ -83,6 +83,7 @@ const buildReport = (res) => {
                 <!--<div class="col-sm errors-report-cell">Error Type</div>-->
                 <div class="col-sm errors-report-cell">Error Message</div>
                 <div class="col-sm errors-report-cell">Row(s)</div>
+                <div class="col-sm errors-report-cell"></div>
             </div>
 
             <div class="errors-tab-rows">
@@ -103,7 +104,7 @@ const buildReport = (res) => {
     errs_tables.map(tblname => {
         let tbl = document.querySelector(`#${tblname}-errors-tab-body div.errors-tab-rows`);
         
-        tbl.innerHTML = res.errs.map(e => {
+        tbl.innerHTML = res.errs.map((e, i) => {
             if (e.table === tblname) {
                 let s = `
                     <div class="error-description-list row">
@@ -117,7 +118,12 @@ const buildReport = (res) => {
                             ${e.error_message}
                         </div>
                         <div class="errors-report-cell error-description-list-item col-sm">
-                            ${e.rows.join(", ") }
+                            <span id="error-row-numbers-${i}"> ${e.rows.join(", ") }</span>
+                        </div>
+                        <div class="errors-report-cell error-description-list-item col-sm">
+                            <button class="btn btn-secondary hide-row-numbers-btn" data-role="hide" data-error-type="error" data-iteration-number="${i}">
+                                Hide row numbers
+                            </button>
                         </div>
                     </div>
                 `;
@@ -177,6 +183,7 @@ const buildReport = (res) => {
                 <!--<div class="col-sm warnings-report-cell">Error Type</div>-->
                 <div class="col-sm warnings-report-cell">Error Message</div>
                 <div class="col-sm warnings-report-cell">Row(s)</div>
+                <div class="col-sm warnings-report-cell"></div>
             </div>
 
             <div class="warnings-tab-rows">
@@ -196,7 +203,7 @@ const buildReport = (res) => {
     warnings_tables.map(tblname => {
         console.log(tblname);
         let tbl = document.querySelector(`#${tblname}-warnings-tab-body div.warnings-tab-rows`);
-        tbl.innerHTML = res.warnings.map(e => {
+        tbl.innerHTML = res.warnings.map((e, i) => {
             if (e.table === tblname) {
                 let s = `
                     <div class="error-description-list row">
@@ -210,7 +217,12 @@ const buildReport = (res) => {
                             ${e.error_message}
                         </div>
                         <div class="warnings-report-cell error-description-list-item col-sm">
-                            ${e.rows.join(", ") }
+                            <span id="warning-row-numbers-${i}"> ${e.rows.join(", ") }</span>
+                        </div>
+                        <div class="warnings-report-cell error-description-list-item col-sm">
+                            <button class="btn btn-secondary hide-row-numbers-btn" data-role="hide" data-error-type="warning" data-iteration-number="${i}">
+                                Hide row numbers
+                            </button>
                         </div>
                     </div>
                 `;
@@ -239,7 +251,37 @@ const buildReport = (res) => {
         document.getElementById('visual-map').setAttribute('src',`/${script_root}/map`)
     }
 
+    Array.from(document.getElementsByClassName('hide-row-numbers-btn')).forEach(
+        (btn) => {
+            console.log("btn");
+            console.log(btn);
+            btn.addEventListener('click', () => {
+                const role = btn.dataset.role;
+                const errtype = btn.dataset.errorType;
+                const iterationNumber = btn.dataset.iterationNumber;
+                console.assert(
+                    ['hide','show'].includes(role),
+                    "in the hide row numbers button, the data attribute called function should be set to hide or show"
+                )
+                const rowNumberContainer = document.getElementById(`${errtype}-row-numbers-${iterationNumber}`);
+                
+                if (role === 'hide') {
+                    rowNumberContainer.classList.add('hidden')
+                    
+                    // set the button up so the next click shows them
+                    btn.setAttribute('data-role','show');
+                    btn.innerText = 'Show row numbers';
+                } else {
+                    rowNumberContainer.classList.remove('hidden')
 
+                    // set the button up so the next click hides them
+                    btn.setAttribute('data-role','hide')
+                    btn.innerText = 'Hide row numbers';
+                }
+            
+            })
+        }
+    )
 
     
     
