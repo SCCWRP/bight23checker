@@ -98,7 +98,7 @@ def chemistry(all_dfs):
 
         # If there are less grainsize records, flag them as being the bad rows. Otherwise flag the non grainsize rows
         results_args.update({
-            "badrows": results[(grain_bool) if (n_grain < n_nongrain) else (~grain_bool)].index.tolist(),
+            "badrows": results[(grain_bool) if (n_grain < n_nongrain) else (~grain_bool)].tmp_row.tolist(),
             "badcolumn": "AnalyteName",
             "error_type": "Logic Error",
             "error_message": "You are attempting to submit grainsize analytes along with other sediment chemistry analytes. Sediment Chemistry Results must be submitted separately from Grainsize data"
@@ -173,7 +173,7 @@ def chemistry(all_dfs):
     
     # badrows are deemed to be ones that are not in the "spike" or Reference category, but the TrueValue column is NOT a -88 (Warning)
     print('# badrows are deemed to be ones that are not in the "spike" or Reference category, but the TrueValue column is NOT a -88 (Warning)')
-    badrows = results[(~spike_mask) & (results.truevalue != -88)].index.tolist()
+    badrows = results[(~spike_mask) & (results.truevalue != -88)].tmp_row.tolist()
     results_args.update({
         "badrows": badrows,
         "badcolumn": "TrueValue",
@@ -184,7 +184,7 @@ def chemistry(all_dfs):
     
     # badrows here could be considered as ones that ARE CRM's / spikes, but the TrueValue is missing (Warning)
     print('# badrows here could be considered as ones that ARE CRMs / spikes, but the TrueValue is missing (Warning)')
-    badrows = results[(spike_mask) & (results.truevalue < 0)].index.tolist()
+    badrows = results[(spike_mask) & (results.truevalue < 0)].tmp_row.tolist()
     results_args.update({
         "badrows": badrows,
         "badcolumn": "TrueValue",
@@ -195,7 +195,7 @@ def chemistry(all_dfs):
 
     # Check - Result column should be a positive number (except -88) for SampleType == 'Result' (Error)
     print("""# Check - Result column should be a positive number (except -88) for SampleType == 'Result' (Error)""")
-    badrows = results[(results.sampletype == 'Result') & (results.result != -88) & (results.result <= 0)].index.tolist()
+    badrows = results[(results.sampletype == 'Result') & (results.result != -88) & (results.result <= 0)].tmp_row.tolist()
     results_args.update({
         "badrows": badrows,
         "badcolumn": "Result",
@@ -207,7 +207,7 @@ def chemistry(all_dfs):
     # Check - The MDL should never be greater than the RL (Error)
     print('# Check - The MDL should never be greater than the RL (Error)')
     results_args.update({
-        "badrows": results[results.mdl > results.rl].index.tolist(),
+        "badrows": results[results.mdl > results.rl].tmp_row.tolist(),
         "badcolumn": "MDL",
         "error_type": "Value Error",
         "error_message": "The MDL should never be greater than the RL"
@@ -217,7 +217,7 @@ def chemistry(all_dfs):
     # Check - The MDL should not be equal to the RL (Warning)
     print('# Check - The MDL should not be equal to the RL (Warning)')
     results_args.update({
-        "badrows": results[results.mdl == results.rl].index.tolist(),
+        "badrows": results[results.mdl == results.rl].tmp_row.tolist(),
         "badcolumn": "MDL",
         "error_type": "Value Error",
         "error_message": "The MDL should not be equal the RL in most cases"
@@ -227,7 +227,7 @@ def chemistry(all_dfs):
     # Check - The MDL should never be a negative number (Error)
     print('# Check - The MDL should never be a negative number (Error)')
     results_args.update({
-        "badrows": results[results.mdl < 0].index.tolist(),
+        "badrows": results[results.mdl < 0].tmp_row.tolist(),
         "badcolumn": "MDL",
         "error_type": "Value Error",
         "error_message": "The MDL should not be negative"
@@ -239,7 +239,7 @@ def chemistry(all_dfs):
     # Check - if the qualifier is "less than" or "below method detection limit" Then the result must be -88 (Error)
     print('# Check - if the qualifier is "less than" or "below method detection limit" Then the result must be -88 (Error)')
     results_args.update({
-        "badrows": results[results.qualifier.isin(["less than", "below method detection limit"]) & results.result != -88].index.tolist(),
+        "badrows": results[results.qualifier.isin(["less than", "below method detection limit"]) & (results.result.astype(float) != -88)].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
         "error_message": "If the Qualifier is 'less than' or 'below method detection limit' then the Result should be -88"
@@ -251,7 +251,7 @@ def chemistry(all_dfs):
     results_args.update({
         "badrows": results[
                 (results.qualifier.isin(["estimated", "below reporting level"])) & ((results.result < results.mdl) | (results.result > results.rl))
-            ].index.tolist(),
+            ].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
         "error_message": "If the Qualifier is 'estimated' or 'below reporting level' then the Result should be between the MDL and RL (Inclusive)"
@@ -264,7 +264,7 @@ def chemistry(all_dfs):
         "badrows": results[
                 (results.qualifier.isin(["estimated", "below reporting level", "below method detection limit", "estimated"])) 
                 & (results.result > results.rl)
-            ].index.tolist(),
+            ].tmp_row.tolist(),
         "badcolumn": "Qualifier",
         "error_type": "Value Error",
         "error_message": "if qualifier is 'less than', 'below method detection limit', 'below reporting level' or 'estimated', but the Result > RL, then the incorrect qualifier was used"
@@ -274,7 +274,7 @@ def chemistry(all_dfs):
     # Check - if the qualifier is "none" then the result must be greater than the RL (Error)
     print('# Check - if the qualifier is "none" then the result must be greater than the RL (Error)')
     results_args.update({
-        "badrows": results[(results.qualifier == 'none') & (results.result <= results.rl)].index.tolist(),
+        "badrows": results[(results.qualifier == 'none') & (results.result <= results.rl)].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
         "error_message": "if the qualifier is 'none' then the result must be greater than the RL"
@@ -284,7 +284,7 @@ def chemistry(all_dfs):
     # Check - Comment is required if the qualifier says "analyst error" "contaminated" or "interference" (Error)
     print('# Check - Comment is required if the qualifier says "analyst error" "contaminated" or "interference" (Error)')
     results_args.update({
-        "badrows": results[(results.qualifier.isin(["analyst error","contaminated","interference"])) & (results.fillna('').comments == '')].index.tolist(),
+        "badrows": results[(results.qualifier.isin(["analyst error","contaminated","interference"])) & (results.fillna('').comments == '')].tmp_row.tolist(),
         "badcolumn": "Comments",
         "error_type": "Value Error",
         "error_message": "Comment is required if the qualifier says 'analyst error' 'contaminated' or 'interference'"
@@ -294,7 +294,7 @@ def chemistry(all_dfs):
     # Check - We would like the submitter to contact us if the qualifier says "analyst error" (Warning)
     print('# Check - We would like the submitter to contact us if the qualifier says "analyst error" (Warning)')
     results_args.update({
-        "badrows": results[results.qualifier == "analyst error"].index.tolist(),
+        "badrows": results[results.qualifier == "analyst error"].tmp_row.tolist(),
         "badcolumn": "Qualifier",
         "error_type": "Value Error",
         "error_message": "We would like to be contacted concerning this record of data. Please contact bight23-im@sccwrp.org"
@@ -405,7 +405,7 @@ def chemistry(all_dfs):
         & (~results.units.isin(['mg/kg dw','ug/g dw']))
     )
     results_args.update({
-        "badrows": results[units_metals_mask | units_metals_crm_mask].index.tolist(),
+        "badrows": results[units_metals_mask | units_metals_crm_mask].tmp_row.tolist(),
         "badcolumn": "Units",
         "error_type": "Value Error",
         "error_message": "For Inorganics, units must be in ug/g dw (for Reference Materials, mg/kg dw is ok too)"
@@ -418,7 +418,7 @@ def chemistry(all_dfs):
     print('# mb_mask = Method blank mask')
     mb_mask = (results.sampletype == 'Method blank') 
     results_args.update({
-        "badrows": results[mb_mask & ((results.result < results.mdl) & (results.result != -88))].index.tolist(),
+        "badrows": results[mb_mask & ((results.result < results.mdl) & (results.result != -88))].tmp_row.tolist(),
         "badcolumn": "Result",
         "error_type": "Value Error",
         "error_message": "For Method blank sampletypes, if Result is less than MDL, it must be -88"
@@ -428,7 +428,7 @@ def chemistry(all_dfs):
     # Check - If SampleType=Method blank and Result=-88, then qualifier must be below MDL or none.
     print('# Check - If SampleType=Method blank and Result=-88, then qualifier must be below MDL or none.')
     results_args.update({
-        "badrows": results[(mb_mask & (results.result != -88)) & (~results.qualifier.isin(['below method detection limit','none'])) ].index.tolist(),
+        "badrows": results[(mb_mask & (results.result != -88)) & (~results.qualifier.isin(['below method detection limit','none'])) ].tmp_row.tolist(),
         "badcolumn": "Qualifier",
         "error_type": "Value Error",
         "error_message": "If SampleType=Method blank and Result=-88, then qualifier must be 'below method detection limit' or 'none'"
@@ -450,7 +450,7 @@ def chemistry(all_dfs):
         "badrows": results[
                 results.analyteclass.isin(holding_time_classes) 
                 & holding_time_mask
-            ].index.tolist(),
+            ].tmp_row.tolist(),
         "badcolumn": "SampleDate, AnalysisDate",
         "error_type": "Sample Past Holding Time",
         "error_message": f"Here, the analysisdate is more than a year after the sampledate, which is invalid for analyteclasses {','.join(holding_time_classes)}"
@@ -463,7 +463,7 @@ def chemistry(all_dfs):
     print('# months is not allowed in a timedelta so here we put 183 days instead')
     Hg_holding_time_mask = ((results.analysisdate - results.sampledate >= timedelta(days=183)) & (results.analytename == 'Mercury'))
     results_args.update({
-        "badrows": results[Hg_holding_time_mask].index.tolist(),
+        "badrows": results[Hg_holding_time_mask].tmp_row.tolist(),
         "badcolumn": "SampleDate, AnalysisDate",
         "error_type": "Sample Past Holding Time",
         "error_message": f"Here, the analysisdate is more than 6 months after the sampledate, which is past the holding time for Mercury"
