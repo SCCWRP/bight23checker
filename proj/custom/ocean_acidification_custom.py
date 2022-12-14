@@ -1,11 +1,14 @@
 # Dont touch this file! This is intended to be a template for implementing new custom checks
 
+import re, os
+
 from inspect import currentframe
-from flask import current_app
+from flask import current_app, session
+from datetime import timedelta, datetime
 from .functions import checkData
-import re
+
 import pandas as pd
-from datetime import timedelta
+import subprocess as sp
 
 
 def ocean_acidification(all_dfs):
@@ -198,7 +201,7 @@ def ocean_acidification(all_dfs):
         # compare depths 
 
         # Below code is from Lily. Moved into production 7/9/2019 - Robert
-        # I will try to make it work with existing code since it seems that records are matched on more thab simply stationcode and date. - Robert 7/9/2019
+        # I will try to make it work with existing code since it seems that records are matched on more than simply stationcode and date. - Robert 7/9/2019
         sub_bottle[['plusdepth']] = sub_bottle[['depth']]+1
         sub_bottle[['minusdepth']] = sub_bottle[['depth']]-1
 
@@ -272,7 +275,7 @@ def ocean_acidification(all_dfs):
         sub_ctd.drop_duplicates(inplace=True)
         print("Here is sub_ctd.sampledate")
         print(sub_ctd.sampledate)
-        sub_ctd.sampledate = sub_ctd.sampledate.apply(lambda x: x.strftime("%m/%d/%Y") if isinstance(x, datetime.datetime) else pd.Timestamp(x).date().strftime("%m/%d/%Y"))
+        sub_ctd.sampledate = sub_ctd.sampledate.apply(lambda x: x.strftime("%m/%d/%Y") if isinstance(x, datetime) else pd.Timestamp(x).date().strftime("%m/%d/%Y"))
 
         sub_ctd['datetime'] = pd.to_datetime(sub_ctd['sampledate'] + ' ' + sub_ctd['sampletime'])
         sub_ctd.drop(['sampledate','sampletime'], axis = 1, inplace = True)
@@ -324,6 +327,58 @@ def ocean_acidification(all_dfs):
         
 
     print("End of OA Custom Checks")
+
+    errs = [er for er in errs if len(er) > 0]
+    warnings = [w for w in errs if len(w) > 0]
+
+    # OA Analysis routine - pH correction and omega aragonite
+    if len(errs) == 0:
+        print("No errors - run analysis routine")
+        # Rscript /path/demo.R tmp.csv
+        print("session.get('excel_path')")
+        print(session.get('excel_path'))
+        print("os.path.join(os.getcwd(), 'R', 'oa.R')")
+        print(os.path.join(os.getcwd(), 'R', 'oa.R'))
+        cmdlist = [
+            'Rscript',
+            f"{os.path.join(os.getcwd(), 'R', 'oa.R')}", 
+            f"{session.get('submission_dir')}", 
+            f"{session.get('excel_path').rsplit('/', 1)[-1]}"
+        ]
+
+        # https://stackoverflow.com/questions/1996518/retrieving-the-output-of-subprocess-call
+        # sp is the subprocess module, imported up top
+        proc = sp.run(cmdlist, stdout=sp.PIPE, stderr=sp.PIPE, universal_newlines = True)
+
+        # print stdout/err
+        msg = f"STDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}"
+        print(msg)
+
+        if not bool(re.search(proc.stderr, '\s*')):
+            raise Exception(f"Error occurred in OA analysis script:\n{proc.stderr}")
+        
+        ctdpath = os.path.join(session.get('submission_dir'), 'analysis_ctd.csv')
+        bottlepath = os.path.join(session.get('submission_dir'), 'analysis_bottle.csv')
+
+        # open an ExcelWriter object to append to the excel workbook
+        writer = pd.ExcelWriter(session.get('excel_path'), engine = 'openpyxl', mode = 'a')
+        
+        if os.path.exists(ctdpath):
+            ctd = pd.read_csv(ctdpath)
+            ctd.to_excel(writer, sheet_name = 'analysis_oactd', index = False)
+        else:
+            raise Exception("OA Analysis ran with no errors, but the CTD analysis csv file was not found")
+
+        if os.path.exists(bottlepath):
+            bottle = pd.read_csv(bottlepath)
+            bottle.to_excel(writer, sheet_name = 'analysis_oabottle', index = False)
+        else:
+            raise Exception("OA Analysis ran with no errors, but the Bottle analysis csv file was not found")
+        
+        writer.close()
+
+
+
 
 
     return {'errors': errs, 'warnings': warnings}
