@@ -733,8 +733,8 @@ def chemistry(all_dfs):
     # QUESTION - Mercury seems to often be analyzed with the method EPA245.7m - what is the RPD threshold on that?
     # Based on the bight 2018 checker, it looks like Bowen told us it had to be under 30 - thats what the old one does
     
-    methods_20rpd = ['ICPAES', 'EPA200.7', 'EPA6010B'] # methods that require 20% RPD
-    methods_30rpd = ['ICPMS', 'EPA200.8', 'EPA6020Bm'] # methods that require 30% RPD
+    methods_20rpd = ['ICPAES', 'EPA200.7', 'EPA 6010B'] # methods that require 20% RPD
+    methods_30rpd = ['ICPMS', 'EPA200.8', 'EPA 6020Bm'] # methods that require 30% RPD
     
     rpdcheckmask = (
         inorg_sed_mask 
@@ -871,7 +871,7 @@ def chemistry(all_dfs):
     print('# Check - For SampleType = Method blank, we must require Result < 10 * MDL - if that criteria is met, the qualifier should be "none"')
     
     # First check that the result is under 10 times the MDL
-    badrows = results[(pah_sed_mask & results.sampletype == 'Method blank') & (results.result >= 10 * results.mdl)].tmp_row.tolist()
+    badrows = results[(pah_sed_mask & (results.sampletype == 'Method blank')) & (results.result >= (10 * results.mdl))].tmp_row.tolist()
     results_args.update({
         "badrows": badrows,
         "badcolumn": "Result",
@@ -945,22 +945,25 @@ def chemistry(all_dfs):
                 .merge(checkdf[~checkdf.passed], on = ['analysisbatchid'], how = 'inner')
             
             argslist = checkdf.groupby(['errmsg']) \
-                .apply(lambda df: df.tmp_row.tolist()) \
-                .reset_index(name = 'badrows') \
-                .apply(
-                    lambda row: 
-                    {
-                        "badrows": row.badrows,
-                        "badcolumn": "Result",
-                        "error_type": "Value Error",
-                        "error_message": row.errmsg
-                    },
-                    axis = 1
-                ).tolist()
+                .apply(lambda df: df.tmp_row.tolist())
+            
+            if not argslist.empty:
+                argslist = argslist \
+                    .reset_index(name = 'badrows') \
+                    .apply(
+                        lambda row: 
+                        {
+                            "badrows": row.badrows,
+                            "badcolumn": "Result",
+                            "error_type": "Value Error",
+                            "error_message": row.errmsg
+                        },
+                        axis = 1
+                    ).tolist()
 
-            for args in argslist:
-                results_args.update(args)
-                warnings.append(checkData(**results_args))
+                for args in argslist:
+                    results_args.update(args)
+                    warnings.append(checkData(**results_args))
 
     # --- END TABLE 5-4 Check #4 --- #
     
