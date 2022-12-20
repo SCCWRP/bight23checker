@@ -1222,7 +1222,7 @@ def chemistry(all_dfs):
     #   if that criteria is met, the qualifier should be "none" (WARNING)
     # First check that the result is under 10 times the MDL
     badrows = results[
-        (results.analyteclass.isin(['TOC','TN']) & results.sampletype == 'Method blank') & (results.result >= 10 * results.mdl)
+        (results.analyteclass.isin(['TOC','TN']) & results.sampletype == 'Method blank') & (results.result >= (10 * results.mdl))
     ].tmp_row.tolist()
     results_args.update({
         "badrows": badrows,
