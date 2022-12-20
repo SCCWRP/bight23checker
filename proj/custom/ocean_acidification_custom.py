@@ -305,12 +305,11 @@ def ocean_acidification(all_dfs):
                     6. all ranges are inclusive (i.e. boundary values included)
         '''
         
-        # NOTE Do these range checks apply to bottle???? - Robert - 7/15/2019
 
-        print("Now checking ranges on depth, temperature, salinity, density, and pH")
+        print("Now checking ranges on depth, temperature, salinity, density, and pH for CTD")
         # depth check
-        print(ctd[(ctd.depth < 0)|(ctd.depth > 200)][['season','agency','sampledate','sampletime','station','depth']])
-        warnings.append(checkData('tbl_oactd', ctd[(ctd.depth < 0)|(ctd.depth > 200)].tmp_row.tolist(),'Depth','Range Warning', 'Depth value is outside of what would be considered a normal range of values, (0 to 200)'))
+        print(ctd[(ctd.depth < 0)|(ctd.depth > 75)][['season','agency','sampledate','sampletime','station','depth']])
+        warnings.append(checkData('tbl_oactd', ctd[(ctd.depth < 0)|(ctd.depth > 75)].tmp_row.tolist(),'Depth','Range Warning', 'Depth value is outside of what would be considered a normal range of values, (0 to 75)'))
         # temperature check
         print(ctd[(ctd.temperature < 0)|(ctd.temperature > 20)][['season','agency','sampledate','sampletime','station','temperature']])
         warnings.append(checkData('tbl_oactd', ctd[(ctd.temperature < 0)|(ctd.temperature > 20)].tmp_row.tolist(),'Temperature','Range Warning', 'Temperature value outside of what would be considered a normal range (e.g. 0-15).'))
@@ -323,6 +322,25 @@ def ocean_acidification(all_dfs):
         # pH check
         print(ctd[(ctd.ph < 7.5)|(ctd.ph > 8.2)][['season','agency','sampledate','sampletime','station','ph']])
         warnings.append(checkData('tbl_oactd', ctd[(ctd.ph < 7.5)|(ctd.ph > 8.2)].tmp_row.tolist(), 'pH','Range Warning', 'pH value outside of what would be considered a normal range (e.g. 7.5-8.2).'))
+        print(ctd[(ctd.ph < 0)|(ctd.ph > 14)][['season','agency','sampledate','sampletime','station','ph']])
+        errs.append(checkData('tbl_oactd', ctd[(ctd.ph < 0)|(ctd.ph > 14)].tmp_row.tolist(), 'pH','Range Warning', 'pH value outside of the pH scale (0 to 14).'))
+
+
+        print("Now checking ranges on depth, temperature, salinity, density, and pH for bottle")
+        # depth check
+        print(bottle[(bottle.depth < 0)|(bottle.depth > 75)][['season','agency','sampledate','sampletime','station','depth']])
+        warnings.append(checkData('tbl_oabottle', bottle[(bottle.depth < 0)|(bottle.depth > 75)].tmp_row.tolist(),'Depth','Range Warning', 'Depth value is outside of what would be considered a normal range of values, (0 to 75)'))
+        # temperature check
+        print(bottle[(bottle.temperature < 0)|(bottle.temperature > 20)][['season','agency','sampledate','sampletime','station','temperature']])
+        warnings.append(checkData('tbl_oabottle', bottle[(bottle.temperature < 0)|(bottle.temperature > 20)].tmp_row.tolist(),'Temperature','Range Warning', 'Temperature value outside of what would be considered a normal range (e.g. 0-15).'))
+        # salinity check
+        print(bottle[(bottle.salinity < 33.0)|(bottle.salinity > 33.7)][['season','agency','sampledate','sampletime','station','salinity']])
+        warnings.append(checkData('tbl_oabottle', bottle[(bottle.salinity < 33.0)|(bottle.salinity > 33.7)].tmp_row.tolist(),'Salinity','Range Warning', 'Salinity value outside of what would be condsidered a normal range (e.g. 33.2-33.5).'))
+        # pH check
+        print(bottle[(bottle.ph < 7.5)|(bottle.ph > 8.2)][['season','agency','sampledate','sampletime','station','ph']])
+        warnings.append(checkData('tbl_oabottle', bottle[(bottle.ph < 7.5)|(bottle.ph > 8.2)].tmp_row.tolist(), 'pH','Range Warning', 'pH value outside of what would be considered a normal range (e.g. 7.5-8.2).'))
+        print(bottle[(bottle.ph < 0)|(bottle.ph > 14)][['season','agency','sampledate','sampletime','station','ph']])
+        errs.append(checkData('tbl_oabottle', bottle[(bottle.ph < 0)|(bottle.ph > 14)].tmp_row.tolist(), 'pH','Range Warning', 'pH value outside of the pH scale (0 to 14).'))
 
         
 
