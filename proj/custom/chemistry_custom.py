@@ -882,7 +882,7 @@ def chemistry(all_dfs):
 
     # If the requirement is met, check that the qualifier says none
     badrows = results[
-        ((pah_sed_mask & results.sampletype == 'Method blank') & (results.result < 10 * results.mdl)) & 
+        ((pah_sed_mask & results.sampletype == 'Method blank') & (results.result < (10 * results.mdl))) & 
         (results.qualifier != 'none')
     ].tmp_row.tolist()
 
@@ -1234,7 +1234,7 @@ def chemistry(all_dfs):
 
     # If the requirement is met, check that the qualifier says none
     badrows = results[
-        ((results.analyteclass.isin(['TOC','TN']) & results.sampletype == 'Method blank') & (results.result < 10 * results.mdl))
+        ((results.analyteclass.isin(['TOC','TN']) & results.sampletype == 'Method blank') & (results.result < (10 * results.mdl)))
         & 
         (results.qualifier != 'none')
     ].tmp_row.tolist()
