@@ -1222,7 +1222,7 @@ def chemistry(all_dfs):
     #   if that criteria is met, the qualifier should be "none" (WARNING)
     # First check that the result is under 10 times the MDL
     badrows = results[
-        (results.analyteclass.isin(['TOC','TN']) & results.sampletype == 'Method blank') & (results.result >= (10 * results.mdl))
+        ((results.analyteclass.isin(['TOC','TN'])) & (results.sampletype == 'Method blank')) & (results.result >= (10 * results.mdl))
     ].tmp_row.tolist()
     results_args.update({
         "badrows": badrows,
@@ -1234,7 +1234,7 @@ def chemistry(all_dfs):
 
     # If the requirement is met, check that the qualifier says none
     badrows = results[
-        ((results.analyteclass.isin(['TOC','TN']) & results.sampletype == 'Method blank') & (results.result < (10 * results.mdl)))
+        (((results.analyteclass.isin(['TOC','TN'])) & (results.sampletype == 'Method blank')) & (results.result < (10 * results.mdl)))
         & 
         (results.qualifier != 'none')
     ].tmp_row.tolist()
@@ -1254,7 +1254,7 @@ def chemistry(all_dfs):
     # --- TABLE 5-6 Check #2 --- #
     # Check - Duplicate Results must have RPD < 30% (WARNING)
     print('# Check - Duplicate Results must have RPD < 30% (WARNING)')
-    checkdf = results[results.analyteclass.isin(['TOC','TN']) & results.sampletype == 'Result']
+    checkdf = results[results.analyteclass.isin(['TOC','TN']) & (results.sampletype == 'Result')]
     if not checkdf.empty:
         checkdf = checkdf.groupby(['analysisbatchid', 'analytename','sampleid']).apply(
             lambda subdf:
@@ -1267,7 +1267,7 @@ def chemistry(all_dfs):
                 f"Duplicate Matrix spikes should have an RPD under 30% (for TOC and TN)"
                 , axis = 1
             )
-            checkdf = results[results.analyteclass.isin(['TOC','TN']) & results.sampletype == 'Result'] \
+            checkdf = results[results.analyteclass.isin(['TOC','TN']) & (results.sampletype == 'Result')] \
                 .merge(
                     checkdf[
                         # just merge records that failed the check
