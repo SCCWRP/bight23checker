@@ -56,6 +56,22 @@ def report():
 
 @report_bp.route('/warnings-report')
 def warnings_report():
+    eng = g.eng
+
+    datatype = request.args.get('datatype')
+
+    if datatype is not None:
+        print('tables')
+        tables = current_app.datasets.get(datatype).get('tables')
+        print(tables)
+
+    # tmp = pdread_sql('SELECT * FROM {table} WHERE warnings IS NOT NULL', eng)
+    # warnings_array = tmp.warnings.apply(lambda x: [s.split(' - ', 1)[-1] for s in x.split(';')]).values
+    # [item for sublist in warnings_array for item in sublist]
+    # unique_warnings = pd.Series([item for sublist in warnings_array for item in sublist]).unique()
+    
+    # pd.read_sql(f"SELECT * FROM tbl_toxwq WHERE warnings LIKE '%%{test}%%'", eng)
+    
     print('hello world')
     return 'hello world'
 
