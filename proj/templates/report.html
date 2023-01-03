@@ -6,9 +6,17 @@
     <title>{{ report_title }}</title>
 </head>
 <body>
-<h1>{{ report_title }}</h1>
-{% for table in tables %}
-            {{ table|safe }}
-{% endfor %}
+    {% if datatype %}
+
+    <h1>{{ report_title }}</h1>
+    {% for table in tables %}
+        {{ table|safe }}
+    {% endfor %}
+
+    {% else %}
+
+    <a href="{{request.script_root}}/report?datatype=chemistry">Chemistry</a>
+
+    {% endif %}
 </body>
 </html>

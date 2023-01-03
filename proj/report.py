@@ -10,7 +10,11 @@ def report():
     valid_datatypes = ['field', 'chemistry', 'infauna', 'toxicity']
     datatype = request.args.get('datatype')
     if datatype is None:
-        return "No datatype specified"
+        print("No datatype specified")
+        return render_template(
+            'report.html',
+            datatype=datatype
+        )
     if datatype in valid_datatypes:
         report_df = pd.read_sql(f'select * from vw_{datatype}_completeness_report', g.eng)
         report_df.set_index(['submissionstatus', 'lab', 'parameter'], inplace = True)
@@ -19,7 +23,8 @@ def report():
         report_df.set_index(['submissionstatus', 'lab'], inplace = True)
 
     return render_template(
-        'report.html',  
+        'report.html',
+        datatype=datatype,
         tables=[report_df.to_html(classes=['w3-table','w3-bordered'], header="true", justify = 'left', sparsify = True)], 
         report_title = f'{datatype.capitalize()} Completeness Report'
     )
@@ -49,6 +54,8 @@ def report():
 #  <a href="/warnings-report?datatype=toxicity">Toxicity</a>
 # etc
 
-# @report_bp.route('/warnings-report')
-# def warnings_report():
+@report_bp.route('/warnings-report')
+def warnings_report():
+    print('hello world')
+    return 'hello world'
 
