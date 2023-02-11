@@ -1,5 +1,5 @@
 import os, time
-from flask import send_file, Blueprint, jsonify, request, g, current_app, render_template, send_from_directory
+from flask import send_file, Blueprint, jsonify, request, g, current_app, render_template, send_from_directory, make_response
 import pandas as pd
 from pandas import read_sql, DataFrame
 import json
@@ -61,27 +61,34 @@ def warnings_report():
     print(datatype)
     table = request.args.get('table')
     print(table)
-    if table is None:
+    if datatype is None and table is None:
         json_file = open('proj/config/config.json') 
         data = json.load(json_file)
         dataset_options = data["DATASETS"].keys()
-        # table_options =data['DATASETS'][datatype]['tables']
+        print("Missing fields")
+        return render_template(
+            'warnings-report.html',
+            dataset_options = dataset_options
+            )
+    elif table is None :
+        json_file = open('proj/config/config.json') 
+        data = json.load(json_file)
+        dataset_options = data["DATASETS"].keys()
+        table_options =data['DATASETS'][datatype]['tables']
         print("Missing fields")
         return render_template(
             'warnings-report.html',
             dataset_options = dataset_options,
-            # table_options = table_options
+            table_options = table_options
             )
-    else :
-        # table_options = current.app.datasets.get(datatype).get('tables')
-
+    else: 
         eng = g.eng
         sql_query = f"SELECT * FROM {table} WHERE warnings IS NOT NULL"
         tmp = pd.read_sql(sql_query, eng)
         warnings_array = tmp.warnings.apply(lambda x: [s.split(' - ', 1)[-1] for s in x.split(';')]).values
-        # [item for sublist in warnings_array for item in sublist]
         unique_warnings = pd.Series([item for sublist in warnings_array for item in sublist]).unique()
         df = pd.DataFrame(unique_warnings, columns = ["Warnings"])
+        print(df)
         # warnings_table = df.to_html(header="true", table_id="table")
 
 
@@ -89,25 +96,39 @@ def warnings_report():
         i=0
         for row in df.Warnings:    
             bad_data= pd.read_sql(f"SELECT * FROM {table} WHERE warnings LIKE '%%{row}%%'", eng)
-            bad_dictionary[f"errors{i}"] = bad_data
+
+            # bad_data.to_excel("downloadable_data.xlsx", index=False)
+            # df["downloadable_data"] = downloadable_data
+            print(bad_data)
+
+
+            # bad_dictionary[f"errors{i}"] = bad_data
             # print(bad_dictionary.get(f"errors{i}"))
-            downloadable_data = bad_dictionary.get(f"errors{i}").to_csv(index=False, encoding='utf-8')
-            print(downloadable_data)
-            i=i+1
-            print("helloWorld")
+            #downloadable_data = bad_dictionary.get(f"errors{i}").to_csv(index=False, encoding='utf-8')
+            # print(downloadable_data)
+            # i=i+1
+            # print("helloWorld")
             # Need to write download thingy here 
             # df["Download Data"]= csv_data
 
             # df.rows= pd.DataFrame(bad_data, columns = ["Bad Data"])
             # print(csv_data)
+
+
+
             
-                 
-
-
-
         return render_template(
             'warnings-report.html',
             datatype=datatype,
             table = table,
-            warnings_table = [df.to_html(classes='data')], titles=df.columns.values)
+            warnings_table = [df.to_html(classes='data')], titles=df.columns.values,
+            df=df)
         
+@report_bp.route('/warnings-report/download/<export_name>', methods = ['GET','POST'])
+def download(export_name):
+#     # bad_data= pd.read_sql(f"SELECT * FROM {table} WHERE warnings LIKE '%%{row}%%'", eng)
+
+#     # bad_data.to_excel("downloadable_data.xlsx", index=False)
+#     # df["downloadable_data"] = downloadable_data  
+#     #   w = 1
+    return send_from_directory(os.path.join(os.getcwd(), "export", "data_query"), export_name, as_attachment=True)

@@ -8,18 +8,25 @@
 
 
 <body>
+    <h1>
+        Warnings report for {{table}}
+    </h1>
+    <h2>
+        Click on warning to download all data containing said warning
+    </h2>
+
+
+
     {% if table %}
 
-    {% for table in warnings_table %}
-            {{titles[loop.index]}}
-            {{ table|safe }}
+    {% for warning in warnings_table %}
+            <!-- {{titles[loop.index]}} -->
+            <a href="{{ url_for('report.download', export_name=warning) }}">{{ warning|safe }}</a>
     {% endfor %}
+    
 
-    {{ download }}
 
     {% else %}
-
-
     Please pick a datatype:
     <form action="/bight23checker/warnings-report">
         <label for="datatype">
@@ -33,33 +40,6 @@
         </label>
         <br>
     </form>
-
-    <script lang="js">
-        // fetch("/var/www/bight23/checker/proj/config/config.json").then(function (response) {
-        //     return response.json
-        // }). then(function (obj) {
-        //     console.log(obj)
-        // })
-        // function generate_tables() {
-        //     var datatype = document.getElementById("datatype")
-        //     return datatype
-        //     console.log(datatype)
-        // }
-        // function generate_tables() {
-        //     selectElement = document.querySelector('datatype');
-        //     // output = selectElement.value;
-        //     // document.querySelector('.output').textContent = output;
-        //     console.log(selectElement)
-        // }
-        function generate_tables() {
-            var datatype = document.getElementById("datatype");
-            console.log(datatype)
-        }
-
-        test.addEventListener("click", generate_tables);
-
-
-    </script>
     
     <br>
     <form action="/bight23checker/warnings-report">
@@ -90,3 +70,4 @@
 </html>
 
 <!-- tbl_chembatch -->
+

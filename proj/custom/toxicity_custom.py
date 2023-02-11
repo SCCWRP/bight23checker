@@ -567,7 +567,12 @@ def toxicity(all_dfs):
     # clean up the errors list
     errs = [e for e in errs if len(e) > 0]
     
-    ### SUMMARY TABLE START ###
+
+    #################################################
+    ### ---------- SUMMARY TABLE START ---------- ###
+    #################################################
+    
+    
     if len(errs) == 0:
         # summary must not be a groupby otherwise below functions wont work
         print("Creating Toxicity Summary Results Table")
@@ -644,7 +649,15 @@ def toxicity(all_dfs):
             for index, values in summary['toxbatch'].iteritems():
                 station_code = summary.loc[index, 'stationid']
                 cneg_result = summary[['result']].where((summary['sampletypecode'] == 'CNEG') & (summary['toxbatch'] == values))
-                result_both = summary[['result']].where((summary['toxbatch'] == values) & (summary['stationid'] == station_code) )
+                
+                # for "result both", we need to exclude the sampletypecode of 'QA' and CNSL (per Darrin)
+                # Robert Butler - Jan 30 2023
+                result_both = summary[['result']].where(
+                    (summary['toxbatch'] == values) 
+                    & (summary['stationid'] == station_code) 
+                    & (summary['sampletypecode'] != 'QA')
+                    & (summary['sampletypecode'] != 'CNSL')
+                )
                 #plus it was causing a critical and i dont know why
                 cneg_result = cneg_result.dropna()
                 result_both = result_both.dropna()
@@ -703,7 +716,6 @@ def toxicity(all_dfs):
                             grp['sqocategory'] = 'Low Toxicity'
                 else:
                     grp['sqocategory'] = 'Nontoxic'
-            
             return grp
 
         print("calling getSQO")
