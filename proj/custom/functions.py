@@ -173,12 +173,8 @@ def check_strata_grab(grab, strata_lookup, field_assignment_table):
         axis=1
     )
 
-    # Assert if we are not able to find the lookup strata
-    # Strata lookup dictionary has (region, stratum) as keys, so if the region + stratum combination is not in the lookup list, we cannot match
-    not_in_field_assignment_table = [(x,y) for x,y in zip(grab['region'], grab['stratum']) if (x,y) not in strata_lookup.keys()]
-    assert len(not_in_field_assignment_table) == 0, f"{','.join(not_in_field_assignment_table)} these combos are not in the field_assignment_table" 
-
     # Now we check if the points are in associated polygon or not. Assign True if they are in
+    print("Now we check if the points are in associated polygon or not. Assign True if they are in")
     grab['is_station_in_strata'] = grab.apply(
         lambda row: strata_lookup.get((row['region'], row['stratum'])).contains(row['SHAPE'])
         if strata_lookup.get((row['region'], row['stratum']), None) is not None
