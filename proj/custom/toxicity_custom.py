@@ -116,15 +116,15 @@ def toxicity(all_dfs):
     })
     errs = [*errs, checkData(**toxbatch_args)]
 
-    badrows = toxresults[~toxresults[['toxbatch','lab']].isin(toxwq[['toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    badrows = toxresults[~toxresults[['stationid','toxbatch','lab']].isin(toxwq[['stationid','toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
     toxresults_args.update({
         "dataframe": toxresults,
         "tablename": 'tbl_toxresults',
         "badrows": badrows,
-        "badcolumn": "toxbatch,lab",
+        "badcolumn": "stationid,toxbatch,lab",
         "error_type": "Logic Error",
         "is_core_error": False,
-        "error_message": "ach Toxicity Result record must have a corresponding Toxicity WQ record. Records are matched on ToxBatch and Lab."
+        "error_message": "Each Toxicity Result record must have a corresponding Toxicity WQ record. Records are matched on ToxBatch and Lab."
     })
     errs = [*errs, checkData(**toxresults_args)] 
     
@@ -141,12 +141,12 @@ def toxicity(all_dfs):
     })
     errs = [*errs, checkData(**toxwq_args)]
     
-    badrows = toxwq[~toxwq[['toxbatch','lab']].isin(toxresults[['toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    badrows = toxwq[~toxwq[['stationid','toxbatch','lab']].isin(toxresults[['stationid','toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
     toxwq_args.update({
         "dataframe": toxwq,
         "tablename": 'tbl_toxwq',
         "badrows": badrows,
-        "badcolumn": "toxbatch,lab",
+        "badcolumn": "stationid,toxbatch,lab",
         "error_type": "Logic Error",
         "is_core_error": False,
         "error_message": "Each Toxicity WQ record must have a corresponding Toxicity Result record. Records are matched on ToxBatch and Lab."
