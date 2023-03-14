@@ -353,6 +353,41 @@ def toxicity(all_dfs):
         tmpargs = multivalue_lookup_check(toxbatch, 'testacceptability', 'lu_toxtestacceptability', 'testacceptability', dbconnection = eng, displayfieldname = "TestAcceptability")
         toxbatch_args.update(tmpargs)
         errs = [*errs, checkData(**toxbatch_args)]
+
+        # 4. ACTUAL TEST DURATION FOR EACH SPECIES IN BATCH TAB
+        print("## ACTUAL TEST DURATION FOR EACH SPECIES IN BATCH TAB ##")
+        # ERROR - Eohaustorius estuarius/Reference >= 4 
+        print("## ERROR - Eohaustorius estuarius/Reference >= 4 ##")
+        badrows = toxbatch[(toxbatch['species'] == 'Eohaustorius estuarius') & (toxbatch['matrix'] == 'Reference Toxicant') & (toxbatch['actualtestduration'] >= 4)].index.tolist()
+        toxbatch_args.update({
+            "badrows": badrows,
+            "badcolumn": "species,actualtestduration",
+            "error_type": "Undefined Error",
+            "error_message": "For records with species of Eohaustorius estuarius and matrix Reference Toxicant, the ActualTestDuration must be less than 4."
+        })
+        errs = [*errs, checkData(**toxbatch_args)]
+        # ERROR - Eohaustorius estuarius/Whole Sediment = 10 
+        print("## ERROR - Eohaustorius estuarius/Whole Sediment = 10 ##")
+        badrows = toxbatch[(toxbatch["species"] == "Eohaustorius estuarius") & (toxbatch["matrix"] == "Whole Sediment") & (toxbatch["actualtestduration"] == 10)].index.tolist()
+        toxbatch_args.update({
+            "badrows": badrows,
+            "badcolumn": "species,actualtestduration",
+            "error_type": "Undefined Error",
+            "error_message": "If species is Eohaustorius estuarius and matrix is Whole Sediment then the ActualTestDuration cannot be 10."
+        })
+        errs = [*errs, checkData(**toxbatch_args)]
+        # ERROR - Mytilus galloprovincialis/Reference or Whole Sediment 48hours or 2 days 
+        print("## ERROR - Mytilus galloprovincialis/Reference or Whole Sediment 48hours or 2 days ##")
+        badrows = toxbatch[(toxbatch["species"] == "Mytilus galloprovincialis") & ((toxbatch['matrix'] == 'Reference Toxicant') | (toxbatch["matrix"] == "Whole Sediment")) & (((toxbatch["actualtestduration"] == 48) & (toxbatch["actualtestdurationunits"] == 'Hours')) | ((toxbatch["actualtestduration"] == 2) & (toxbatch["actualtestdurationunits"] == 'Days')))].index.tolist()
+        toxbatch_args.update({
+           "badrows": badrows,
+           "badcolumn": "species,actualtestduration",
+           "error_type": "Undefined Error",
+           "error_message": "If species is Mytilus galloprovincialis or matrix is Whole Sediment then the ActualTestDuration cannot be 48 hours or 2 days."
+        })
+        errs = [*errs, checkData(**toxbatch_args)]
+        ## STILL NEED TO ADD SP CHECK FOR ACTUALTESTDURATION
+
         ## END BATCH CHECKS ##
 
         ## RESULT CHECKS ##
@@ -551,13 +586,13 @@ def toxicity(all_dfs):
         k = pg[pg.missing != set()]
         print(k)
         for i in k.index:
-            if k.sampletypecode[i] != 'CNSL':
+            if (k.sampletypecode[i] != 'CNSL') and (not pd.isnull(k.missing[i])):
                 badrows = toxbatch[(toxbatch.toxbatch == k.toxbatch[i])&(toxbatch.species == k.species[i])].tmp_row.tolist()
                 toxbatch_args.update({
                     "badrows": badrows,
                     "badcolumn": "toxbatch",
                     "error_type": "Undefined Error",
-                    "error_message": 'Associated water quality group %s/%s/%s is missing time points %s.' %(k.parameter[i],k.species[i],k.sampletypecode[i],list(k.missing[i]))
+                    "error_message": f'Associated water quality group {k.parameter[i]}/{k.species[i]}/{k.sampletypecode[i]} is missing time points {list(k.missing[i])}.'
                 })
                 errs = [*errs, checkData(**toxbatch_args)]
     ## END WQ CHECKS ##
