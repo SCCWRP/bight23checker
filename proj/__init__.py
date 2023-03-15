@@ -13,6 +13,7 @@ from .report import report_bp
 from .scraper import scraper
 from .templater import templater # for dynamic lookup lists called into template before output to user
 from .strata_map_check import map_check, getgeojson
+from .track import track
 
 CUSTOM_CONFIG_PATH = os.path.join(os.getcwd(), 'proj', 'config')
 
@@ -41,6 +42,12 @@ app.secret_key = os.environ.get("FLASK_APP_SECRET_KEY")
 # add all the items from the config file into the app configuration
 # we should probably access all custom config items in this way
 app.config.update(CONFIG)
+
+# add option to allow empty tables in submissions
+# some projects have asked for that, other projects require us to not allow empty tables in submissions
+if 'ALLOW_EMPTY_TABLES' in CONFIG.keys():
+    assert CONFIG.get('ALLOW_EMPTY_TABLES') in ('True', 'False'), 'ALLOW_EMPTY_TABLES option in app configuration must be "True" or "False" - case sensitive'
+    app.config['ALLOW_EMPTY_TABLES'] = eval(CONFIG.get('ALLOW_EMPTY_TABLES'))
 
 # set the database connection string, database, and type of database we are going to point our application at
 #app.eng = create_engine(os.environ.get("DB_CONNECTION_STRING"))
@@ -151,3 +158,4 @@ app.register_blueprint(templater)
 app.register_blueprint(report_bp)
 app.register_blueprint(map_check)
 app.register_blueprint(getgeojson)
+app.register_blueprint(track)

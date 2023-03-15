@@ -628,7 +628,10 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
 
         # Check if trawl stations are in strata
         print("Check if trawl stations are in strata")
+        # checker thing is breaking 
+        print("-------------------- it broke between this --------------------")
         bad_df = check_strata_trawl(trawl, strata_lookup, field_assignment_table)
+        print("-------------------- and this --------------------") # yes it is breaking here :/
 
         if len(bad_df) > 0:
             export_sdf_to_json(os.path.join(session['submission_dir'], "bad_trawl.json"), bad_df)
@@ -741,21 +744,44 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         })
         errs = [*errs, checkData(**grab_args)]
         
-        # Check if trawl stations are in strata
-        print("# Check if grab stations are in strata")
-        bad_df = check_strata_grab(grab, strata_lookup, field_assignment_table)
-        print(bad_df)
-        if len(bad_df) > 0:
-            export_sdf_to_json(os.path.join(session['submission_dir'], "bad_grab.json"), bad_df)
-            export_sdf_to_json(os.path.join(session['submission_dir'], "bight_strata.json"), strata[strata['region'].isin(bad_df['region'])])
+        # Check if grab stationid is in field_assignment_table
+        merged = pd.merge(
+            grab, 
+            field_assignment_table.filter(items=['stationid','stratum','region']), 
+            how='left', 
+            on=['stationid'],
+            indicator=True
 
-        grab_args.update({
-            "badrows": bad_df.tmp_row.tolist(),
-            "badcolumn": 'latitude,longitude',
-            "error_type": "Location Error",
-            "error_message" : f'This station has lat, long outside of the bight strata'
-        })
-        errs = [*errs, checkData(**grab_args)]
+        )
+        bad_df = merged[merged['_merge'] == 'left_only']
+        if len(bad_df) > 0:
+            grab_args.update({
+                "badrows": bad_df.tmp_row.tolist(),
+                "badcolumn": 'stationid',
+                "error_type": "Lookup Error",
+                "error_message" : f'These stations are not in the field assignment table'
+            })
+            errs = [*errs, checkData(**grab_args)]
+            strata_check = False
+        else:
+            strata_check = True
+
+        if strata_check:
+            # Check if grab stations are in strata
+            print("# Check if grab stations are in strata")
+            bad_df = check_strata_grab(grab, strata_lookup, field_assignment_table)
+            print(bad_df)
+            if len(bad_df) > 0:
+                export_sdf_to_json(os.path.join(session['submission_dir'], "bad_grab.json"), bad_df)
+                export_sdf_to_json(os.path.join(session['submission_dir'], "bight_strata.json"), strata[strata['region'].isin(bad_df['region'])])
+
+            grab_args.update({
+                "badrows": bad_df.tmp_row.tolist(),
+                "badcolumn": 'latitude,longitude',
+                "error_type": "Location Error",
+                "error_message" : f'This station has lat, long outside of the bight strata'
+            })
+            errs = [*errs, checkData(**grab_args)]
         print("end grab CHECKS")
 
         ## end grab CHECKS ##

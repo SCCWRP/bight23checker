@@ -5,6 +5,7 @@ from email.mime.application import MIMEApplication
 from email.utils import COMMASPACE, formatdate
 from email import encoders
 import smtplib
+from smtplib import SMTPException
 import pandas as pd
 
 # Function to be used later in sending email
@@ -13,23 +14,34 @@ def send_mail(send_from, send_to, subject, text, filename=None, server="localhos
     
     msg['From'] = send_from
     msg['To'] = COMMASPACE.join(send_to)
+    print("----- MESSAGE TO ----")
+    print(msg['To'])
     msg['Date'] = formatdate(localtime=True)
     msg['Subject'] = subject
     
     msg_content = MIMEText(text)
     msg.attach(msg_content)
     
+    print(f"filename: {filename}")
     if filename is not None:
+        print("filename IS NOT NONE")
         attachment = open(filename,"rb")
         p = MIMEBase('application','octet-stream')
         p.set_payload((attachment).read())
         encoders.encode_base64(p)
         p.add_header('Content-Disposition','attachment; filename= %s' % filename.split("/")[-1])
         msg.attach(p)
-
-    smtp = smtplib.SMTP(server)
-    smtp.sendmail(send_from, send_to, msg.as_string())
-    smtp.close()
+        print(" done with if conditional within send_mail fcn")
+    try:
+        print("inside try to send the email")
+        smtp = smtplib.SMTP(server)
+        print(smtp)
+        smtp.sendmail(send_from, send_to, msg.as_string())
+        print("it sent the thing")
+        smtp.close()
+        print("it closed the thing")
+    except SMTPException:
+        print("Error: unable to send email")
 
 
 def data_receipt(send_from, always_send_to, login_email, dtype, submissionid, originalfile, tables, eng, mailserver, login_info, *args, **kwargs):

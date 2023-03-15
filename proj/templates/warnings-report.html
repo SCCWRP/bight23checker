@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ table }}</title>
+</head>
+
+
+<body>
+    <h1>
+        Warnings report for {{table}}
+    </h1>
+    <h2>
+        Click on warning to download all data containing said warning
+    </h2>
+
+
+
+    {% if table %}
+
+    {% for warning in warnings_table %}
+            <!-- {{titles[loop.index]}} -->
+            <a href="{{ url_for('report.download', export_name=warning) }}">{{ warning|safe }}</a>
+    {% endfor %}
+    
+
+
+    {% else %}
+    Please pick a datatype:
+    <form action="/bight23checker/warnings-report">
+        <label for="datatype">
+            <select name= datatype id="datatype" method="GET" action="/">
+                {% for data in dataset_options %}
+                <option value="{{data}}"> {{data}}</option>
+                {% endfor %}
+            </select>
+            <button id="test" onclick="generate_tables();">Generate tables</button>
+            <!-- <input type="submit" value="Generate tables"> -->
+        </label>
+        <br>
+    </form>
+    
+    <br>
+    <form action="/bight23checker/warnings-report">
+        <label for="table">
+            <select name= table method="GET" action="/">
+                {% for data in table_options %}
+                <option value="{{data}}"> {{data}}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <input type="submit" value="Generate Report">
+
+    </form>
+    {% endif %}
+
+
+
+
+
+
+
+
+    <!-- <a href="{{request.script_root}}/warnings-report?datatype=test">Chemistry</a> -->
+
+
+</body>
+
+</html>
+
+<!-- tbl_chembatch -->
+

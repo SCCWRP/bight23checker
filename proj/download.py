@@ -6,7 +6,7 @@ from pandas import read_sql, DataFrame
 download = Blueprint('download', __name__)
 @download.route('/download/<submissionid>/<filename>', methods = ['GET','POST'])
 def submission_file(submissionid, filename):
-    return send_file( os.path.join(os.getcwd(), "files", submissionid, filename), as_attachment = True, attachment_filename = filename ) \
+    return send_file( os.path.join(os.getcwd(), "files", submissionid, filename), as_attachment = True, download_name = filename ) \
         if os.path.exists(os.path.join(os.getcwd(), "files", submissionid, filename)) \
         else jsonify(message = "file not found")
 
@@ -196,7 +196,7 @@ def template_file():
 
 
     if filename is not None:
-        return send_file( os.path.join(os.getcwd(), "export", "data_query", filename), as_attachment = True, attachment_filename = filename ) \
+        return send_file( os.path.join(os.getcwd(), "export", "data_query", filename), as_attachment = True, download_name = filename ) \
             if os.path.exists(os.path.join(os.getcwd(), "export", "data_query", filename)) \
             else jsonify(message = "file not found")
     
@@ -220,7 +220,7 @@ def data_query(export_name):
 #     tablename = request.args.get('tablename')
 
 #     if filename is not None:
-#         return send_file( os.path.join(os.getcwd(), "export", "data_query", filename), as_attachment = True, attachment_filename = filename ) \
+#         return send_file( os.path.join(os.getcwd(), "export", "data_query", filename), as_attachment = True, download_name = filename ) \
 #             if os.path.exists(os.path.join(os.getcwd(), "export", "data_query", filename)) \
 #             else jsonify(message = "file not found")
     
@@ -238,7 +238,7 @@ def data_query(export_name):
 
 #         data.to_csv(datapath, index = False)
 
-#         return send_file( datapath, as_attachment = True, attachment_filename = f'{tablename}.csv' )
+#         return send_file( datapath, as_attachment = True, download_name = f'{tablename}.csv' )
 
 #     else:
 #         return jsonify(message = "neither a filename nor a database tablename were provided")

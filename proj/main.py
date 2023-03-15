@@ -79,6 +79,9 @@ def main():
         *current_app.tabs_to_ignore, 
         *(current_app.config.get("EXCEL_TABS_CREATED_BY_CHECKER") if current_app.config.get("EXCEL_TABS_CREATED_BY_CHECKER") else []) 
     ]
+
+    converters = current_app.config.get('DTYPE_CONVERTERS')
+    converters = {k: eval(v) for k,v in converters.items()} if converters is not None else None
     all_dfs = {
 
         # Some projects may have descriptions in the first row, which are not the column headers
@@ -86,17 +89,23 @@ def main():
         # For projects that do not set up their data templates in this way, that arg should be removed
 
         # Note also that only empty cells will be regarded as missing values
+        
         sheet: pd.read_excel(
             excel_path, 
             sheet_name = sheet,
             skiprows = current_app.excel_offset,
-            na_values = ['']
+            na_values = [''],
+            converters = converters
         )
         
         for sheet in pd.ExcelFile(excel_path).sheet_names
         
         if ((sheet not in ignored_tabs) and (not sheet.startswith('lu_')))
     }
+
+    # filter out empty dataframes
+    all_dfs = { dfname: df for dfname, df in all_dfs.items() if not df.empty }
+    
     
     assert len(all_dfs) > 0, f"submissionid - {session.get('submissionid')} all_dfs is empty"
     
@@ -282,6 +291,8 @@ def main():
         # Leaving this in out of fear of breaking the application
         # All i know is if i leave it untouched, it wont affect anything
         except Exception as e:
+            # print("entered second exception block --------")
+            # print(e)
             raise Exception(e)
         
         print("custom_output: ")
