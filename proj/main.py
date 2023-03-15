@@ -291,6 +291,8 @@ def main():
         # Leaving this in out of fear of breaking the application
         # All i know is if i leave it untouched, it wont affect anything
         except Exception as e:
+            # print("entered second exception block --------")
+            # print(e)
             raise Exception(e)
         
         print("custom_output: ")

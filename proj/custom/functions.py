@@ -64,7 +64,7 @@ def checkLogic(df1, df2, cols: list, error_type = "Logic Error", df1_name = "", 
     lcols = [x.lower() for x in cols] # lowercase cols
     tmp_missing_val = 'missing_value'
     badrows = df1[
-        ~df1[[lcols]].fillna(tmp_missing_val).isin(df2[[lcols]].fillna(tmp_missing_val).to_dict(orient='list')).all(axis=1)
+        ~df1[lcols].fillna(tmp_missing_val).isin(df2[lcols].fillna(tmp_missing_val).to_dict(orient='list')).all(axis=1)
     ].index.tolist()
 
     print("end checkLogic")

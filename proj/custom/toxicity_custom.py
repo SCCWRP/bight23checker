@@ -154,11 +154,11 @@ def toxicity(all_dfs):
     errs = [*errs, checkData(**toxwq_args)]
 
     # 2 - Check for the minimum number of replicates - ee and mg = 5 and na = 10
-    ## first get a lab replicate count grouped on stationid, toxbatch, and species
-    dfrep = pd.DataFrame(toxresults.groupby(['stationid','toxbatch','species']).size().reset_index(name='replicatecount'))
+    ## first get a lab replicate count grouped on stationid, toxbatch, species, and sampletypecode
+    dfrep = pd.DataFrame(toxresults.groupby(['stationid','toxbatch','species','sampletypecode']).size().reset_index(name='replicatecount'))
     ## merge the lab replicant group with results so that you can get the tmp_row - the lab rep count will be matched with each lab rep
     ## we will want to highlight them as a group rather than by row
-    dfrep = pd.merge(dfrep,toxresults, on=['stationid','toxbatch','species'], how='inner')
+    dfrep = pd.merge(dfrep,toxresults, on=['stationid','toxbatch','species','sampletypecode'], how='inner')
     print("## A MINIMUM NUMBER OF 5 REPLICATES ARE REQUIRED FOR SPECIES EOHAUSTORIUS ESTUARIUS AND MYTILUS GALLOPROVINCIALIS ##")
     badrows = dfrep[
         (dfrep['species'].isin(['Eohaustorius estuarius','EE','Mytilus galloprovincialis','MG'])) & 
@@ -168,12 +168,13 @@ def toxicity(all_dfs):
         "dataframe": toxresults,
         "tablename": 'tbl_toxresults',
         "badrows": badrows,
-        "badcolumn": "toxbatch,lab",
+        "badcolumn": "toxbatch,lab,sampletypecode",
         "error_type": "Logic Error",
         "is_core_error": False,
         "error_message": "A minimum number of 5 replicates are required for species Eohaustorius estuarius and Mytilus galloprovincialis"
     })
     errs = [*errs, checkData(**toxresults_args)] 
+
     print("## A MINIMUM NUMBER OF 10 REPLICATES ARE REQUIRED FOR SPECIES NEANTHES ARENACEODENTATA ##")
     badrows = dfrep[(dfrep['species'] == 'Neanthes arenaceodentata') & (dfrep['replicatecount'] < 10)].tmp_row.tolist()
     toxresults_args.update({
@@ -455,6 +456,17 @@ def toxicity(all_dfs):
         tmpargs = multivalue_lookup_check(toxresults, 'qacode', 'lu_toxtestacceptability', 'testacceptability', dbconnection = eng, displayfieldname = 'QACode')
         toxresults_args.update(tmpargs)
         errs = [*errs, checkData(**toxresults_args)]
+
+        # 5. ENDPOINT PERCENT NORMAL-ALIVE APPLIES TO MG.
+        print("## ENDPOINT PERCENT NORMAL-ALIVE APPLIES TO MG ##")
+        badrows = toxresults[(toxresults["species"] != "Mytilus galloprovincialis") & (toxresults["endpoint"] == "Percent normal-alive")].tmp_row.tolist()
+        toxresults_args.update({
+            "badrows": badrows,
+            "badcolumn": "species, endpoint",
+            "error_type": "Undefined Error",
+            "error_message": "Endpoint Percent Normal-alive applies to Mytilus galloprovincialis."
+        })
+        errs = [*errs, checkData(**toxresults_args)] 
         ## END RESULT CHECKS ##
 
         ## START WQ CHECKS ##

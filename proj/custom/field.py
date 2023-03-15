@@ -628,7 +628,10 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
 
         # Check if trawl stations are in strata
         print("Check if trawl stations are in strata")
+        # checker thing is breaking 
+        print("-------------------- it broke between this --------------------")
         bad_df = check_strata_trawl(trawl, strata_lookup, field_assignment_table)
+        print("-------------------- and this --------------------") # yes it is breaking here :/
 
         if len(bad_df) > 0:
             export_sdf_to_json(os.path.join(session['submission_dir'], "bad_trawl.json"), bad_df)
