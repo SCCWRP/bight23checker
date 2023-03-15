@@ -61,7 +61,11 @@ def checkLogic(df1, df2, cols: list, error_type = "Logic Error", df1_name = "", 
     )
 
     # 'Kristin wrote this code in ancient times.'
-    badrows = df1[~df1[cols].isin(df2[cols].to_dict(orient='list')).all(axis=1)].index.tolist()
+    lcols = [x.lower() for x in cols] # lowercase cols
+    tmp_missing_val = 'missing_value'
+    badrows = df1[
+        ~df1[lcols].fillna(tmp_missing_val).isin(df2[lcols].fillna(tmp_missing_val).to_dict(orient='list')).all(axis=1)
+    ].index.tolist()
 
     print("end checkLogic")
 
@@ -173,12 +177,8 @@ def check_strata_grab(grab, strata_lookup, field_assignment_table):
         axis=1
     )
 
-    # Assert if we are not able to find the lookup strata
-    # Strata lookup dictionary has (region, stratum) as keys, so if the region + stratum combination is not in the lookup list, we cannot match
-    not_in_field_assignment_table = [(x,y) for x,y in zip(grab['region'], grab['stratum']) if (x,y) not in strata_lookup.keys()]
-    assert len(not_in_field_assignment_table) == 0, f"{','.join(not_in_field_assignment_table)} these combos are not in the field_assignment_table" 
-
     # Now we check if the points are in associated polygon or not. Assign True if they are in
+    print("Now we check if the points are in associated polygon or not. Assign True if they are in")
     grab['is_station_in_strata'] = grab.apply(
         lambda row: strata_lookup.get((row['region'], row['stratum'])).contains(row['SHAPE'])
         if strata_lookup.get((row['region'], row['stratum']), None) is not None
@@ -200,6 +200,8 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
         how='left', 
         on=['stationid']
     )
+    print("trawl merged df: ")
+    print(trawl)
 
     # Make the points based on long, lat columns of grab
     trawl['SHAPE'] = trawl.apply(
@@ -213,13 +215,43 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
         }),
         axis=1
     )
+    print("------- shape was populated -------")
     
     # Assert if we are not able to find the lookup strata
     # Strata lookup dictionary has (region, stratum) as keys, so if the region + stratum combination is not in the lookup list, we cannot match
+    print("it probably crashes at the zip function")
     not_in_field_assignment_table = [(x,y) for x,y in zip(trawl['region'], trawl['stratum']) if (x,y) not in strata_lookup.keys()]
-    assert len(not_in_field_assignment_table) == 0, f"{','.join(not_in_field_assignment_table)} these combos are not in the field_assignment_table" 
+    print("--- not_in_field_assignment_table ---")
+    print(not_in_field_assignment_table) # this passed
+    print("                             ")
+    print("                             ")
+    print("                             ")
+    print("checking the length")
+    print(len(not_in_field_assignment_table) == 0)
+    print(not_in_field_assignment_table[0][0])
+    print(type(not_in_field_assignment_table[0][0]))
+
+    print("REPLACING THE NUMERIC nan WITH TEXT null")
+    if np.nan in not_in_field_assignment_table[0]:
+        #replace numeric nan with text null
+        not_in_field_assignment_table = [
+            #tuple(None if isinstance(i, float) and math.isnan(i) else i for i in t) 
+            # try with empty string instead because None will be nonetype object and .join does not like that
+            tuple('' if isinstance(i, float) and math.isnan(i) else i for i in t) 
+            for t in not_in_field_assignment_table
+        ]
+    print(not_in_field_assignment_table)
+
+    print('\n'.join(','.join(elems) for elems in not_in_field_assignment_table))
+    print("this following does not work...")
+    #print(f"{','.join(not_in_field_assignment_table)} these combos are not in the field_assignment_table")
+    # error when not_in_field_assignment_table = [(nan, nan)] is a tuple values, ERROR: sequence item 0: expected str instance, tuple found
+    #assert len(not_in_field_assignment_table) == 0, f"{','.join(not_in_field_assignment_table)} these combos are not in the field_assignment_table" 
+    assert len(not_in_field_assignment_table) == 0, f"{','.join(','.join(elems) for elems in not_in_field_assignment_table)} these combos are not in the field_assignment_table" 
+    print("the assertion did not fail")
 
     # Now we check if the points are in associated polygon or not. Assign True if they are in
+    print(" -------------------------BEFORE IS STATION IN STRATA")
     trawl['is_station_in_strata'] = trawl.apply(
         lambda row: strata_lookup.get((row['region'], row['stratum'])).contains(row['SHAPE'])
         if strata_lookup.get((row['region'], row['stratum']), None) is not None
@@ -227,9 +259,13 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
         'cannot_find_lookup_strata',
         axis=1
     )
+    print(" --------------------------------AFTER IS STATION IN STRATA")
+
 
     # Now we get the bad rows
     bad_df = trawl.assign(tmp_row=trawl.index).query("is_station_in_strata == False")
+    print("bad df was populated:")
+    print(bad_df)
     return bad_df
 
 def export_sdf_to_json(path, sdf):
