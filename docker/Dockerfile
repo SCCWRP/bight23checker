@@ -72,7 +72,6 @@ RUN mkdir -p /var/www/checker/
 RUN pip3 install geopy
 
 #CMD ["uwsgi","-s","/tmp/empachecker.sock","--uid","www-data","--gid","www-data","--manage-script-name","--mount","/checker=run:app","--chmod-socket=666"]
-
 # docker container run -it -d --name $1 \
 #     -v /tmp:/tmp -v /var/www/templates/$1:/var/www/$1 \
 #     -v /etc/timezone:/etc/timezone:ro \
