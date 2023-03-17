@@ -27,6 +27,8 @@ templater = Blueprint('templater', __name__)
 def template():
     system_fields = current_app.system_fields
     datatype = request.args.get("datatype")
+    if datatype not in current_app.datasets.keys():
+        return f"{datatype} not found"
     tbls = current_app.datasets.get(datatype)['tables']
     file_prefix = datatype.upper()
     database_name = str(g.eng).replace(")","").split("/")[-1]
@@ -360,7 +362,7 @@ def template():
     wb.close()
     ############################################################################################################################
     ############################################################################################################################
-    return send_file(f"{os.getcwd()}/export/data_templates/{file_prefix}-TEMPLATE.xlsx", as_attachment=True, attachment_filename=f'{file_prefix}-TEMPLATE.xlsx')
+    return send_file(f"{os.getcwd()}/export/data_templates/{file_prefix}-TEMPLATE.xlsx", as_attachment=True, download_name=f'{file_prefix}-TEMPLATE.xlsx')
 
 
 

@@ -51,12 +51,15 @@ def load():
             f"""
             SELECT table_name 
             FROM information_schema.tables 
-            WHERE table_name LIKE 'tbl_%%' OR table_name = '{current_app.config.get("TOXSUMMARY_TABLENAME")}' """, eng
+            WHERE (table_name LIKE 'tbl_%%') OR (table_name LIKE 'analysis_%%') OR (table_name = '{current_app.config.get("TOXSUMMARY_TABLENAME")}') """, eng
         ) \
         .table_name \
         .values
     
-
+    print('all_dfs.keys()')
+    print(all_dfs.keys())
+    print('valid_tables')
+    print(valid_tables)
     assert all(sheet in valid_tables for sheet in all_dfs.keys()), \
         f"Sheetname in excel file {excel_path} not found in the list of tables that can be submitted to"
 
@@ -111,17 +114,29 @@ def load():
 
 
     # We have to make an exception for toxsummary, since the summary table gets added after the fact
-    assert set(current_app.datasets.get(session.get('datatype')).get('tables')) == set(all_dfs.keys() - set([current_app.config.get("TOXSUMMARY_TABLENAME")])), \
+    analysis_tables = current_app.datasets.get(session.get('datatype')).get('analysis_tables')
+
+    if analysis_tables is None: # not all datatypes have analysis tables
+        analysis_tables = []
+
+    assert set(current_app.datasets.get(session.get('datatype')).get('tables')) == set(all_dfs.keys() - set(analysis_tables)), \
             f"""There is a mismatch between the table names listed in __init__.py current_app.datasets
             and the keys of all_dfs (datatype: {session.get('datatype')}"""
     
 
     # Now go through each tab and load to the database
-    tables_to_load = current_app.datasets.get(session.get('datatype')).get('tables') \
-        if not session.get('datatype') == 'toxicity' \
-        else [*current_app.datasets.get(session.get('datatype')).get('tables'), current_app.config.get("TOXSUMMARY_TABLENAME")]
+    tables_to_load = list(
+        set(
+            [
+            *current_app.datasets.get(session.get('datatype')).get('tables'), 
+            *analysis_tables
+        ]
+        )
+        .intersection(set(all_dfs.keys()))
+    )
 
     for tbl in tables_to_load:
+
         # Below comment applied to one project where the tables had foreign key relationships
         # We may or may not want to also apply that to bight
         # print(f"Loading Data to {tbl}. Be sure that the tables are in the correct order in __init__.py datasets")

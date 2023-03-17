@@ -371,7 +371,8 @@ def ocean_acidification(all_dfs):
         print(msg)
 
         if not bool(re.search(proc.stderr, '\s*')):
-            raise Exception(f"Error occurred in OA analysis script:\n{proc.stderr}")
+            print(f"Error occurred in OA analysis script:\n{proc.stderr}")
+            
         
         ctdpath = os.path.join(session.get('submission_dir'), 'analysis_ctd.csv')
         bottlepath = os.path.join(session.get('submission_dir'), 'analysis_bottle.csv')
@@ -379,25 +380,22 @@ def ocean_acidification(all_dfs):
         # open an ExcelWriter object to append to the excel workbook
         writer = pd.ExcelWriter(session.get('excel_path'), engine = 'openpyxl', mode = 'a')
         
-        if os.path.exists(ctdpath):
+        if os.path.exists(ctdpath) and os.path.exists(bottlepath):
             ctd = pd.read_csv(ctdpath)
             ctd.to_excel(writer, sheet_name = 'analysis_oactd', index = False)
-        else:
-            raise Exception("OA Analysis ran with no errors, but the CTD analysis csv file was not found")
 
-        if os.path.exists(bottlepath):
             bottle = pd.read_csv(bottlepath)
             bottle.to_excel(writer, sheet_name = 'analysis_oabottle', index = False)
+        
         else:
-            raise Exception("OA Analysis ran with no errors, but the Bottle analysis csv file was not found")
+            if not os.path.exists(ctdpath):
+                print("OA Analysis ran with no errors, but the CTD analysis csv file was not found")
+            if not os.path.exists(bottlepath):
+                print("OA Analysis ran with no errors, but the Bottle analysis csv file was not found")
+            warnings.append(checkData('tbl_oabottle', bottle.tmp_row.tolist(), 'Season,Agency,SampleDate,SampleTime,Station,Depth,FieldRep,LabRep','Undefined Warning', 'Could not process analysis for this data set'))
+            warnings.append(checkData('tbl_oactd', ctd.tmp_row.tolist(), 'Season,Agency,SampleDate,SampleTime,Station,Depth,FieldRep,LabRep','Undefined Warning', 'Could not process analysis for this data set'))
+            
         
         writer.close()
-
-        print('ctd.sampletime.unique()')
-        print(ctd.sampletime.unique())
-
-
-
-
 
     return {'errors': errs, 'warnings': warnings}

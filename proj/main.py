@@ -102,6 +102,10 @@ def main():
         
         if ((sheet not in ignored_tabs) and (not sheet.startswith('lu_')))
     }
+
+    # filter out empty dataframes
+    all_dfs = { dfname: df for dfname, df in all_dfs.items() if not df.empty }
+    
     
     assert len(all_dfs) > 0, f"submissionid - {session.get('submissionid')} all_dfs is empty"
     
@@ -287,6 +291,8 @@ def main():
         # Leaving this in out of fear of breaking the application
         # All i know is if i leave it untouched, it wont affect anything
         except Exception as e:
+            # print("entered second exception block --------")
+            # print(e)
             raise Exception(e)
         
         print("custom_output: ")
