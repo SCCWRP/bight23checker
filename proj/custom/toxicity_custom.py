@@ -154,11 +154,7 @@ def toxicity(all_dfs):
     errs = [*errs, checkData(**toxwq_args)]
 
     # 2 - Check for the minimum number of replicates - ee and mg = 5 and na = 10
-<<<<<<< HEAD
-    ## first get a lab replicate count grouped on stationid, toxbatch, and species
-=======
     ## first get a lab replicate count grouped on stationid, toxbatch, species, and sampletypecode
->>>>>>> d8a3b14caae9b9b585ee44a31401d9c93bd80af8
     dfrep = pd.DataFrame(toxresults.groupby(['stationid','toxbatch','species','sampletypecode']).size().reset_index(name='replicatecount'))
     ## merge the lab replicant group with results so that you can get the tmp_row - the lab rep count will be matched with each lab rep
     ## we will want to highlight them as a group rather than by row
@@ -986,23 +982,24 @@ def toxicity(all_dfs):
         print("Aria Stopped here")
         # Aria Stopped here 
 
-         #Ayah Started here 03/08/2023 NEW Checks
         
-        #  #Check 1: Toxicity Check-endpoint in Result tab needs to be species specific 
-        # print("--- Toxicity Check-endpoint in Result tab needs to be species specific ---")
-        # badrows = toxresults[(toxresults["species"] != "Mytilus galloprovincialis") & (toxresults["endpoint"] == "Percent normal-alive")].tmp_row.tolist()
-        # print("badrows")
-        # print(badrows)
-        # toxresults_args.update({
-        #     "dataframe": toxresults,
-        #     "tablename": 'tbl_toxresults',
-        #     "badrows": badrows,
-        #     "badcolumn": "species, endpoint",
-        #     "error_type": "Undefined Error",
-        #     "is_core_error": False,
-        #     "error_message": "Endpoint needs to be species specific"
-        # })
-        # errs = [*errs, checkData(**toxresults_args)] 
+        #Ayah Started here 03/08/2023 NEW Checks
+        
+        # Check 1: Toxicity Check-endpoint in Result tab needs to be species specific 
+        print("--- Toxicity Check-endpoint in Result tab needs to be species specific ---")
+        badrows = toxresults[(toxresults["species"] != "Mytilus galloprovincialis") & (toxresults["endpoint"] == "Percent normal-alive")].tmp_row.tolist()
+        print("badrows")
+        print(badrows)
+        toxresults_args.update({
+            "dataframe": toxresults,
+            "tablename": 'tbl_toxresults',
+            "badrows": badrows,
+            "badcolumn": "species, endpoint",
+            "error_type": "Undefined Error",
+            "is_core_error": False,
+            "error_message": "Endpoint needs to be species specific"
+        })
+        errs = [*errs, checkData(**toxresults_args)] 
 
 
     return {'errors': errs, 'warnings': warnings}
