@@ -154,47 +154,58 @@ def toxicity(all_dfs):
     errs = [*errs, checkData(**toxwq_args)]
 
 
-    # Check: Eohaustorius estuarius/Reference >= 4 checker 
-    #Tested and working 3/7/2023
-    badrows = toxbatch[(toxbatch['species'] == 'Eohaustorius estuarius') & (toxbatch['actualtestduration'] >= 4)].index.tolist()
+    # Check: For EE with matrix "RT" the ActualTestDuration must be less than 4 days.
+    badrows = toxbatch[(toxbatch['species'] == 'Eohaustorius estuarius') & (toxbatch['matrix'] == 'Reference Toxicant') & (toxbatch['actualtestduration'] >= 4)].index.tolist()
     toxbatch_args.update({
         "dataframe": toxbatch,
         "tablename": 'tbl_toxbatch',
         "badrows": badrows,
-        "badcolumn": "species,actualtestduration",
+        "badcolumn": "species, matrix, actualtestduration",
         "error_type": "Logic Error",
         "is_core_error": False,
-        "error_message": "For records with 'species' value of 'Eohaustorius estuarius', the 'actualtestduration' must be less than 4."
+        "error_message": "For records with species Eohaustorius estuarius and matrix Reference Toxicant, the ActualTestDuration must be less than 4 days."
     })
     errs = [*errs, checkData(**toxbatch_args)]
     
     
-    # #check Eohaustorius estuarius/Whole Sediment = 10 
-    # print(toxbatch[(toxbatch["species"] == "Eohaustorius estuarius") & (toxbatch["matrix"] == "Whole Sediment") & (toxbatch["actualtestduration"] == 10)])
-    #Tested and working 3/7/2023
+    # Check: For EE with matrix "WS" the ActualTestDuration cannot be 10 days.
     badrows = toxbatch[(toxbatch["species"] == "Eohaustorius estuarius") & (toxbatch["matrix"] == "Whole Sediment") & (toxbatch["actualtestduration"] == 10)].index.tolist()
     toxbatch_args.update({
         "dataframe": toxbatch,
         "tablename": 'tbl_toxbatch',
         "badrows": badrows,
-        "badcolumn": "species,actualtestduration",
+        "badcolumn": "species, matrix, actualtestduration",
         "error_type": "Logic Error",
         "is_core_error": False,
-        "error_message": "If species is Eohaustorius estuarius and maxrix is Whole sediment then the actualtestduration cant be 10"
+        "error_message": "For records with Eohaustorius estuarius and matrix Whole Sediment, the ActualTestDuration cannot be 10 days."
     })
     errs = [*errs, checkData(**toxbatch_args)]
 
-    # check: Mytilus galloprovincialis/Reference or Whole Sediment 48hours or 2 days
-    #Tested and working 3/7/2023
-    badrows = toxbatch[(((toxbatch["species"] == "Mytilus galloprovincialis") | (toxbatch["matrix"] == "Whole Sediment"))) & ((((toxbatch["actualtestduration"] == 48) & (toxbatch["actualtestdurationunits"] == 'Hours')) | ((toxbatch["actualtestduration"] == 2) & (toxbatch["actualtestdurationunits"] == 'Days'))))].index.tolist()
+
+    # Check: For MG with matrix RT or WS the ActualTestDuration cannot be 48 hours or 2 days. 
+    badrows = toxbatch[(toxbatch["species"] == "Mytilus galloprovincialis") & ((toxbatch["matrix"] == "Reference Toxicant") | (toxbatch["matrix"] == "Whole Sediment")) & (((toxbatch["actualtestduration"] == 48) & (toxbatch["actualtestdurationunits"] == 'Hours')) | ((toxbatch["actualtestduration"] == 2) & (toxbatch["actualtestdurationunits"] == 'Days')))].index.tolist()
     toxbatch_args.update({
         "dataframe": toxbatch,
         "tablename": 'tbl_toxbatch',
         "badrows": badrows,
-        "badcolumn": "species,actualtestduration",
+        "badcolumn": "species, matrix, actualtestduration",
         "error_type": "Logic Error",
         "is_core_error": False,
-        "error_message": "If species is Mytilus galloprovincialis or maxrix is Whole sediment then the actualtestduration cant be 48 hours nor 2 days "
+        "error_message": "For records with Mytilus galloprovincialis and matrix of either Reference Toxicant or Whole Sediment, the ActualTestDuration cannot be 48 hours (2 days)."
+    })
+    errs = [*errs, checkData(**toxbatch_args)]
+
+
+    # Check: For SP with matrix RT or WS the ActualTestDuration cannot be 72 hours or 3 days. 
+    badrows = toxbatch[(toxbatch["species"] == "Strongylocentrotus purpuratus") & ((toxbatch["matrix"] == "Reference Toxicant") | (toxbatch["matrix"] == "Whole Sediment")) & (((toxbatch["actualtestduration"] == 72) & (toxbatch["actualtestdurationunits"] == 'Hours')) | ((toxbatch["actualtestduration"] == 3) & (toxbatch["actualtestdurationunits"] == 'Days')))].index.tolist()
+    toxbatch_args.update({
+        "dataframe": toxbatch,
+        "tablename": 'tbl_toxbatch',
+        "badrows": badrows,
+        "badcolumn": "species, matrix, actualtestduration",
+        "error_type": "Logic Error",
+        "is_core_error": False,
+        "error_message": "For records with Strongylocentrotus purpuratus and matrix of either Reference Toxicant or Whole Sediment, the ActualTestDuration cannot be 72 hours (3 days)."
     })
     errs = [*errs, checkData(**toxbatch_args)]
 
@@ -203,21 +214,21 @@ def toxicity(all_dfs):
 
     
     #Ayah Started here 03/08/2023 NEW Check
-    # Check : Toxicity Check-endpoint in Result tab needs to be species specific 
-    print("--- Toxicity Check-endpoint in Result tab needs to be species specific ---")
-    badrows = toxresults[(toxresults["species"] != "Mytilus galloprovincialis") & (toxresults["endpoint"] == "Percent normal-alive")].tmp_row.tolist()
-    print("badrows")
-    print(badrows)
-    toxresults_args.update({
-        "dataframe": toxresults,
-        "tablename": 'tbl_toxresults',
-        "badrows": badrows,
-        "badcolumn": "species, endpoint",
-        "error_type": "Undefined Error",
-        "is_core_error": False,
-        "error_message": "Endpoint needs to be species specific"
-    })
-    errs = [*errs, checkData(**toxresults_args)] 
+    # # Check : Toxicity Check-endpoint in Result tab needs to be species specific 
+    # print("--- Toxicity Check-endpoint in Result tab needs to be species specific ---")
+    # badrows = toxresults[(toxresults["species"] != "Mytilus galloprovincialis") & (toxresults["endpoint"] == "Percent normal-alive")].tmp_row.tolist()
+    # print("badrows")
+    # print(badrows)
+    # toxresults_args.update({
+    #     "dataframe": toxresults,
+    #     "tablename": 'tbl_toxresults',
+    #     "badrows": badrows,
+    #     "badcolumn": "species, endpoint",
+    #     "error_type": "Undefined Error",
+    #     "is_core_error": False,
+    #     "error_message": "Endpoint needs to be species specific"
+    # })
+    # errs = [*errs, checkData(**toxresults_args)] 
 
 
     # 2 - Check for the minimum number of replicates - ee and mg = 5 and na = 10
