@@ -127,9 +127,9 @@ def toxicity(all_dfs):
         "error_message": "Each Toxicity Result record must have a corresponding Toxicity WQ record. Records are matched on ToxBatch and Lab."
     })
     errs = [*errs, checkData(**toxresults_args)] 
-    
+
     # wq
-    badrows = toxwq[~toxwq[['toxbatch','lab']].isin(toxbatch[['toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    badrows = toxwq[~toxwq[['toxbatch','lab']].isin(toxbatch[['toxbatch',    'lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
     toxwq_args.update({
         "dataframe": toxwq,
         "tablename": 'tbl_toxwq',
@@ -153,17 +153,87 @@ def toxicity(all_dfs):
     })
     errs = [*errs, checkData(**toxwq_args)]
 
+
+    # Check: Eohaustorius estuarius/Reference >= 4 checker 
+    #Tested and working 3/7/2023
+    badrows = toxbatch[(toxbatch['species'] == 'Eohaustorius estuarius') & (toxbatch['actualtestduration'] >= 4)].index.tolist()
+    toxbatch_args.update({
+        "dataframe": toxbatch,
+        "tablename": 'tbl_toxbatch',
+        "badrows": badrows,
+        "badcolumn": "species,actualtestduration",
+        "error_type": "Logic Error",
+        "is_core_error": False,
+        "error_message": "For records with 'species' value of 'Eohaustorius estuarius', the 'actualtestduration' must be less than 4."
+    })
+    errs = [*errs, checkData(**toxbatch_args)]
+    
+    
+    # #check Eohaustorius estuarius/Whole Sediment = 10 
+    # print(toxbatch[(toxbatch["species"] == "Eohaustorius estuarius") & (toxbatch["matrix"] == "Whole Sediment") & (toxbatch["actualtestduration"] == 10)])
+    #Tested and working 3/7/2023
+    badrows = toxbatch[(toxbatch["species"] == "Eohaustorius estuarius") & (toxbatch["matrix"] == "Whole Sediment") & (toxbatch["actualtestduration"] == 10)].index.tolist()
+    toxbatch_args.update({
+        "dataframe": toxbatch,
+        "tablename": 'tbl_toxbatch',
+        "badrows": badrows,
+        "badcolumn": "species,actualtestduration",
+        "error_type": "Logic Error",
+        "is_core_error": False,
+        "error_message": "If species is Eohaustorius estuarius and maxrix is Whole sediment then the actualtestduration cant be 10"
+    })
+    errs = [*errs, checkData(**toxbatch_args)]
+
+    # check: Mytilus galloprovincialis/Reference or Whole Sediment 48hours or 2 days
+    #Tested and working 3/7/2023
+    badrows = toxbatch[(((toxbatch["species"] == "Mytilus galloprovincialis") | (toxbatch["matrix"] == "Whole Sediment"))) & ((((toxbatch["actualtestduration"] == 48) & (toxbatch["actualtestdurationunits"] == 'Hours')) | ((toxbatch["actualtestduration"] == 2) & (toxbatch["actualtestdurationunits"] == 'Days'))))].index.tolist()
+    toxbatch_args.update({
+        "dataframe": toxbatch,
+        "tablename": 'tbl_toxbatch',
+        "badrows": badrows,
+        "badcolumn": "species,actualtestduration",
+        "error_type": "Logic Error",
+        "is_core_error": False,
+        "error_message": "If species is Mytilus galloprovincialis or maxrix is Whole sediment then the actualtestduration cant be 48 hours nor 2 days "
+    })
+    errs = [*errs, checkData(**toxbatch_args)]
+
+    print("Aria Stopped here")
+    # Aria Stopped here 
+
+    
+    #Ayah Started here 03/08/2023 NEW Check
+    # Check : Toxicity Check-endpoint in Result tab needs to be species specific 
+    print("--- Toxicity Check-endpoint in Result tab needs to be species specific ---")
+    badrows = toxresults[(toxresults["species"] != "Mytilus galloprovincialis") & (toxresults["endpoint"] == "Percent normal-alive")].tmp_row.tolist()
+    print("badrows")
+    print(badrows)
+    toxresults_args.update({
+        "dataframe": toxresults,
+        "tablename": 'tbl_toxresults',
+        "badrows": badrows,
+        "badcolumn": "species, endpoint",
+        "error_type": "Undefined Error",
+        "is_core_error": False,
+        "error_message": "Endpoint needs to be species specific"
+    })
+    errs = [*errs, checkData(**toxresults_args)] 
+
+
     # 2 - Check for the minimum number of replicates - ee and mg = 5 and na = 10
     ## first get a lab replicate count grouped on stationid, toxbatch, species, and sampletypecode
     dfrep = pd.DataFrame(toxresults.groupby(['stationid','toxbatch','species','sampletypecode']).size().reset_index(name='replicatecount'))
+    
     ## merge the lab replicant group with results so that you can get the tmp_row - the lab rep count will be matched with each lab rep
     ## we will want to highlight them as a group rather than by row
     dfrep = pd.merge(dfrep,toxresults, on=['stationid','toxbatch','species','sampletypecode'], how='inner')
+
     print("## A MINIMUM NUMBER OF 5 REPLICATES ARE REQUIRED FOR SPECIES EOHAUSTORIUS ESTUARIUS AND MYTILUS GALLOPROVINCIALIS ##")
     badrows = dfrep[
         (dfrep['species'].isin(['Eohaustorius estuarius','EE','Mytilus galloprovincialis','MG'])) & 
         (dfrep['replicatecount'] < 5)
     ].tmp_row.tolist()
+
     toxresults_args.update({
         "dataframe": toxresults,
         "tablename": 'tbl_toxresults',
@@ -175,18 +245,49 @@ def toxicity(all_dfs):
     })
     errs = [*errs, checkData(**toxresults_args)] 
 
-    print("## A MINIMUM NUMBER OF 10 REPLICATES ARE REQUIRED FOR SPECIES NEANTHES ARENACEODENTATA ##")
-    badrows = dfrep[(dfrep['species'] == 'Neanthes arenaceodentata') & (dfrep['replicatecount'] < 10)].tmp_row.tolist()
+    # Below is the old check - it should also filter to sampletypecodes of CNSL, CNEG and Grab
+    # print("## A MINIMUM NUMBER OF 10 REPLICATES ARE REQUIRED FOR SPECIES NEANTHES ARENACEODENTATA ##")
+    # badrows = dfrep[(dfrep['species'] == 'Neanthes arenaceodentata') & (dfrep['replicatecount'] < 10)].tmp_row.tolist()
+    # toxresults_args.update({
+    #     "dataframe": toxresults,
+    #     "tablename": 'tbl_toxresults',
+    #     "badrows": badrows,
+    #     "badcolumn": "toxbatch,lab,sampletypecode",
+    #     "error_type": "Logic Error",
+    #     "is_core_error": False,
+    #     "error_message": "A minimum number of 10 replicates are required for species Neanthes arenaceodentata"
+    # })
+    # errs = [*errs, checkData(**toxresults_args)] 
+
+    ## Ayah's Edit - add the sampletypecode to the group
+    badrows = dfrep[dfrep['sampletypecode'].isin(['CNEG','CNSL','Grab']) & dfrep['species'].isin(['Neanthes arenaceodentata']) & (dfrep['replicatecount'] < 10)].tmp_row.tolist()
     toxresults_args.update({
         "dataframe": toxresults,
         "tablename": 'tbl_toxresults',
         "badrows": badrows,
-        "badcolumn": "toxbatch,lab",
+        "badcolumn": "toxbatch,lab,sampletypecode",
         "error_type": "Logic Error",
         "is_core_error": False,
         "error_message": "A minimum number of 10 replicates are required for species Neanthes arenaceodentata"
     })
-    errs = [*errs, checkData(**toxresults_args)] 
+
+
+    ## Ayah's Edit (add the last value in sampletypecode)
+    badrows = dfrep[(
+        dfrep['sampletypecode'].isin(['CNEG','CNSL','Grab']) 
+        & dfrep['species'].isin(['Eohaustorius estuarius','EE','Mytilus galloprovincialis','MG']) 
+        & (dfrep['replicatecount'] < 5)
+    )].tmp_row.tolist()
+    toxresults_args.update({
+        "dataframe": toxresults,
+        "tablename": 'tbl_toxresults',
+        "badrows": badrows,
+        "badcolumn": "toxbatch,lab,sampletypecode",
+        "error_type": "Logic Error",
+        "is_core_error": False,
+        "error_message": "A minimum number of 5 replicates are required for species Eohaustorius estuarius and Mytilus galloprovincialis"
+    })
+
     
     # 3. EACH BS or SWI BATCH MUST HAVE A "REFERENCE TOXICANT" BATCH WITHIN A SPECIFIED DATE RANGE.
     print("# 3. EACH BS or SWI BATCH MUST HAVE A REFERENCE TOXICANT BATCH WITHIN A SPECIFIED DATE RANGE.")
@@ -904,6 +1005,15 @@ def toxicity(all_dfs):
         #     print(f"column: {c}")
         #     print(toxsummary[c])
 
+        #Aria: 3/6/23 New Checkers 
+        print("Aria STARTED here ")
+
+        ################################################
+        #WARNING: CHECK AND SEE IF DATAFRAME NAME AND TBLNAME IS CORRECT
+        ################################################
+
         
 
+
     return {'errors': errs, 'warnings': warnings}
+
