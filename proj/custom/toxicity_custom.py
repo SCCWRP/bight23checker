@@ -153,62 +153,6 @@ def toxicity(all_dfs):
     })
     errs = [*errs, checkData(**toxwq_args)]
 
-
-    # Check: For EE with matrix "RT" the ActualTestDuration must be less than 4 days.
-    badrows = toxbatch[(toxbatch['species'] == 'Eohaustorius estuarius') & (toxbatch['matrix'] == 'Reference Toxicant') & (toxbatch['actualtestduration'] >= 4)].index.tolist()
-    toxbatch_args.update({
-        "dataframe": toxbatch,
-        "tablename": 'tbl_toxbatch',
-        "badrows": badrows,
-        "badcolumn": "species, matrix, actualtestduration",
-        "error_type": "Logic Error",
-        "is_core_error": False,
-        "error_message": "For records with species Eohaustorius estuarius and matrix Reference Toxicant, the ActualTestDuration must be less than 4 days."
-    })
-    errs = [*errs, checkData(**toxbatch_args)]
-    
-    
-    # Check: For EE with matrix "WS" the ActualTestDuration cannot be 10 days.
-    badrows = toxbatch[(toxbatch["species"] == "Eohaustorius estuarius") & (toxbatch["matrix"] == "Whole Sediment") & (toxbatch["actualtestduration"] == 10)].index.tolist()
-    toxbatch_args.update({
-        "dataframe": toxbatch,
-        "tablename": 'tbl_toxbatch',
-        "badrows": badrows,
-        "badcolumn": "species, matrix, actualtestduration",
-        "error_type": "Logic Error",
-        "is_core_error": False,
-        "error_message": "For records with Eohaustorius estuarius and matrix Whole Sediment, the ActualTestDuration cannot be 10 days."
-    })
-    errs = [*errs, checkData(**toxbatch_args)]
-
-
-    # Check: For MG with matrix RT or WS the ActualTestDuration cannot be 48 hours or 2 days. 
-    badrows = toxbatch[(toxbatch["species"] == "Mytilus galloprovincialis") & ((toxbatch["matrix"] == "Reference Toxicant") | (toxbatch["matrix"] == "Whole Sediment")) & (((toxbatch["actualtestduration"] == 48) & (toxbatch["actualtestdurationunits"] == 'Hours')) | ((toxbatch["actualtestduration"] == 2) & (toxbatch["actualtestdurationunits"] == 'Days')))].index.tolist()
-    toxbatch_args.update({
-        "dataframe": toxbatch,
-        "tablename": 'tbl_toxbatch',
-        "badrows": badrows,
-        "badcolumn": "species, matrix, actualtestduration",
-        "error_type": "Logic Error",
-        "is_core_error": False,
-        "error_message": "For records with Mytilus galloprovincialis and matrix of either Reference Toxicant or Whole Sediment, the ActualTestDuration cannot be 48 hours (2 days)."
-    })
-    errs = [*errs, checkData(**toxbatch_args)]
-
-
-    # Check: For SP with matrix RT or WS the ActualTestDuration cannot be 72 hours or 3 days. 
-    badrows = toxbatch[(toxbatch["species"] == "Strongylocentrotus purpuratus") & ((toxbatch["matrix"] == "Reference Toxicant") | (toxbatch["matrix"] == "Whole Sediment")) & (((toxbatch["actualtestduration"] == 72) & (toxbatch["actualtestdurationunits"] == 'Hours')) | ((toxbatch["actualtestduration"] == 3) & (toxbatch["actualtestdurationunits"] == 'Days')))].index.tolist()
-    toxbatch_args.update({
-        "dataframe": toxbatch,
-        "tablename": 'tbl_toxbatch',
-        "badrows": badrows,
-        "badcolumn": "species, matrix, actualtestduration",
-        "error_type": "Logic Error",
-        "is_core_error": False,
-        "error_message": "For records with Strongylocentrotus purpuratus and matrix of either Reference Toxicant or Whole Sediment, the ActualTestDuration cannot be 72 hours (3 days)."
-    })
-    errs = [*errs, checkData(**toxbatch_args)]
-
     print("Aria Stopped here")
     # Aria Stopped here 
 
@@ -223,7 +167,7 @@ def toxicity(all_dfs):
     #     "dataframe": toxresults,
     #     "tablename": 'tbl_toxresults',
     #     "badrows": badrows,
-    #     "badcolumn": "species, endpoint",
+    #     "badcolumn": "species, ",
     #     "error_type": "Undefined Error",
     #     "is_core_error": False,
     #     "error_message": "Endpoint needs to be species specific"
@@ -471,35 +415,63 @@ def toxicity(all_dfs):
         print("## ACTUAL TEST DURATION FOR EACH SPECIES IN BATCH TAB ##")
         # ERROR - Eohaustorius estuarius/Reference >= 4 
         print("## ERROR - Eohaustorius estuarius/Reference >= 4 ##")
+        # For EE with matrix "RT" the ActualTestDuration must be less than 4 days.
         badrows = toxbatch[(toxbatch['species'] == 'Eohaustorius estuarius') & (toxbatch['matrix'] == 'Reference Toxicant') & (toxbatch['actualtestduration'] >= 4)].index.tolist()
         toxbatch_args.update({
+            "dataframe": toxbatch,
+            "tablename": 'tbl_toxbatch',
             "badrows": badrows,
-            "badcolumn": "species,actualtestduration",
-            "error_type": "Undefined Error",
-            "error_message": "For records with species of Eohaustorius estuarius and matrix Reference Toxicant, the ActualTestDuration must be less than 4."
+            "badcolumn": "species, matrix, actualtestduration",
+            "error_type": "Logic Error",
+            "is_core_error": False,
+            "error_message": "For records with species Eohaustorius estuarius and matrix Reference Toxicant, the ActualTestDuration must be less than 4 days."
         })
         errs = [*errs, checkData(**toxbatch_args)]
+        
         # ERROR - Eohaustorius estuarius/Whole Sediment = 10 
         print("## ERROR - Eohaustorius estuarius/Whole Sediment = 10 ##")
+        # For EE with matrix "WS" the ActualTestDuration cannot be 10 days.
         badrows = toxbatch[(toxbatch["species"] == "Eohaustorius estuarius") & (toxbatch["matrix"] == "Whole Sediment") & (toxbatch["actualtestduration"] == 10)].index.tolist()
         toxbatch_args.update({
+            "dataframe": toxbatch,
+            "tablename": 'tbl_toxbatch',
             "badrows": badrows,
-            "badcolumn": "species,actualtestduration",
-            "error_type": "Undefined Error",
-            "error_message": "If species is Eohaustorius estuarius and matrix is Whole Sediment then the ActualTestDuration cannot be 10."
+            "badcolumn": "species, matrix, actualtestduration",
+            "error_type": "Logic Error",
+            "is_core_error": False,
+            "error_message": "For records with Eohaustorius estuarius and matrix Whole Sediment, the ActualTestDuration cannot be 10 days."
         })
         errs = [*errs, checkData(**toxbatch_args)]
+
         # ERROR - Mytilus galloprovincialis/Reference or Whole Sediment 48hours or 2 days 
         print("## ERROR - Mytilus galloprovincialis/Reference or Whole Sediment 48hours or 2 days ##")
-        badrows = toxbatch[(toxbatch["species"] == "Mytilus galloprovincialis") & ((toxbatch['matrix'] == 'Reference Toxicant') | (toxbatch["matrix"] == "Whole Sediment")) & (((toxbatch["actualtestduration"] == 48) & (toxbatch["actualtestdurationunits"] == 'Hours')) | ((toxbatch["actualtestduration"] == 2) & (toxbatch["actualtestdurationunits"] == 'Days')))].index.tolist()
+        # For MG with matrix RT or WS the ActualTestDuration cannot be 48 hours or 2 days. 
+        badrows = toxbatch[(toxbatch["species"] == "Mytilus galloprovincialis") & ((toxbatch["matrix"] == "Reference Toxicant") | (toxbatch["matrix"] == "Whole Sediment")) & (((toxbatch["actualtestduration"] == 48) & (toxbatch["actualtestdurationunits"] == 'Hours')) | ((toxbatch["actualtestduration"] == 2) & (toxbatch["actualtestdurationunits"] == 'Days')))].index.tolist()
         toxbatch_args.update({
-           "badrows": badrows,
-           "badcolumn": "species,actualtestduration",
-           "error_type": "Undefined Error",
-           "error_message": "If species is Mytilus galloprovincialis or matrix is Whole Sediment then the ActualTestDuration cannot be 48 hours or 2 days."
+            "dataframe": toxbatch,
+            "tablename": 'tbl_toxbatch',
+            "badrows": badrows,
+            "badcolumn": "species, matrix, actualtestduration",
+            "error_type": "Logic Error",
+            "is_core_error": False,
+            "error_message": "For records with Mytilus galloprovincialis and matrix of either Reference Toxicant or Whole Sediment, the ActualTestDuration cannot be 48 hours (2 days)."
         })
         errs = [*errs, checkData(**toxbatch_args)]
-        ## STILL NEED TO ADD SP CHECK FOR ACTUALTESTDURATION
+
+        # ERROR - Strongylocentrotus purpuratus/Reference or Whole Sediment 72hours or 3 days 
+        print("## ERROR - Strongylocentrotus purpuratus/Reference or Whole Sediment 72hours or 3 days ##")
+        # Check: For SP with matrix RT or WS the ActualTestDuration cannot be 72 hours or 3 days. 
+        badrows = toxbatch[(toxbatch["species"] == "Strongylocentrotus purpuratus") & ((toxbatch["matrix"] == "Reference Toxicant") | (toxbatch["matrix"] == "Whole Sediment")) & (((toxbatch["actualtestduration"] == 72) & (toxbatch["actualtestdurationunits"] == 'Hours')) | ((toxbatch["actualtestduration"] == 3) & (toxbatch["actualtestdurationunits"] == 'Days')))].index.tolist()
+        toxbatch_args.update({
+            "dataframe": toxbatch,
+            "tablename": 'tbl_toxbatch',
+            "badrows": badrows,
+            "badcolumn": "species, matrix, actualtestduration",
+            "error_type": "Logic Error",
+            "is_core_error": False,
+            "error_message": "For records with Strongylocentrotus purpuratus and matrix of either Reference Toxicant or Whole Sediment, the ActualTestDuration cannot be 72 hours (3 days)."
+        })
+        errs = [*errs, checkData(**toxbatch_args)]
 
         ## END BATCH CHECKS ##
 
