@@ -153,28 +153,6 @@ def toxicity(all_dfs):
     })
     errs = [*errs, checkData(**toxwq_args)]
 
-    print("Aria Stopped here")
-    # Aria Stopped here 
-
-    
-    #Ayah Started here 03/08/2023 NEW Check
-    # # Check : Toxicity Check-endpoint in Result tab needs to be species specific 
-    # print("--- Toxicity Check-endpoint in Result tab needs to be species specific ---")
-    # badrows = toxresults[(toxresults["species"] != "Mytilus galloprovincialis") & (toxresults["endpoint"] == "Percent normal-alive")].tmp_row.tolist()
-    # print("badrows")
-    # print(badrows)
-    # toxresults_args.update({
-    #     "dataframe": toxresults,
-    #     "tablename": 'tbl_toxresults',
-    #     "badrows": badrows,
-    #     "badcolumn": "species, ",
-    #     "error_type": "Undefined Error",
-    #     "is_core_error": False,
-    #     "error_message": "Endpoint needs to be species specific"
-    # })
-    # errs = [*errs, checkData(**toxresults_args)] 
-
-
     # 2 - Check for the minimum number of replicates - ee and mg = 5 and na = 10
     ## first get a lab replicate count grouped on stationid, toxbatch, species, and sampletypecode
     dfrep = pd.DataFrame(toxresults.groupby(['stationid','toxbatch','species','sampletypecode']).size().reset_index(name='replicatecount'))
@@ -541,14 +519,14 @@ def toxicity(all_dfs):
         toxresults_args.update(tmpargs)
         errs = [*errs, checkData(**toxresults_args)]
 
-        # 5. ENDPOINT PERCENT NORMAL-ALIVE APPLIES TO MG.
-        print("## ENDPOINT PERCENT NORMAL-ALIVE APPLIES TO MG ##")
+        # 5. ENDPOINT PERCENT NORMAL-ALIVE IS SPECIES SPECIFIC TO TO MG.
+        print("## ENDPOINT PERCENT NORMAL-ALIVE IS SPECIES SPECIFIC TO MG ##")
         badrows = toxresults[(toxresults["species"] != "Mytilus galloprovincialis") & (toxresults["endpoint"] == "Percent normal-alive")].tmp_row.tolist()
         toxresults_args.update({
             "badrows": badrows,
             "badcolumn": "species, endpoint",
             "error_type": "Undefined Error",
-            "error_message": "Endpoint Percent Normal-alive applies to Mytilus galloprovincialis."
+            "error_message": "Endpoint Percent Normal-alive is species specific to Mytilus galloprovincialis."
         })
         errs = [*errs, checkData(**toxresults_args)] 
         ## END RESULT CHECKS ##
@@ -988,8 +966,6 @@ def toxicity(all_dfs):
         #     print(f"column: {c}")
         #     print(toxsummary[c])
 
-        #Aria: 3/6/23 New Checkers 
-        print("Aria STARTED here ")
 
         ################################################
         #WARNING: CHECK AND SEE IF DATAFRAME NAME AND TBLNAME IS CORRECT
