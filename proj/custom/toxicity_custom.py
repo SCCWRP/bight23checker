@@ -314,6 +314,45 @@ def toxicity(all_dfs):
         "error_message": "A toxicity submission requires that the field data be submitted first. Your station does not match the grab event table."
     })
     errs = [*errs, checkData(**toxresults_args)] 
+
+    # 4. LABREP IN RESULTS TAB NEEDS TO BE CONTIGUOUS.
+    # MIGHT NEED TO ADD FIELDREPLICATE TO GROUP RESULTS
+    print("4. LABREP IN RESULTS TAB NEEDS TO BE CONTIGUOUS.")
+    grouping_cols = [
+        'stationid',
+        'toxbatch',
+        'matrix',
+        'lab',
+        'species',
+        'dilution',
+        'treatment',
+        'concentration',
+        'concentrationunits',
+        'endpoint',
+        'sampletypecode',
+        'samplecollectdate'
+    ]
+    dflabrep = toxresults.groupby(grouping_cols)
+    dflabrep = toxresults.groupby(grouping_cols)['labrep', 'tmp_row'].apply(lambda x: tuple([x.labrep.tolist(), x.tmp_row.tolist()]))
+    dflabrep = dflabrep.reset_index(name='repsandrows')
+    dflabrep['reps'] = dflabrep.repsandrows.apply(lambda x: x[0]) # first value of the tuple is the labreplicate
+    dflabrep['rows'] = dflabrep.repsandrows.apply(lambda x: x[1]) # second value of the tuple is the row index number (tmp_row)
+    dflabrep.drop('repsandrows', axis=1, inplace=True)
+    # checking to see if LabReplicated were labeled correctely
+    # This is done using the sum of the first 'n' formula 1 + 2 + ... + n == n(n+1)/2
+    dflabrep['passed'] = dflabrep['reps'].apply(lambda x: (sum(x) == ((len(x) * (len(x) + 1)) / 2 )) & ([num > 0 for num in x] == [True] * len(x)) )
+    badrows = [item for sublist in dflabrep[dflabrep['passed'] == False].rows.tolist() for item in sublist]
+    toxresults_args.update({
+        "dataframe": toxresults,
+        "tablename": 'tbl_toxresults',
+        "badrows": badrows,
+        "badcolumn": "labrep",
+        "error_type": "Logic Error",
+        "is_core_error": False,
+        "error_message": "LabReplicates must be contiguous."
+    })
+    errs = [*errs, checkData(**toxresults_args)] 
+
     ## END LOGIC CHECKS ##
     print("## END LOGIC CHECKS ##")
 
