@@ -265,7 +265,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             warnings = [*warnings, checkData(**occupation_args)]
         
         for organization in sampling_organizations:
-            trawlstations = pd.read_sql(f"SELECT DISTINCT stationid FROM field_assignment_table WHERE trawlagency = '{organization}'", eng).stationid.tolist()
+            trawlstations = pd.read_sql(f"""SELECT DISTINCT stationid FROM field_assignment_table WHERE "parameter" = 'trawl' AND assigned_agency = '{organization}' ; """, eng).stationid.tolist()
             badrows = occupation[(occupation.collectiontype != 'Grab') & (~occupation.stationid.isin(trawlstations))].tmp_row.tolist()
             occupation_args.update({
                 "badrows": badrows,
@@ -275,7 +275,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             })
             warnings = [*warnings, checkData(**occupation_args)]
             
-            grabstations = pd.read_sql(f"SELECT DISTINCT stationid FROM field_assignment_table WHERE grabagency = '{organization}'", eng).stationid.tolist()
+            grabstations = pd.read_sql(f"""SELECT DISTINCT stationid FROM field_assignment_table WHERE "parameter" = 'sediment' AND assigned_agency = '{organization}' """, eng).stationid.tolist()
             badrows = occupation[(occupation.collectiontype == 'Grab') & (~occupation.stationid.isin(grabstations))].tmp_row.tolist()
             occupation_args.update({
                 "badrows": badrows,
@@ -288,7 +288,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         raise Exception("No sampling organization detected")
 
     print("# Check StationOccupation/Salinity - if the station is an Estuary or Brackish Estuary then the salinity is required")
-    estuaries = pd.read_sql("SELECT stationid, stratum FROM field_assignment_table WHERE stratum IN ('Estuaries', 'Brackish Estuaries');", eng)
+    estuaries = pd.read_sql("SELECT DISTINCT stationid, stratum FROM field_assignment_table WHERE stratum IN ('Estuaries', 'Brackish Estuaries');", eng)
 
     print("# Only run if they submitted data for estuaries")
     if len((occupation[(occupation.stationid.isin(estuaries.stationid))]))!=0 :
@@ -308,7 +308,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     print("# Jordan - Station Occupation Latitude/Longitude should be no more than 100M from Field Assignment Table Target Latitude/Longitude otherwise warning")
     print("# Merges SO dataframe and FAT dataframe according to StationIDs")
     so = occupation[['stationid','occupationlatitude','occupationlongitude','tmp_row']]
-    fat = pd.read_sql("SELECT * FROM field_assignment_table", eng)
+    fat = pd.read_sql("SELECT DISTINCT stationid, latitude AS targetlatitude, longitude AS targetlongitude FROM field_assignment_table", eng)
     sofat = pd.merge(so, fat, how = 'left', on ='stationid')
 
     # Raises Error for Unmatched StationIDs & Distances More than 100M from FAT Target
@@ -526,7 +526,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         ##  This check is only to be done for submissions where the trawl track table hasn't been provided (most of the time).
         print("New calculated field (TrawlDistanceToNominalTarget) - Draw a line from StartLat/StartLon to EndLat/Lon calculate nearest point to tblStations Lat/Lon")
         # creates dataframe from field assignment table
-        field_sql = eng.execute("select stationid,targetlatitude,targetlongitude from field_assignment_table;")
+        field_sql = eng.execute("select DISTINCT stationid,latitude AS targetlatitude,longitude AS targetlongitude from field_assignment_table;")
         station = pd.DataFrame(field_sql.fetchall())
         station.columns = field_sql.keys()
         # creates new dataframes containing pertinent fields
@@ -655,7 +655,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         print("##  New calculated field (GrabDistanceToNominalTarget) . Look at Field Assignment Table target latitude/longitude. How are far off is Grab/Lat/Lon to target ##")
         # create dataframe from Database field_assignment_table
         
-        latlons = eng.execute('select stationid, targetlatitude, targetlongitude from field_assignment_table;')
+        latlons = eng.execute('select distinct stationid, latitude AS targetlatitude, longitude AS targetlongitude from field_assignment_table;')
         db = pd.DataFrame(latlons.fetchall())
         db.columns = latlons.keys()
         
@@ -697,7 +697,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
 
         # eric - check that Grab/Depth is more than 10% off of StationOccupation/Depth - warning only  - Will need to check database for StationOccupation whether user has provided or not. Same as trawl check.
         print("## Check that Grab/Depth is more than 10% off of StationOccupation/Depth - warning only  - Will need to check database for StationOccupation whether user has provided or not. Same as trawl check. ##")
-        station_database = eng.execute('select stationid from field_assignment_table;')
+        station_database = eng.execute('select distinct stationid from field_assignment_table;')
         db = pd.DataFrame(station_database.fetchall())
         db.columns = station_database.keys()
         # new code added by paul based on trawl above - bug not distinguishing grab and trawl
@@ -747,7 +747,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         # Check if grab stationid is in field_assignment_table
         merged = pd.merge(
             grab, 
-            field_assignment_table.filter(items=['stationid','stratum','region']), 
+            field_assignment_table.filter(items=['stationid','stratum','region']).drop_duplicates(), 
             how='left', 
             on=['stationid'],
             indicator=True

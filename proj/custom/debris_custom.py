@@ -257,7 +257,7 @@ def debris(all_dfs):
     
     #Jordan - Lookup list - Link data to Bight station list to look for mismatched records.
     print('Lookup list - Link data to Bight station list to look for mismatched records.')
-    bight_stations = eng.execute("SELECT stationid,trawlagency FROM field_assignment_table;")
+    bight_stations = eng.execute("""SELECT stationid,assigned_agency AS trawlagency FROM field_assignment_table WHERE "parameter" = 'trawl';""")
     bs = pd.DataFrame(bight_stations.fetchall())
     bs.columns = bight_stations.keys()
     false_records = trawldebris[

@@ -955,7 +955,7 @@ def toxicity(all_dfs):
                     field_assignment_table.stratum
                 FROM field_assignment_table 
                     INNER JOIN tbl_stationoccupation 
-                    ON field_assignment_table.stationid = tbl_stationoccupation.stationid 
+                    ON field_assignment_table.stationid = tbl_stationoccupation.stationid
                 WHERE 
                     tbl_stationoccupation.collectiontype = 'Grab' 
                     AND tbl_stationoccupation.stationfail = 'None or No Failure'

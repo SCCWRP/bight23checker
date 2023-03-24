@@ -182,7 +182,7 @@ def fish(all_dfs):
     # 3. Return error if abundance records are not found in field assignment table
     print("Fish Custom Checks")
     print("Return error if abundance records are not found in field assignment table")
-    field_assgn_table = eng.execute("SELECT stationid,trawlagency FROM field_assignment_table;")
+    field_assgn_table = eng.execute("""SELECT stationid,assigned_agency AS trawlagency FROM field_assignment_table WHERE "parameter" = 'trawl';""")
     f = pd.DataFrame(field_assgn_table.fetchall())
     f.columns = field_assgn_table.keys()
     unique_fat_records = zip(f.stationid,f.trawlagency)
