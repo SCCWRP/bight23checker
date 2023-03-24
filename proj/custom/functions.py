@@ -163,7 +163,7 @@ def check_strata_grab(grab, strata_lookup, field_assignment_table):
     # We need these columns to look up for the polygon the stations are supposed to be in
     grab = pd.merge(
         grab, 
-        field_assignment_table.filter(items=['stationid','stratum','region']), 
+        field_assignment_table.filter(items=['stationid','stratum','region']).drop_duplicates(), 
         how='left', 
         on=['stationid']
     )
@@ -196,7 +196,7 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
     # We need these columns to look up for the polygon the stations are supposed to be in
     trawl = pd.merge(
         trawl, 
-        field_assignment_table.filter(items=['stationid','stratum','region']), 
+        field_assignment_table.filter(items=['stationid','stratum','region']).drop_duplicates(), 
         how='left', 
         on=['stationid']
     )

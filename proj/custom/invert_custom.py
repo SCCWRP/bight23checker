@@ -236,25 +236,6 @@ def invert(all_dfs):
     }
     warnings = [*warnings, checkData(**trawlinvertebratebiomass_args)]
 
-    '''
-    NOTE: This check determines whether or not the stationID submitted can be found in the field assignment table. However, the logic checks already
-            determine whether the stations are found in trawl event table. Since the stations in the trawl event table is a subset of the stations in
-            the field assignment table, this check seems to be unnecessary. - Jordan 9/12/2018
-    # Jordan - Lookup list - Link data to Bight station list to look for mismatched records - Error -> Stations not Bight stations
-    errorLog("Lookup list - Link data to Bight station list to look for mismatched records - Error -> Stations not Bight stations")
-    field_assignment_table = eng.execute(
-        "select stationid from field_assignment_table;")
-    fat = DataFrame(field_assignment_table.fetchall()
-                    ); fat.columns = field_assignment_table.keys()
-    errorLog('field assignment table records')
-    errorLog(fat)
-    errorLog(abundance[~abundance.stationid.isin(fat.stationid.tolist())])
-    checkData(abundance[~abundance.stationid.isin(fat.stationid.tolist())].tmp_row.tolist(
-    ),'StationID','Undefined Error','error','Stations not Bight stations.',abundance)
-    errorLog(biomass[~biomass.stationid.isin(fat.stationid.tolist())])
-    checkData(biomass[~biomass.stationid.isin(fat.stationid.tolist())].tmp_row.tolist(
-    ),'StationID','Undefined Error','error','Stations not Bight stations.',biomass)
-    '''
 
     # NOTE: "Composite Weight records are no longer going to be submitted for fish or invert." - Shelly 9/12/2018
     # Jordan - Cross table checks - abundance vs. biomass  Link both abundance and biomass submissions and run mismatch query to check for orphan records. "Composite weight" should be only mismatch.  Error message - Orphan records for biomass vs abundance.
