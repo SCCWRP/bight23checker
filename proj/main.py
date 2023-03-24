@@ -44,7 +44,7 @@ def main():
 
             # To be accessed later by the upload routine that loads data to the tables
             session['excel_path'] = excel_path
-
+            
             # Put their original filename in the submission tracking table
             g.eng.execute(
                 f"""

@@ -33,6 +33,11 @@ def template():
     file_prefix = datatype.upper()
     database_name = str(g.eng).replace(")","").split("/")[-1]
     print(current_app.datasets.keys())
+
+    static_template = current_app.datasets.get(datatype).get('template_filename')    
+    if static_template:
+        print("Static template")
+        return send_file(f"{os.getcwd()}/export/data_templates/{static_template}", as_attachment=True, download_name=f'{static_template}')
     
     eng = g.eng
     # intialize metadata

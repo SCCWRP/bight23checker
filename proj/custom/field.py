@@ -19,7 +19,7 @@ from arcgis.geometry import lengths, areas_and_lengths, project
 import os
 
 def fieldchecks(occupation, eng, trawl = None, grab = None):
-    
+    #return {'errors': [], 'warnings': []}
     current_function_name = str(currentframe().f_code.co_name)
     print("current_function_name")
     print(current_function_name)
