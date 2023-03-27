@@ -11,7 +11,9 @@ require([
     "esri/Graphic",
     "esri/layers/GraphicsLayer"
 ], function(esriConfig, Map, Graphic, MapView, FeatureLayer, LayerList, Legend, GeoJSONLayer, MapImageLayer, Graphic, GraphicsLayer) {
-
+    const blueColors = ["#eff3ff","#bdd7e7","#6baed6","#3182bd","#08519c"];
+    const greenColors = ["#edf8e9","#bae4b3","#74c476","#31a354","#006d2c"];
+    const purpleColors = ["#f2f0f7","#cbc9e2","#9e9ac8","#756bb1","#54278f"];
     const strataRenderer = {
         type: "unique-value",  // autocasts as new UniqueValueRenderer()
         field: "stratum",
@@ -19,18 +21,10 @@ require([
         uniqueValueInfos: [
             {
                 // All features with value of "North" will be blue
-                value: "Estuaries",
+                value: "Bay",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: 'rgb(0, 109, 119)'
-                }
-            },
-            {
-                // All features with value of "North" will be blue
-                value: "Freshwater Estuary",
-                symbol: {
-                    type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: 'rgb(131, 197, 190)'
+                    color: greenColors[4]
                 }
             },
             {
@@ -38,15 +32,7 @@ require([
                 value: "Marina",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: 'rgb(136, 73, 143)'
-                }
-            },
-            {
-                // All features with value of "North" will be blue
-                value: "Bay",
-                symbol: {
-                    type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: 'rgb(136, 73, 143)'
+                    color: greenColors[3]
                 }
             },
             {
@@ -54,7 +40,23 @@ require([
                 value: "Port",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: 'rgb(62, 92, 118)'
+                    color: purpleColors[2]
+                }
+            },
+            {
+                // All features with value of "North" will be blue
+                value: "Estuaries",
+                symbol: {
+                    type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+                    color: greenColors[1]
+                }
+            },
+            {
+                // All features with value of "North" will be blue
+                value: "Freshwater Estuary",
+                symbol: {
+                    type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+                    color: greenColors[0]
                 }
             },
             {
@@ -62,15 +64,7 @@ require([
                 value: "Inner Shelf",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: 'rgb(224, 251, 252)'
-                }
-            },
-            {
-                // All features with value of "North" will be blue
-                value: "Lower Slope",
-                symbol: {
-                    type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: 'rgb(34, 51, 59)'
+                    color: blueColors[0]
                 }
             },
             {
@@ -78,7 +72,7 @@ require([
                 value: "Mid Shelf",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: 'rgb(152, 193, 217)'
+                    color: blueColors[1]
                 }
             },
             {
@@ -86,7 +80,7 @@ require([
                 value: "Outer Shelf",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: 'rgb(28, 68, 142)'
+                    color: blueColors[2]
                 }
             },
             {
@@ -94,7 +88,15 @@ require([
                 value: "Upper Slope",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: 'rgb(224, 242, 233)'
+                    color: blueColors[3]
+                }
+            },
+            {
+                // All features with value of "North" will be blue
+                value: "Lower Slope",
+                symbol: {
+                    type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+                    color: blueColors[4]
                 }
             },
             {
@@ -102,7 +104,7 @@ require([
                 value: "Channel Islands",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: 'rgb(60, 136, 126)'
+                    color: purpleColors[4]
                 }
             }
         ]
