@@ -126,7 +126,7 @@ def toxicity(all_dfs):
         "is_core_error": False,
         "error_message": "Each Toxicity Result record must have a corresponding Toxicity WQ record. Records are matched on ToxBatch and Lab."
     })
-    errs = [*errs, checkData(**toxresults_args)] 
+    errs = [*errs, checkData(**toxresults_args)]
 
     # wq
     badrows = toxwq[~toxwq[['toxbatch','lab']].isin(toxbatch[['toxbatch',    'lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
@@ -153,8 +153,7 @@ def toxicity(all_dfs):
     })
     errs = [*errs, checkData(**toxwq_args)]
 
-    # 2 - Check for the minimum number of replicates - ee and mg = 5 and na = 10
-    # SampleTypeCode added to the group for replicate counts. 
+    # 2 - Check for the minimum number of replicates - ee = 4 and mg = 5 and na = 10
     ## first get a lab replicate count grouped on stationid, toxbatch, species, and sampletypecode
     dfrep = pd.DataFrame(toxresults.groupby(['stationid','toxbatch','species','sampletypecode']).size().reset_index(name='replicatecount'))
     
@@ -162,18 +161,13 @@ def toxicity(all_dfs):
     ## we will want to highlight them as a group rather than by row
     dfrep = pd.merge(dfrep,toxresults, on=['stationid','toxbatch','species','sampletypecode'], how='inner')
 
-    print("## A MINIMUM NUMBER OF 5 REPLICATES ARE REQUIRED FOR SPECIES EOHAUSTORIUS ESTUARIUS AND MYTILUS GALLOPROVINCIALIS ##")
+    ## A MINIMUM NUMBER OF 4 REPLICATES ARE REQUIRED FOR SPECIES EOHAUSTORIUS ESTUARIUS##
+    print("## A MINIMUM NUMBER OF 4 REPLICATES ARE REQUIRED FOR SPECIES EOHAUSTORIUS ESTUARIUS##")
     badrows = dfrep[
         (dfrep['sampletypecode'].isin(['CNEG','CNSL','Grab'])) & 
-        (dfrep['species'].isin(['Eohaustorius estuarius','EE','Mytilus galloprovincialis','MG'])) & 
-        (dfrep['replicatecount'] < 5)
+        (dfrep['species'].isin(['Eohaustorius estuarius','EE'])) & 
+        (dfrep['replicatecount'] < 4)
     ].tmp_row.tolist()
-
-    # badrows = dfrep[
-    #     (dfrep['species'].isin(['Eohaustorius estuarius','EE','Mytilus galloprovincialis','MG'])) & 
-    #     (dfrep['replicatecount'] < 5)
-    # ].tmp_row.tolist()
-
     toxresults_args.update({
         "dataframe": toxresults,
         "tablename": 'tbl_toxresults',
@@ -181,44 +175,17 @@ def toxicity(all_dfs):
         "badcolumn": "toxbatch,lab,sampletypecode",
         "error_type": "Logic Error",
         "is_core_error": False,
-        "error_message": "A minimum number of 5 replicates are required for species Eohaustorius estuarius and Mytilus galloprovincialis"
+        "error_message": "A minimum number of 4 replicates is required for species Eohaustorius estuarius with any of the following SampleTypeCode: CNEG, CNSL, Grab."
     })
     errs = [*errs, checkData(**toxresults_args)] 
 
-    # Below is the old check - it should also filter to sampletypecodes of CNSL, CNEG and Grab
-    # print("## A MINIMUM NUMBER OF 10 REPLICATES ARE REQUIRED FOR SPECIES NEANTHES ARENACEODENTATA ##")
-    # badrows = dfrep[(dfrep['species'] == 'Neanthes arenaceodentata') & (dfrep['replicatecount'] < 10)].tmp_row.tolist()
-    # toxresults_args.update({
-    #     "dataframe": toxresults,
-    #     "tablename": 'tbl_toxresults',
-    #     "badrows": badrows,
-    #     "badcolumn": "toxbatch,lab,sampletypecode",
-    #     "error_type": "Logic Error",
-    #     "is_core_error": False,
-    #     "error_message": "A minimum number of 10 replicates are required for species Neanthes arenaceodentata"
-    # })
-    # errs = [*errs, checkData(**toxresults_args)] 
-
-    # ## Ayah's Edit - add the sampletypecode to the group
-    # badrows = dfrep[dfrep['sampletypecode'].isin(['CNEG','CNSL','Grab']) & dfrep['species'].isin(['Neanthes arenaceodentata']) & (dfrep['replicatecount'] < 10)].tmp_row.tolist()
-    # toxresults_args.update({
-    #     "dataframe": toxresults,
-    #     "tablename": 'tbl_toxresults',
-    #     "badrows": badrows,
-    #     "badcolumn": "toxbatch,lab,sampletypecode",
-    #     "error_type": "Logic Error",
-    #     "is_core_error": False,
-    #     "error_message": "A minimum number of 10 replicates are required for species Neanthes arenaceodentata"
-    # })
-    # errs = [*errs, checkData(**toxresults_args)]
-
-
-    ## Ayah's Edit (add the last value in sampletypecode)
-    badrows = dfrep[(
-        dfrep['sampletypecode'].isin(['CNEG','CNSL','Grab']) 
-        & dfrep['species'].isin(['Eohaustorius estuarius','EE','Mytilus galloprovincialis','MG']) 
-        & (dfrep['replicatecount'] < 5)
-    )].tmp_row.tolist()
+    ## A MINIMUM NUMBER OF 5 REPLICATES ARE REQUIRED FOR SPECIES MYTILUS GALLOPROVINCIALIS ##
+    print("## A MINIMUM NUMBER OF 5 REPLICATES ARE REQUIRED FOR SPECIES MYTILUS GALLOPROVINCIALIS ##")
+    badrows = dfrep[
+        (dfrep['sampletypecode'].isin(['CNEG','CNSL','Grab'])) & 
+        (dfrep['species'].isin(['Mytilus galloprovincialis','MG'])) & 
+        (dfrep['replicatecount'] < 5)
+    ].tmp_row.tolist()
     toxresults_args.update({
         "dataframe": toxresults,
         "tablename": 'tbl_toxresults',
@@ -226,9 +193,27 @@ def toxicity(all_dfs):
         "badcolumn": "toxbatch,lab,sampletypecode",
         "error_type": "Logic Error",
         "is_core_error": False,
-        "error_message": "A minimum number of 5 replicates are required for species Eohaustorius estuarius and Mytilus galloprovincialis"
+        "error_message": "A minimum number of 5 replicates is required for species Mytilus galloprovincialis with any of the following SampleTypeCode: CNEG, CNSL, Grab."
     })
+    errs = [*errs, checkData(**toxresults_args)] 
 
+    ## A MINIMUM NUMBER OF 10 REPLICATES ARE REQUIRED FOR SPECIES NEANTHES ARENACEODENTATA ##
+    print("## A MINIMUM NUMBER OF 10 REPLICATES ARE REQUIRED FOR SPECIES NEANTHES ARENACEODENTATA ##")
+    badrows = dfrep[
+        (dfrep['sampletypecode'].isin(['CNEG','CNSL','Grab'])) & 
+        (dfrep['species'].isin(['Neanthes arenaceodentata'])) & 
+        (dfrep['replicatecount'] < 10)
+    ].tmp_row.tolist()
+    toxresults_args.update({
+        "dataframe": toxresults,
+        "tablename": 'tbl_toxresults',
+        "badrows": badrows,
+        "badcolumn": "toxbatch,lab,sampletypecode",
+        "error_type": "Logic Error",
+        "is_core_error": False,
+        "error_message": "A minimum number of 10 replicates is required for species Neanthes arenaceodentata with any of the following SampleTypeCode: CNEG, CNSL, Grab."
+    })
+    errs = [*errs, checkData(**toxresults_args)]
     
     # 3. EACH BS or SWI BATCH MUST HAVE A "REFERENCE TOXICANT" BATCH WITHIN A SPECIFIED DATE RANGE.
     print("# 3. EACH BS or SWI BATCH MUST HAVE A REFERENCE TOXICANT BATCH WITHIN A SPECIFIED DATE RANGE.")
@@ -329,6 +314,45 @@ def toxicity(all_dfs):
         "error_message": "A toxicity submission requires that the field data be submitted first. Your station does not match the grab event table."
     })
     errs = [*errs, checkData(**toxresults_args)] 
+
+    # 4. LABREP IN RESULTS TAB NEEDS TO BE CONTIGUOUS.
+    # MIGHT NEED TO ADD FIELDREPLICATE TO GROUP RESULTS
+    print("4. LABREP IN RESULTS TAB NEEDS TO BE CONTIGUOUS.")
+    grouping_cols = [
+        'stationid',
+        'toxbatch',
+        'matrix',
+        'lab',
+        'species',
+        'dilution',
+        'treatment',
+        'concentration',
+        'concentrationunits',
+        'endpoint',
+        'sampletypecode',
+        'samplecollectdate'
+    ]
+    dflabrep = toxresults.groupby(grouping_cols)
+    dflabrep = toxresults.groupby(grouping_cols)['labrep', 'tmp_row'].apply(lambda x: tuple([x.labrep.tolist(), x.tmp_row.tolist()]))
+    dflabrep = dflabrep.reset_index(name='repsandrows')
+    dflabrep['reps'] = dflabrep.repsandrows.apply(lambda x: x[0]) # first value of the tuple is the labreplicate
+    dflabrep['rows'] = dflabrep.repsandrows.apply(lambda x: x[1]) # second value of the tuple is the row index number (tmp_row)
+    dflabrep.drop('repsandrows', axis=1, inplace=True)
+    # checking to see if LabReplicated were labeled correctely
+    # This is done using the sum of the first 'n' formula 1 + 2 + ... + n == n(n+1)/2
+    dflabrep['passed'] = dflabrep['reps'].apply(lambda x: (sum(x) == ((len(x) * (len(x) + 1)) / 2 )) & ([num > 0 for num in x] == [True] * len(x)) )
+    badrows = [item for sublist in dflabrep[dflabrep['passed'] == False].rows.tolist() for item in sublist]
+    toxresults_args.update({
+        "dataframe": toxresults,
+        "tablename": 'tbl_toxresults',
+        "badrows": badrows,
+        "badcolumn": "labrep",
+        "error_type": "Logic Error",
+        "is_core_error": False,
+        "error_message": "LabReplicates must be contiguous."
+    })
+    errs = [*errs, checkData(**toxresults_args)] 
+
     ## END LOGIC CHECKS ##
     print("## END LOGIC CHECKS ##")
 
