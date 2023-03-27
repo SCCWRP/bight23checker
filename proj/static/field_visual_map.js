@@ -12,6 +12,102 @@ require([
     "esri/layers/GraphicsLayer"
 ], function(esriConfig, Map, Graphic, MapView, FeatureLayer, LayerList, Legend, GeoJSONLayer, MapImageLayer, Graphic, GraphicsLayer) {
 
+    const strataRenderer = {
+        type: "unique-value",  // autocasts as new UniqueValueRenderer()
+        field: "stratum",
+        defaultSymbol: { type: "simple-fill",color: 'rgb(0, 109, 119)' },  
+        uniqueValueInfos: [
+            {
+                // All features with value of "North" will be blue
+                value: "Estuaries",
+                symbol: {
+                    type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+                    color: 'rgb(0, 109, 119)'
+                }
+            },
+            {
+                // All features with value of "North" will be blue
+                value: "Freshwater Estuary",
+                symbol: {
+                    type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+                    color: 'rgb(131, 197, 190)'
+                }
+            },
+            {
+                // All features with value of "North" will be blue
+                value: "Marina",
+                symbol: {
+                    type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+                    color: 'rgb(136, 73, 143)'
+                }
+            },
+            {
+                // All features with value of "North" will be blue
+                value: "Bay",
+                symbol: {
+                    type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+                    color: 'rgb(136, 73, 143)'
+                }
+            },
+            {
+                // All features with value of "North" will be blue
+                value: "Port",
+                symbol: {
+                    type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+                    color: 'rgb(62, 92, 118)'
+                }
+            },
+            {
+                // All features with value of "North" will be blue
+                value: "Inner Shelf",
+                symbol: {
+                    type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+                    color: 'rgb(224, 251, 252)'
+                }
+            },
+            {
+                // All features with value of "North" will be blue
+                value: "Lower Slope",
+                symbol: {
+                    type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+                    color: 'rgb(34, 51, 59)'
+                }
+            },
+            {
+                // All features with value of "North" will be blue
+                value: "Mid Shelf",
+                symbol: {
+                    type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+                    color: 'rgb(152, 193, 217)'
+                }
+            },
+            {
+                // All features with value of "North" will be blue
+                value: "Outer Shelf",
+                symbol: {
+                    type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+                    color: 'rgb(28, 68, 142)'
+                }
+            },
+            {
+                // All features with value of "North" will be blue
+                value: "Upper Slope",
+                symbol: {
+                    type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+                    color: 'rgb(224, 242, 233)'
+                }
+            },
+            {
+                // All features with value of "North" will be blue
+                value: "Channel Islands",
+                symbol: {
+                    type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+                    color: 'rgb(60, 136, 126)'
+                }
+            }
+        ]
+    }
+
     const script_root = sessionStorage.script_root
     
     fetch(`${script_root}/getgeojson`, {
@@ -21,9 +117,10 @@ require([
         {return response.json()
     }).then(function (data) {
         
-        var points = data['points']
-        var polylines = data['polylines']
-        var polygons = data['polygons']
+        const points = data['points']
+        const polylines = data['polylines']
+        const polygons = data['polygons']
+        const strataLayerId = data['strata_layer_id']
         
         console.log(points)
         console.log(polylines)
@@ -32,8 +129,18 @@ require([
         arcGISAPIKey = data['arcgis_api_key']
         esriConfig.apiKey = arcGISAPIKey
         
+        const bightstrata = new FeatureLayer({
+            // autocasts as new PortalItem()
+            portalItem: {
+                id: strataLayerId
+            },
+            outFields: ["*"],
+            renderer: strataRenderer
+        });
+
         const map = new Map({
-            basemap: "arcgis-topographic" // Basemap layer service
+            basemap: "arcgis-topographic", // Basemap layer service
+            layers: [bightstrata]
         });
     
         const view = new MapView({
@@ -42,6 +149,7 @@ require([
             zoom: 10,
             container: "viewDiv"
         });
+
         
         const graphicsLayer = new GraphicsLayer();
         map.add(graphicsLayer);
@@ -145,8 +253,34 @@ require([
                 graphicsLayer.add(polygonGraphic);
             }
         }
-        
 
-    }
-    )
+        bightstrata.load().then(() => {
+
+            const legend = new Legend({
+                view: view,
+                container: document.createElement('div'),
+                layerInfos: [
+                    {
+                        layer: bightstrata,
+                        title: 'Bight Strata',
+                    },
+                ],
+            });
+            
+            //document.getElementById("viewDiv").appendChild(legend.container);
+            view.ui.add(legend, "bottom-left");
+        })
+    
+        // const legendExpand = new Expand({
+        //     view: view,
+        //     content: legend.container,
+        //     group: "bottom-left",
+        //     expanded: true,
+        //   });
+          
+
+        
+        
+    })
+      
 });

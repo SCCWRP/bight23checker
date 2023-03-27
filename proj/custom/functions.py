@@ -227,23 +227,26 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
     print("                             ")
     print("                             ")
     print("checking the length")
-    print(len(not_in_field_assignment_table) == 0)
-    print(not_in_field_assignment_table[0][0])
-    print(type(not_in_field_assignment_table[0][0]))
 
-    print("REPLACING THE NUMERIC nan WITH TEXT null")
-    if np.nan in not_in_field_assignment_table[0]:
-        #replace numeric nan with text null
-        not_in_field_assignment_table = [
-            #tuple(None if isinstance(i, float) and math.isnan(i) else i for i in t) 
-            # try with empty string instead because None will be nonetype object and .join does not like that
-            tuple('' if isinstance(i, float) and math.isnan(i) else i for i in t) 
-            for t in not_in_field_assignment_table
-        ]
-    print(not_in_field_assignment_table)
 
-    print('\n'.join(','.join(elems) for elems in not_in_field_assignment_table))
-    print("this following does not work...")
+    # Please forgive me, but i am not sure why the below (commented out) code was put in - Robert
+    # ------------------------------------------------------------------------------------
+    # print("REPLACING THE NUMERIC nan WITH TEXT null")
+    # if np.nan in not_in_field_assignment_table[0]:
+    #     #replace numeric nan with text null
+    #     not_in_field_assignment_table = [
+    #         #tuple(None if isinstance(i, float) and math.isnan(i) else i for i in t) 
+    #         # try with empty string instead because None will be nonetype object and .join does not like that
+    #         tuple('' if isinstance(i, float) and math.isnan(i) else i for i in t) 
+    #         for t in not_in_field_assignment_table
+    #     ]
+    # print(not_in_field_assignment_table)
+
+    # print('\n'.join(','.join(elems) for elems in not_in_field_assignment_table))
+    # print("this following does not work...")
+    # ------------------------------------------------------------------------------------
+
+
     #print(f"{','.join(not_in_field_assignment_table)} these combos are not in the field_assignment_table")
     # error when not_in_field_assignment_table = [(nan, nan)] is a tuple values, ERROR: sequence item 0: expected str instance, tuple found
     #assert len(not_in_field_assignment_table) == 0, f"{','.join(not_in_field_assignment_table)} these combos are not in the field_assignment_table" 

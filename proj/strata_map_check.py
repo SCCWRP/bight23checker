@@ -48,4 +48,4 @@ def send_geojson():
     else:
         polygons = "None"
 
-    return jsonify(points=points, polylines=polylines, polygons=polygons, arcgis_api_key=arcgis_api_key)
+    return jsonify(points=points, polylines=polylines, polygons=polygons, arcgis_api_key=arcgis_api_key, strata_layer_id = os.environ.get('BIGHT18_STRATA_LAYER_ID'))

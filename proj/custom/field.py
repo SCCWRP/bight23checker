@@ -58,12 +58,19 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     strata['SHAPE'] = pd.Series(project(geometries=strata['SHAPE'].tolist(), in_sr=3857, out_sr=4326))
     
     # Turn the dataframe strata into a dictionary so we can look it up later when we check if points are in polygon
-    strata_lookup = {}
-    for tup, subdf in strata.groupby(['region','stratum']):
-        # For some reasons, the stratum in stations_grab_final is Bay, but it's Bays in the strata layer
-        if tup[1] == 'Bay':
-            tup = (tup[0], 'Bays')
-        strata_lookup[(tup[0],tup[1])] = subdf['SHAPE'].iloc[0]
+    # strata_lookup = {}
+    # for tup, subdf in strata.groupby(['region','stratum']):
+    #     # For some reasons, the stratum in stations_grab_final is Bay, but it's Bays in the strata layer
+    #     if tup[1] == 'Bay':
+    #         tup = (tup[0], 'Bays')
+    #     strata_lookup[(tup[0],tup[1])] = subdf['SHAPE'].iloc[0]
+    
+    # I am going to be forcing Karen to match the field assignment table with the strata layer, so we might not need to do that
+    # and in fact, doing so may possibly break it in bight 2023
+    strata_lookup = {
+        # (tup[0],tup[1] if tup[1] != 'Bay' else 'Bays') : subdf['SHAPE'].iloc[0] for tup, subdf in strata.groupby(['region','stratum'])
+        (tup[0],tup[1]) : subdf['SHAPE'].iloc[0] for tup, subdf in strata.groupby(['region','stratum'])
+    }
     
     eng = g.eng
     
