@@ -14,11 +14,20 @@ require([
     const blueColors = ["#eff3ff","#bdd7e7","#6baed6","#3182bd","#08519c"];
     const greenColors = ["#edf8e9","#bae4b3","#74c476","#31a354","#006d2c"];
     const purpleColors = ["#f2f0f7","#cbc9e2","#9e9ac8","#756bb1","#54278f"];
+    const colorForTheSpecifiedRegionOfTheUser = '#db162f';  // fire engine red
     const strataRenderer = {
         type: "unique-value",  // autocasts as new UniqueValueRenderer()
         field: "stratum",
         defaultSymbol: { type: "simple-fill",color: 'rgb(0, 109, 119)' },  
         uniqueValueInfos: [
+            {
+                // All features with value of "North" will be blue
+                value: "Your Region",
+                symbol: {
+                    type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+                    color: colorForTheSpecifiedRegionOfTheUser
+                }
+            },
             {
                 // All features with value of "North" will be blue
                 value: "Bay",
@@ -157,32 +166,27 @@ require([
         map.add(graphicsLayer);
         
 
-        let attr = {
-            Name: "Station out of the specified region", // The name of the pipeline
-            Recommendation: "Check the Error Tab", // The name of the pipeline
-        };
+        // let attr = {
+        //     Name: "Station out of the specified region", // The name of the pipeline
+        //     Recommendation: "Check the Error Tab", // The name of the pipeline
+        // };
 
-        let popUp = {
-            title: "{Name}",
-            content: [
-              {
-                type: "fields",
-                fieldInfos: [
-                  {
-                    fieldName: "Name"
-                  },
-                  {
-                    fieldName: "Recommendation"
-                  }
-                ]
-              }
-            ]
-        }
+        
 
         if (points !== "None" ) {
+            let popUp = {
+                title: "{stationid}",
+                content: `
+                    <p><strong>Your station {stationid} was not found inside the region which was specified in the data ({region})</strong></p>
+                    <p>This point corresponds to grab event number: {grabeventnumber}</p>
+                    <p>The Region specified in your data was: {region}</p>
+                    <p>The Stratum specified in your data was: {stratum}</p>
+                `
+            }
             for (let i = 0; i < points.length; i++){
                 
-                let point = points[i]
+                let point = points[i].geometry
+
                 console.log(point)
                 let simpleMarkerSymbol = {
                     type: "simple-marker",
@@ -197,7 +201,7 @@ require([
                 let pointGraphic = new Graphic({
                     geometry: point,
                     symbol: simpleMarkerSymbol,
-                    attributes: attr,
+                    attributes: points[i].properties,
                     popupTemplate: popUp
                     });
 
@@ -206,8 +210,19 @@ require([
         }
 
         if (polylines !== "None" ) {
+            let popUp = {
+                title: "{stationid}",
+                content: `
+                    <p><strong>Your station {stationid} was not found inside the region which was specified in the data ({region})</strong></p>
+                    <p>This line corresponds to trawl number: {trawlnumber}</p>
+                    <p>The Region specified in your data was: {region}</p>
+                    <p>The Stratum specified in your data was: {stratum}</p>
+                `
+            }
             for (let i = 0; i < polylines.length; i++){
-                let polyline = polylines[i]
+                let polyline = polylines[i].geometry
+                console.log('polyline')
+                console.log(polyline)
                 
                 let simpleLineSymbol = {
                     type: "simple-line",
@@ -218,7 +233,7 @@ require([
                 let polylineGraphic  = new Graphic({
                     geometry: polyline,
                     symbol: simpleLineSymbol,
-                    attributes: attr,
+                    attributes: polylines[i].properties,
                     popupTemplate: popUp
                 });
                 graphicsLayer.add(polylineGraphic);
@@ -227,18 +242,28 @@ require([
 
         if (polygons !== "None" ) {
             let popupTemplate = {
-                title: "{Name}"
+                title: "{region}",
+                content: `
+                    <p>The Region specified in your data submission was: {region}</p>
+                    <p>The Stratum specified in your submission was: {stratum}</p>
+                    <p><strong>The Lat/Longs for your station {stationid} were not found in this region ({region})</strong></p>
+                `
             }
-            let attributes = {
-                Name: "Bight Strata Layer"
-            }
+            // let attributes = {
+            //     Name: "Bight Strata Layer"
+            // }
 
+            console.log('polygons')
+            console.log(polygons)
             for (let i = 0; i < polygons.length; i++){
-                let polygon = polygons[i]
+                let polygon = polygons[i].geometry
+                let attributes = polygons[i].properties
+                console.log('polygon')
+                console.log(polygon)
                 
                 let simpleFillSymbol = {
                     type: "simple-fill",
-                    color: [227, 139, 79, 0.8],  // Orange, opacity 80%
+                    color: colorForTheSpecifiedRegionOfTheUser, 
                     size: "15px",
                     outline: {
                         color: [255, 255, 255],

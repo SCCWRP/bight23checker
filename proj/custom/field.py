@@ -642,7 +642,11 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
 
         if len(bad_df) > 0:
             export_sdf_to_json(os.path.join(session['submission_dir'], "bad_trawl.json"), bad_df)
-            export_sdf_to_json(os.path.join(session['submission_dir'], "bight_region.json"), strata[strata['region'].isin(bad_df['region'])])
+            # export_sdf_to_json(os.path.join(session['submission_dir'], "bight_region.json"), strata[strata['region'].isin(bad_df['region'])])
+            export_sdf_to_json(
+                os.path.join(session['submission_dir'], "bight_region.json"), 
+                strata.merge( bad_df[['stationid','region']], on = 'region', how = 'inner' )
+            )
         
         trawl_args.update({
             "badrows": bad_df.tmp_row.tolist(),

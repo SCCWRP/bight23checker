@@ -273,13 +273,27 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
 
 def export_sdf_to_json(path, sdf):
     if "paths" in sdf['SHAPE'].iloc[0].keys():
+        # data = [
+        #     {
+        #         "type":"polyline",
+        #         "paths" : item.get('paths')[0]
+        #     }
+        #     for item in sdf['SHAPE']
+        # ]
         data = [
             {
-                "type":"polyline",
-                "paths" : item.get('paths')[0]
+                "type" : "Feature",
+                "geometry" : {
+                    "type":"polyline",
+                    "paths" : row.SHAPE.get('paths')[0]
+                },
+                "properties" : {
+                    k:str(v) for k,v in row.items() if k not in ('strata_polygon', 'SHAPE')
+                }
             }
-            for item in sdf['SHAPE']
-        ]
+
+            for _, row in sdf.iterrows()
+        ]        
     elif "rings" in sdf['SHAPE'].iloc[0].keys():
 
         # data = [
@@ -297,21 +311,36 @@ def export_sdf_to_json(path, sdf):
                     "rings" : row.SHAPE.get('rings')[0]
                 },
                 "properties" : {
-                    k:v for k,v in row.items() if k not in ('strata_polygon', 'SHAPE')
+                    k:str(v) for k,v in row.items() if k not in ('strata_polygon', 'SHAPE')
                 }
             }
-            
+
             for _, row in sdf.iterrows()
         ]        
     else:
+        # data = [
+        #     {
+        #         "type":"point",
+        #         "longitude": item["x"],
+        #         "latitude": item["y"]
+        #     }
+        #     for item in sdf.get("SHAPE").tolist()
+        # ]
         data = [
             {
-                "type":"point",
-                "longitude": item["x"],
-                "latitude": item["y"]
+                "type" : "Feature",
+                "geometry" : {
+                    "type":"point",
+                    "longitude": row.SHAPE.get("x"),
+                    "latitude": row.SHAPE.get("y")
+                },
+                "properties" : {
+                    k:str(v) for k,v in row.items() if k not in ('strata_polygon', 'SHAPE')
+                }
             }
-            for item in sdf.get("SHAPE").tolist()
-        ]
+
+            for _, row in sdf.iterrows()
+        ]        
     
     with open(path, "w", encoding="utf-8") as geojson_file:
        json.dump(data, geojson_file)
