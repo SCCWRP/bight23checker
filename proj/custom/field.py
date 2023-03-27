@@ -16,6 +16,7 @@ from arcgis.gis import GIS
 from arcgis.features import GeoAccessor, GeoSeriesAccessor
 from arcgis.geometry.filters import within, contains
 from arcgis.geometry import lengths, areas_and_lengths, project
+from arcgis.geometry import Point as arcgisPoint
 import os
 
 def fieldchecks(occupation, eng, trawl = None, grab = None):
@@ -637,25 +638,33 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         print("Check if trawl stations are in strata")
         # checker thing is breaking 
         print("-------------------- it broke between this --------------------")
-        bad_df = check_strata_trawl(trawl, strata_lookup, field_assignment_table)
+        trawl_map_errors_df = check_strata_trawl(trawl, strata_lookup, field_assignment_table)
         print("-------------------- and this --------------------") # yes it is breaking here :/
 
-        if len(bad_df) > 0:
-            export_sdf_to_json(os.path.join(session['submission_dir'], "bad_trawl.json"), bad_df)
-            # export_sdf_to_json(os.path.join(session['submission_dir'], "bight_region.json"), strata[strata['region'].isin(bad_df['region'])])
+        trawlpath = os.path.join(session['submission_dir'], "bad_trawl.json")
+        if len(trawl_map_errors_df) > 0:
+            export_sdf_to_json(trawlpath, trawl_map_errors_df)
+            # export_sdf_to_json(os.path.join(session['submission_dir'], "bight_region.json"), strata[strata['region'].isin(trawl_map_errors_df['region'])])
             export_sdf_to_json(
                 os.path.join(session['submission_dir'], "bight_region.json"), 
-                strata.merge( bad_df[['stationid','region']], on = 'region', how = 'inner' )
+                strata.merge( trawl_map_errors_df[['stationid','region']], on = 'region', how = 'inner' )
             )
+        else:
+            if os.path.exists(trawlpath):
+                os.remove(trawlpath)
         
         trawl_args.update({
-            "badrows": bad_df.tmp_row.tolist(),
+            "badrows": trawl_map_errors_df.tmp_row.tolist(),
             "badcolumn": 'startlatitude,startlongitude, endlatitude, endlongitude',
             "error_type": "Location Error",
-            "error_message" : f'This station has lat, long outside of the bight strata'
+            "error_message" : f'This station has lat/longs outside of the region/stratum where the target lat/longs are (See Map tab for more details)'
         })
         errs = [*errs, checkData(**trawl_args)]
-
+    else:
+        # catch the case where the submission is only grab - trawl file should NOT be there...
+        trawlpath = os.path.join(session['submission_dir'], "bad_trawl.json")
+        if os.path.exists(trawlpath):
+            os.remove(trawlpath)
 
     # ------- END Trawl Checks ------- #
 
@@ -782,20 +791,50 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             print("# Check if grab stations are in strata")
             bad_df = check_strata_grab(grab, strata_lookup, field_assignment_table)
             print(bad_df)
+            grabpath = os.path.join(session['submission_dir'], "bad_grab.json")
             if len(bad_df) > 0:
-                export_sdf_to_json(os.path.join(session['submission_dir'], "bad_grab.json"), bad_df)
+                export_sdf_to_json(grabpath, bad_df)
                 export_sdf_to_json(os.path.join(session['submission_dir'], "bight_region.json"), strata[strata['region'].isin(bad_df['region'])])
+            else:
+                if os.path.exists(grabpath):
+                    os.remove(grabpath)
 
             grab_args.update({
                 "badrows": bad_df.tmp_row.tolist(),
                 "badcolumn": 'latitude,longitude',
                 "error_type": "Location Error",
-                "error_message" : f'This station has lat, long outside of the bight strata'
+                "error_message" : f'This station has lat/longs outside of the region/stratum where the target lat/longs are (See Map tab for more details)'
             })
             errs = [*errs, checkData(**grab_args)]
         print("end grab CHECKS")
 
         ## end grab CHECKS ##
+    else:
+        # catch the case where the submission is only trawl - grab file should NOT be there...
+        grabpath = os.path.join(session['submission_dir'], "bad_grab.json")
+        if os.path.exists(grabpath):
+            os.remove(grabpath)
 
+    # export geojson with target latlongs
+    print('field_assignment_table')
+    print(field_assignment_table)
+    targets = occupation[['stationid']].merge(field_assignment_table[['stationid','latitude','longitude']], on = 'stationid', how = 'inner') \
+        .drop_duplicates()
+    print('targets')
+    print(targets[['latitude','longitude']])
+    targets['SHAPE'] = targets.apply(
+        lambda row: arcgisPoint({                
+            "x" :  row['longitude'], 
+            "y" :  row['latitude'], 
+            "spatialReference" : {'latestWkid': 4326, 'wkid': 4326}
+        }),
+        axis=1
+    )
+    print('targets after')
+    print(targets)
+    targetpath = os.path.join(session['submission_dir'], "target_stations.json")
+    if os.path.exists(targetpath):
+        os.remove(targetpath)
+    export_sdf_to_json(targetpath, targets)
 
     return {'errors': errs, 'warnings': warnings}

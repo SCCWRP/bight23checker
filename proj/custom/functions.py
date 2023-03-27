@@ -272,6 +272,10 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
     return bad_df
 
 def export_sdf_to_json(path, sdf):
+    print('path')
+    print(path)
+    print('sdf')
+    print(sdf)
     if "paths" in sdf['SHAPE'].iloc[0].keys():
         # data = [
         #     {

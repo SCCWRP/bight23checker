@@ -29,6 +29,7 @@ def send_geojson():
     path_to_grab_json = os.path.join(os.getcwd(), "files", str(session.get('submissionid')), "bad_grab.json")
     path_to_trawl_json = os.path.join(os.getcwd(), "files", str(session.get('submissionid')), "bad_trawl.json")
     path_to_strata_json = os.path.join(os.getcwd(), "files", str(session.get('submissionid')), "bight_region.json")
+    path_to_target_json = os.path.join(os.getcwd(), "files", str(session.get('submissionid')), "target_stations.json")
     
     if os.path.exists(path_to_grab_json):
         with open(path_to_grab_json, 'r') as f:
@@ -48,4 +49,10 @@ def send_geojson():
     else:
         polygons = "None"
 
-    return jsonify(points=points, polylines=polylines, polygons=polygons, arcgis_api_key=arcgis_api_key, strata_layer_id = os.environ.get('BIGHT18_STRATA_LAYER_ID'))
+    if os.path.exists(path_to_target_json):
+        with open(path_to_target_json, 'r') as f:
+            targets = json.load(f)
+    else:
+        targets = "None"
+
+    return jsonify(targets = targets, points=points, polylines=polylines, polygons=polygons, arcgis_api_key=arcgis_api_key, strata_layer_id = os.environ.get('BIGHT18_STRATA_LAYER_ID'))

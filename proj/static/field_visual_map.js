@@ -11,9 +11,40 @@ require([
     "esri/Graphic",
     "esri/layers/GraphicsLayer"
 ], function(esriConfig, Map, Graphic, MapView, FeatureLayer, LayerList, Legend, GeoJSONLayer, MapImageLayer, Graphic, GraphicsLayer) {
+
+    function arrayToCssColor(color, opacity = 1) {
+        if (typeof(color) === 'string') {
+            return color
+        }
+        return `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${opacity})`;
+      }
+      
     const blueColors = ["#eff3ff","#bdd7e7","#6baed6","#3182bd","#08519c"];
     const greenColors = ["#edf8e9","#bae4b3","#74c476","#31a354","#006d2c"];
     const purpleColors = ["#f2f0f7","#cbc9e2","#9e9ac8","#756bb1","#54278f"];
+    const blueColorsRGBA = [
+        "rgba(239, 243, 255, 0.25)",
+        "rgba(189, 215, 231, 0.25)",
+        "rgba(107, 174, 214, 0.25)",
+        "rgba(49, 130, 189, 0.25)",
+        "rgba(8, 81, 156, 0.25)"
+    ];
+        
+    const greenColorsRGBA = [
+        "rgba(237, 248, 233, 0.25)",
+        "rgba(186, 228, 179, 0.25)",
+        "rgba(116, 196, 118, 0.25)",
+        "rgba(49, 163, 84, 0.25)",
+        "rgba(0, 109, 44, 0.25)"
+    ];
+        
+    const purpleColorsRGBA = [
+        "rgba(242, 240, 247, 0.25)",
+        "rgba(203, 201, 226, 0.25)",
+        "rgba(158, 154, 200, 0.25)",
+        "rgba(117, 107, 177, 0.25)",
+        "rgba(84, 39, 143, 0.25)"
+    ];
     const colorForTheSpecifiedRegionOfTheUser = '#db162f';  // fire engine red
     const strataRenderer = {
         type: "unique-value",  // autocasts as new UniqueValueRenderer()
@@ -33,7 +64,7 @@ require([
                 value: "Bay",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: greenColors[4]
+                    color: greenColorsRGBA[4]
                 }
             },
             {
@@ -41,7 +72,7 @@ require([
                 value: "Marina",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: greenColors[3]
+                    color: greenColorsRGBA[3]
                 }
             },
             {
@@ -49,7 +80,7 @@ require([
                 value: "Port",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: purpleColors[2]
+                    color: purpleColorsRGBA[2]
                 }
             },
             {
@@ -57,7 +88,7 @@ require([
                 value: "Estuaries",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: greenColors[1]
+                    color: greenColorsRGBA[1]
                 }
             },
             {
@@ -65,7 +96,7 @@ require([
                 value: "Freshwater Estuary",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: greenColors[0]
+                    color: greenColorsRGBA[0]
                 }
             },
             {
@@ -73,7 +104,7 @@ require([
                 value: "Inner Shelf",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: blueColors[0]
+                    color: blueColorsRGBA[0]
                 }
             },
             {
@@ -81,7 +112,7 @@ require([
                 value: "Mid Shelf",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: blueColors[1]
+                    color: blueColorsRGBA[1]
                 }
             },
             {
@@ -89,7 +120,7 @@ require([
                 value: "Outer Shelf",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: blueColors[2]
+                    color: blueColorsRGBA[2]
                 }
             },
             {
@@ -97,7 +128,7 @@ require([
                 value: "Upper Slope",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: blueColors[3]
+                    color: blueColorsRGBA[3]
                 }
             },
             {
@@ -105,7 +136,7 @@ require([
                 value: "Lower Slope",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: blueColors[4]
+                    color: blueColorsRGBA[4]
                 }
             },
             {
@@ -113,7 +144,7 @@ require([
                 value: "Channel Islands",
                 symbol: {
                     type: "simple-fill",  // autocasts as new SimpleFillSymbol()
-                    color: purpleColors[4]
+                    color: purpleColorsRGBA[4]
                 }
             }
         ]
@@ -132,6 +163,7 @@ require([
         const polylines = data['polylines']
         const polygons = data['polygons']
         const strataLayerId = data['strata_layer_id']
+        const targets = data['targets']
         
         console.log(points)
         console.log(polylines)
@@ -165,6 +197,43 @@ require([
         const graphicsLayer = new GraphicsLayer();
         map.add(graphicsLayer);
         
+        let targetStationSymbol = {
+            type: "simple-marker",
+            color: [0,255,0],  // Green
+            size: "15px",
+            outline: {
+                color: [255, 255, 255], // White
+                width: 2
+            }
+        };
+
+        let simpleMarkerSymbol = {
+            type: "simple-marker",
+            color: [255,0,0],  // Red
+            size: "15px",
+            outline: {
+                color: [255, 255, 255], // White
+                width: 2
+            }
+        };
+
+        let simpleLineSymbol = {
+            type: "simple-line",
+            color: [255,0,0], // RED
+            size: "15px",
+            width: '3px'
+        };
+
+        let simpleFillSymbol = {
+            type: "simple-fill",
+            color: colorForTheSpecifiedRegionOfTheUser, 
+            size: "15px",
+            outline: {
+                color: [255, 255, 255],
+                width: 1
+            }
+        };
+        
 
         // let attr = {
         //     Name: "Station out of the specified region", // The name of the pipeline
@@ -173,72 +242,6 @@ require([
 
         
 
-        if (points !== "None" ) {
-            let popUp = {
-                title: "{stationid}",
-                content: `
-                    <p><strong>Your station {stationid} was not found inside the region which was specified in the data ({region})</strong></p>
-                    <p>This point corresponds to grab event number: {grabeventnumber}</p>
-                    <p>The Region specified in your data was: {region}</p>
-                    <p>The Stratum specified in your data was: {stratum}</p>
-                `
-            }
-            for (let i = 0; i < points.length; i++){
-                
-                let point = points[i].geometry
-
-                console.log(point)
-                let simpleMarkerSymbol = {
-                    type: "simple-marker",
-                    color: [255,0,0],  // Red
-                    size: "15px",
-                    outline: {
-                        color: [255, 255, 255], // White
-                        width: 2
-                    }
-                };
-                
-                let pointGraphic = new Graphic({
-                    geometry: point,
-                    symbol: simpleMarkerSymbol,
-                    attributes: points[i].properties,
-                    popupTemplate: popUp
-                    });
-
-                graphicsLayer.add(pointGraphic);
-            }
-        }
-
-        if (polylines !== "None" ) {
-            let popUp = {
-                title: "{stationid}",
-                content: `
-                    <p><strong>Your station {stationid} was not found inside the region which was specified in the data ({region})</strong></p>
-                    <p>This line corresponds to trawl number: {trawlnumber}</p>
-                    <p>The Region specified in your data was: {region}</p>
-                    <p>The Stratum specified in your data was: {stratum}</p>
-                `
-            }
-            for (let i = 0; i < polylines.length; i++){
-                let polyline = polylines[i].geometry
-                console.log('polyline')
-                console.log(polyline)
-                
-                let simpleLineSymbol = {
-                    type: "simple-line",
-                    color: [255,0,0], // RED
-                    size: "15px"
-                };
-                
-                let polylineGraphic  = new Graphic({
-                    geometry: polyline,
-                    symbol: simpleLineSymbol,
-                    attributes: polylines[i].properties,
-                    popupTemplate: popUp
-                });
-                graphicsLayer.add(polylineGraphic);
-            }
-        }
 
         if (polygons !== "None" ) {
             let popupTemplate = {
@@ -261,16 +264,6 @@ require([
                 console.log('polygon')
                 console.log(polygon)
                 
-                let simpleFillSymbol = {
-                    type: "simple-fill",
-                    color: colorForTheSpecifiedRegionOfTheUser, 
-                    size: "15px",
-                    outline: {
-                        color: [255, 255, 255],
-                        width: 1
-                    }
-                };
-                
                 let polygonGraphic  = new Graphic({
                     geometry: polygon,
                     symbol: simpleFillSymbol,
@@ -279,24 +272,179 @@ require([
                 });
                 graphicsLayer.add(polygonGraphic);
             }
+        } 
+        if (points !== "None" ) {
+            let popUp = {
+                title: "{stationid}",
+                content: `
+                    <p><strong>The Lat/Longs given for station {stationid} were not found inside the region where the station lives ({region})</strong></p>
+                    <p>This point corresponds to grab event number: {grabeventnumber}</p>
+                `
+            }
+            for (let i = 0; i < points.length; i++){
+                
+                let point = points[i].geometry
+
+                console.log(point)
+                
+                
+                let pointGraphic = new Graphic({
+                    geometry: point,
+                    symbol: simpleMarkerSymbol,
+                    attributes: points[i].properties,
+                    popupTemplate: popUp
+                    });
+
+                graphicsLayer.add(pointGraphic);
+            }
         }
 
-        bightstrata.load().then(() => {
+        if (polylines !== "None" ) {
+            let popUp = {
+                title: "{stationid}",
+                content: `
+                    <p><strong>This trawl for {stationid} was not found inside the region where the station lives ({region})</strong></p>
+                    <p>This line corresponds to trawl number: {trawlnumber}</p>
+                    <p>Start LatLongs: {startlatitude}, {startlongitude}</p>
+                    <p>Over LatLongs: {overlatitude}, {overlongitude}</p>
+                    <p>End LatLongs: {endlatitude}, {endlongitude}</p>
+                `
+            }
+            for (let i = 0; i < polylines.length; i++){
+                let polyline = polylines[i].geometry
+                console.log('polyline')
+                console.log(polyline)
+                
+                let polylineGraphic  = new Graphic({
+                    geometry: polyline,
+                    symbol: simpleLineSymbol,
+                    attributes: polylines[i].properties,
+                    popupTemplate: popUp
+                });
+                graphicsLayer.add(polylineGraphic);
+            }
+        }
+       
+        if (targets !== "None" ) {
+            let popUp = {
+                title: "{stationid} (Target)",
+                content: `
+                    <p>This point corresponds to the Target LatLongs for the station {stationid}</p>
+                `
+            }
+            for (let i = 0; i < targets.length; i++){
+                
+                let point = targets[i].geometry
 
-            const legend = new Legend({
-                view: view,
-                container: document.createElement('div'),
-                layerInfos: [
-                    {
-                        layer: bightstrata,
-                        title: 'Bight Strata',
-                    },
-                ],
+                console.log(point)
+                
+                
+                let pointGraphic = new Graphic({
+                    geometry: point,
+                    symbol: targetStationSymbol,
+                    attributes: targets[i].properties,
+                    popupTemplate: popUp
+                    });
+
+                graphicsLayer.add(pointGraphic);
+            }
+        }
+        
+        const customLegendDiv = document.createElement('div');
+        customLegendDiv.setAttribute('id','custom-legend');
+        // style="position: absolute; bottom: 10px; left: 10px; background-color: white; padding: 10px;"
+        customLegendDiv.style.position = 'absolute';
+        customLegendDiv.style.bottom = '25px';
+        customLegendDiv.style.left = '10px';
+        customLegendDiv.style.backgroundColor = 'white';
+        customLegendDiv.style.padding = '10px';
+
+        document.getElementById('viewDiv').appendChild(customLegendDiv)
+
+        const legendData = [
+            {
+                symbol: targetStationSymbol,
+                label: "Target LatLongs"
+            },
+            {
+                symbol: simpleMarkerSymbol,
+                label: "Grab"
+            },
+            {
+                symbol: simpleLineSymbol,
+                label: "Trawl"
+            },
+            {
+                symbol: simpleFillSymbol,
+                label: "Region of Target Station"
+            }
+        ]
+        function createCustomLegend(legendData) {
+            const legendContainer = document.getElementById("custom-legend");
+          
+            legendData.forEach((item) => {
+              // Create a symbol element
+              const symbolElement = document.createElement("div");
+              symbolElement.style.display = "inline-block";
+              symbolElement.style.marginRight = "10px";
+              symbolElement.style.width = "24px";
+              symbolElement.style.height = "24px";
+          
+              if (item.symbol.type === "simple-marker") {
+                symbolElement.style.backgroundColor = arrayToCssColor(item.symbol.color);
+                symbolElement.style.border = `${item.symbol.outline.width}px solid ${arrayToCssColor(item.symbol.outline.color)}`;
+              } else if (item.symbol.type === "simple-line") {
+                symbolElement.style.borderTop = `2px solid ${arrayToCssColor(item.symbol.color)}`;
+                symbolElement.style.transform = `rotate(45deg)`;
+                symbolElement.style.transformOrigin = `left`;
+              } else if (item.symbol.type === "simple-fill") {
+                symbolElement.style.backgroundColor = arrayToCssColor(item.symbol.color, 0.6); // Set opacity to 0.6
+                symbolElement.style.border = `${item.symbol.outline.width}px solid ${arrayToCssColor(item.symbol.outline.color)}`;
+              }
+          
+              // Create a label element
+              const labelElement = document.createElement("span");
+              labelElement.textContent = item.label;
+          
+              // Create a container for the symbol and label
+              const containerElement = document.createElement("div");
+              containerElement.style.display = "flex";
+              containerElement.style.alignItems = "center";
+              containerElement.style.marginBottom = "5px";
+              
+              if (item.symbol.type === 'simple-marker') {
+                  // make the border radius a large number so the element becomes circular
+                  symbolElement.style.borderRadius = "5000px"; 
+              }
+          
+              // Add the symbol and label to the container
+              containerElement.appendChild(symbolElement);
+              containerElement.appendChild(labelElement);
+          
+              // Add the container to the legend
+              legendContainer.appendChild(containerElement);
             });
+          }
+          
+
+        createCustomLegend(legendData);
+        // bightstrata.load().then(() => {
+
+        //     const legend = new Legend({
+        //         view: view,
+        //         container: document.createElement('div'),
+        //         layerInfos: [
+        //             {
+        //                 layer: bightstrata,
+        //                 title: 'Bight Strata',
+        //             },
+        //         ],
+        //     });
             
-            //document.getElementById("viewDiv").appendChild(legend.container);
-            view.ui.add(legend, "bottom-left");
-        })
+        //     //document.getElementById("viewDiv").appendChild(legend.container);
+        //     view.ui.add(legend, "bottom-left");
+        // })
+        
     
         // const legendExpand = new Expand({
         //     view: view,
