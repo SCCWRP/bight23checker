@@ -158,7 +158,7 @@ require([
         
 
         let attr = {
-            Name: "Station out of bight strata", // The name of the pipeline
+            Name: "Station out of the specified region", // The name of the pipeline
             Recommendation: "Check the Error Tab", // The name of the pipeline
         };
 

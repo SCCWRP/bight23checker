@@ -28,7 +28,7 @@ def send_geojson():
     
     path_to_grab_json = os.path.join(os.getcwd(), "files", str(session.get('submissionid')), "bad_grab.json")
     path_to_trawl_json = os.path.join(os.getcwd(), "files", str(session.get('submissionid')), "bad_trawl.json")
-    path_to_strata_json = os.path.join(os.getcwd(), "files", str(session.get('submissionid')), "bight_strata.json")
+    path_to_strata_json = os.path.join(os.getcwd(), "files", str(session.get('submissionid')), "bight_region.json")
     
     if os.path.exists(path_to_grab_json):
         with open(path_to_grab_json, 'r') as f:

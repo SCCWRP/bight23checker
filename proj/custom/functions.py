@@ -281,12 +281,27 @@ def export_sdf_to_json(path, sdf):
             for item in sdf['SHAPE']
         ]
     elif "rings" in sdf['SHAPE'].iloc[0].keys():
+
+        # data = [
+        #     {
+        #         "type":"polygon",
+        #         "rings" : item.get('rings')[0]
+        #     }
+        #     for item in sdf['SHAPE']
+        # ]        
         data = [
             {
-                "type":"polygon",
-                "rings" : item.get('rings')[0]
+                "type" : "Feature",
+                "geometry" : {
+                    "type":"polygon",
+                    "rings" : row.SHAPE.get('rings')[0]
+                },
+                "properties" : {
+                    k:v for k,v in row.items() if k not in ('strata_polygon', 'SHAPE')
+                }
             }
-            for item in sdf['SHAPE']
+            
+            for _, row in sdf.iterrows()
         ]        
     else:
         data = [
