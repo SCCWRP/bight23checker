@@ -190,7 +190,7 @@ def template():
             'glossary': glossary
         },
         **{
-            lu_name: pd.read_sql(f"SELECT * from {lu_name}", eng).drop(columns=['objectid'])
+            lu_name: pd.read_sql(f"SELECT * from {lu_name}", eng).drop(columns=['objectid'], errors = 'ignore')
             for lu_name in list(set(list_lu_needed))
         }
     }
