@@ -34,8 +34,12 @@ def template():
     database_name = str(g.eng).replace(")","").split("/")[-1]
     print(current_app.datasets.keys())
 
-    static_template = current_app.datasets.get(datatype).get('template_filename')    
-    if static_template:
+    static_template = current_app.datasets.get(datatype).get('template_filename')
+    print("datatype")
+    print(datatype)
+    print("static_template")
+    print(static_template)
+    if static_template is not None:
         print("Static template")
         return send_file(f"{os.getcwd()}/export/data_templates/{static_template}", as_attachment=True, download_name=f'{static_template}')
     

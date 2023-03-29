@@ -301,9 +301,9 @@ def toxicity(all_dfs):
     
     # get only the unique records for database/stationid
     unique_stations = sql_df.stationid.unique()
-    
+
     # find what records dont match the unique stations in the database
-    badrows = toxresults[ (~toxresults.stationid.isin(unique_stations)) & (toxresults.sampletypecode == 'Grab') ].tmp_row.tolist()
+    badrows = toxresults[ ( ~toxresults.stationid.isin(unique_stations) ) & (toxresults.sampletypecode == 'Grab') ].tmp_row.tolist()
     toxresults_args.update({
         "dataframe": toxresults,
         "tablename": 'tbl_toxresults',
@@ -997,7 +997,6 @@ def toxicity(all_dfs):
         # for c in toxsummary.columns:
         #     print(f"column: {c}")
         #     print(toxsummary[c])
-
 
         ################################################
         #WARNING: CHECK AND SEE IF DATAFRAME NAME AND TBLNAME IS CORRECT
