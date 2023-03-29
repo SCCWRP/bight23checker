@@ -696,7 +696,7 @@ def toxicity(all_dfs):
                 badrows = toxbatch[(toxbatch.toxbatch == k.toxbatch[i])&(toxbatch.species == k.species[i])].tmp_row.tolist()
                 toxbatch_args.update({
                     "badrows": badrows,
-                    "badcolumn": "toxbatch",
+                    "badcolumn": "timepoint",
                     "error_type": "Undefined Error",
                     "error_message": f'Associated water quality group {k.parameter[i]}/{k.species[i]}/{k.sampletypecode[i]} is missing time points {list(k.missing[i])}.'
                 })
