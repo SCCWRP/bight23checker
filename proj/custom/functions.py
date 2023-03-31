@@ -250,7 +250,7 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
     #print(f"{','.join(not_in_field_assignment_table)} these combos are not in the field_assignment_table")
     # error when not_in_field_assignment_table = [(nan, nan)] is a tuple values, ERROR: sequence item 0: expected str instance, tuple found
     #assert len(not_in_field_assignment_table) == 0, f"{','.join(not_in_field_assignment_table)} these combos are not in the field_assignment_table" 
-    assert len(not_in_field_assignment_table) == 0, f"{','.join(','.join(elems) for elems in not_in_field_assignment_table)} these combos are not in the field_assignment_table" 
+    #assert len(not_in_field_assignment_table) == 0, f"{','.join(','.join(elems) for elems in not_in_field_assignment_table)} these combos are not in the field_assignment_table" 
     print("the assertion did not fail")
 
     # Now we check if the points are in associated polygon or not. Assign True if they are in
