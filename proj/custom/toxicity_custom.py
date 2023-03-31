@@ -512,8 +512,7 @@ def toxicity(all_dfs):
         print("## Check - Strongylocentrotus purpuratus/Reference or Whole Sediment 72hours or 3 days ##")
         # Check: For SP with matrix RT or WS the ActualTestDuration should be around 72 hours or 3 days. 
         badrows = toxbatch[
-                (toxbatch["species"] == "Strongylocentrotus purpuratus") 
-                & ( toxbatch["matrix"].isin(["Reference Toxicant", "Whole Sediment"]) ) 
+                (toxbatch["species"] == "Strongylocentrotus purpuratus")
                 & 
                 ( 
                     # ActualTestDurationUnits can only can be "Hours" or "Days" - it is tied to a lookup list lu_toxtestunits
@@ -530,10 +529,10 @@ def toxicity(all_dfs):
             "dataframe": toxbatch,
             "tablename": 'tbl_toxbatch',
             "badrows": badrows,
-            "badcolumn": "species, matrix, actualtestduration",
+            "badcolumn": "species, actualtestduration",
             "error_type": "Logic Error",
             "is_core_error": False,
-            "error_message": "For records with Strongylocentrotus purpuratus and matrix of either Reference Toxicant or Whole Sediment, the ActualTestDuration should be 68 to 76 hours (about 3 days)."
+            "error_message": "For records with Strongylocentrotus purpuratus, the ActualTestDuration should be 68 to 76 hours (about 3 days)."
         })
         errs = [*errs, checkData(**toxbatch_args)]
 
