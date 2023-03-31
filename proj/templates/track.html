@@ -1,8 +1,7 @@
+{% if authorized %}
 <html>
 <head>
-	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename = 'button.css')}}">
-	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename = 'trackform.css')}}">
-{% if authorized %}
+
   <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.16/css/jquery.dataTables.min.css">
   <style>
 	.datatablerowhighlight {
@@ -27,46 +26,54 @@
 		<td>{{ s.login_email }}</td><td>{{ s.login_agency }}</td><td>{{ s.submissionid }}</td><td>{{ s.datatype }}</td><td>{{ s.submit }}</td><td>{{ s.created_date }}</td><td><a href="{{ submit_file }}"> {{ s.original_filename }} </a></td>
 		</tr>
 	{% endfor %}
-{% else %}
-
-	<form id="track-auth-form">
-		<label for="trackpw">Please sign in to view the submission tracking (The password is exactly what you think it is)</label>
-		<input type="password" name="trackpw">
-		<button id="track-auth-submit-btn" class="btn btn-primary" type="submit">Submit</button>
-	</form>
-{% endif %}
 </tbody>
 </table>
 </body>
-<script type="text/javascript">
-	document.getElementById('track-auth-form')?.addEventListener('submit', (event) => {
-		event.preventDefault();
-		const formData = new FormData(event.target);
-		fetch(
-			`{{request.script_root}}/trackauth`, 
-			{
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(Object.fromEntries(formData.entries()))
-			}
-		)
-		.then(response => {
-			if (!response.ok) {
-				throw new Error('Network response was not ok');
-			}
-			return response.json();
-		})
-		.then(data => {
-			console.log(data);
-			if (data.message === 'true') {
-				window.location = `{{request.script_root}}/track`
-			}
-		})
-		.catch(error => {
-			console.error('There was a problem submitting the form', error);
-		});
-	})
-</script>
 </html>
+{% else %}
+<html>
+	<head>
+		<link rel="stylesheet" type="text/css" href="{{url_for('static', filename = 'button.css')}}">
+		<link rel="stylesheet" type="text/css" href="{{url_for('static', filename = 'trackform.css')}}">
+	</head>
+	<body>
+
+		<form id="track-auth-form">
+			<label for="trackpw">Please sign in to view the submission tracking (The password is exactly what you think it is)</label>
+			<input type="password" name="trackpw">
+			<button id="track-auth-submit-btn" class="btn btn-primary" type="submit">Submit</button>
+		</form>
+	</body>
+	<script type="text/javascript">
+		document.getElementById('track-auth-form')?.addEventListener('submit', (event) => {
+			event.preventDefault();
+			const formData = new FormData(event.target);
+			fetch(
+				`{{request.script_root}}/trackauth`, 
+				{
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify(Object.fromEntries(formData.entries()))
+			}
+			)
+			.then(response => {
+				if (!response.ok) {
+					throw new Error('Network response was not ok');
+				}
+				return response.json();
+			})
+			.then(data => {
+				console.log(data);
+				if (data.message === 'true') {
+					window.location = `{{request.script_root}}/track`
+				}
+			})
+			.catch(error => {
+				console.error('There was a problem submitting the form', error);
+			});
+		})
+	</script>
+</html>
+{% endif %}
