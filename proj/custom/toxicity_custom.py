@@ -476,13 +476,13 @@ def toxicity(all_dfs):
         })
         errs = [*errs, checkData(**toxbatch_args)]
 
-        # ERROR - Mytilus galloprovincialis/Reference or Whole Sediment 48hours or 2 days 
-        print("## ERROR - Mytilus galloprovincialis/Reference or Whole Sediment 48hours or 2 days ##")
+        # ERROR - Mytilus galloprovincialis/Reference or Sediment Water Interface 48hours or 2 days 
+        print("## ERROR - Mytilus galloprovincialis/Reference or Sediment Water Interface 48hours or 2 days ##")
         # For MG with matrix RT or WS the ActualTestDuration should be around 48 hours or 2 days. 
         badrows = toxbatch[
                 (
                     ( toxbatch["species"] == "Mytilus galloprovincialis") 
-                    & ( toxbatch["matrix"].isin(["Reference Toxicant", "Whole Sediment"]) ) 
+                    & ( toxbatch["matrix"].isin(["Reference Toxicant", "Sediment Water Interface"]) ) 
                 )
                 & 
                 ( 
@@ -504,7 +504,7 @@ def toxicity(all_dfs):
             "badcolumn": "species, matrix, actualtestduration",
             "error_type": "Logic Error",
             "is_core_error": False,
-            "error_message": "For records with Mytilus galloprovincialis and matrix of either Reference Toxicant or Whole Sediment, the ActualTestDuration must be 44 to 52 hours (about 2 days)."
+            "error_message": "For records with Mytilus galloprovincialis and matrix of either Reference Toxicant or Sediment Water Interface, the ActualTestDuration must be 44 to 52 hours (about 2 days)."
         })
         errs = [*errs, checkData(**toxbatch_args)]
 
