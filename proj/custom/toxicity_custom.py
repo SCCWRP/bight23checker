@@ -604,14 +604,14 @@ def toxicity(all_dfs):
         toxresults_args.update(tmpargs)
         errs = [*errs, checkData(**toxresults_args)]
 
-        # 5. ENDPOINT PERCENT NORMAL-ALIVE IS SPECIES SPECIFIC TO TO MG.
-        print("## ENDPOINT PERCENT NORMAL-ALIVE IS SPECIES SPECIFIC TO MG ##")
-        badrows = toxresults[(toxresults["species"] != "Mytilus galloprovincialis") & (toxresults["endpoint"] == "Percent normal-alive")].tmp_row.tolist()
+        # 5. ENDPOINT PERCENT NORMAL-ALIVE IS SPECIES SPECIFIC TO TO MG OR SG.
+        print("## ENDPOINT PERCENT NORMAL-ALIVE IS SPECIES SPECIFIC TO MG OR SP##")
+        badrows = toxresults[((toxresults["species"] != "Mytilus galloprovincialis") & (toxresults["species"] != "Strongylocentrotus purpuratus")) & (toxresults["endpoint"] == "Percent normal-alive")].tmp_row.tolist()
         toxresults_args.update({
             "badrows": badrows,
             "badcolumn": "species, endpoint",
             "error_type": "Undefined Error",
-            "error_message": "Endpoint Percent Normal-alive is species specific to Mytilus galloprovincialis."
+            "error_message": "Endpoint Percent Normal-alive is species specific to either Mytilus galloprovincialis or Strongylocentrotus purpuratus."
         })
         errs = [*errs, checkData(**toxresults_args)] 
         ## END RESULT CHECKS ##
