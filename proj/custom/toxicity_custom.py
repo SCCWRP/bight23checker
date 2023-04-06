@@ -957,10 +957,13 @@ def toxicity(all_dfs):
         toxsummary.drop('tmp_row', axis = 1, inplace = True)
         
 
-        
+
 
 
         ## SUMMARY TABLE CHECKS ##
+        # adding tmp_row column to back into toxsummary df (after it was removed right before summary table checks run)
+        toxsummary = toxsummary.assign(tmp_row = toxsummary.index)
+        
         print("Starting Toxicity Summary Result Checks")
         toxsummary_args = {
             "dataframe": toxsummary,
