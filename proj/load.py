@@ -29,6 +29,9 @@ def load():
     excel_path = session['excel_path']
 
     eng = g.eng
+    
+    converters = current_app.config.get('DTYPE_CONVERTERS')
+    converters = {k: eval(v) for k,v in converters.items()} if converters is not None else None
 
     all_dfs = {
 
@@ -37,13 +40,18 @@ def load():
         # For projects that do not set up their data templates in this way, that arg should be removed
 
         # Note also that only empty cells will be regarded as missing values
-        sheet: pd.read_excel(excel_path, sheet_name = sheet, skiprows = current_app.excel_offset, na_values = [''])
+        sheet: pd.read_excel(
+            excel_path, 
+            sheet_name = sheet, 
+            skiprows = current_app.excel_offset, 
+            na_values = [''], 
+            converters = converters
+        )
         
         for sheet in pd.ExcelFile(excel_path).sheet_names
         
         if ((sheet not in current_app.tabs_to_ignore) and (not sheet.startswith('lu_')))
     }
-
 
     valid_tables = pd.read_sql(
             # percent signs are escaped by doubling them, not with a backslash

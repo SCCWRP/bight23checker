@@ -52,7 +52,8 @@ class GeoDBDataFrame(DataFrame):
                                     # If it is, we do not want to wrap it in single quotes
                                     # If its an arc function, we also dont want to wrap it in quotes in that case
                                     else str(val).strip()
-                                    if ( (check_dtype(float, val)) or (check_dtype(int, val)) or ("sde.next_" in str(val)) )
+                                    #if ( (check_dtype(float, val)) or (check_dtype(int, val)) or ("sde.next_" in str(val)) )
+                                    if ( ("sde.next_" in str(val)) )
 
                                     # If all else fails its basically either a character or a time
                                     # in which case we wrap in single quotes
