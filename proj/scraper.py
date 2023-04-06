@@ -14,7 +14,7 @@ def lookuplists():
             layer = request.args.get("layer")
 
             # layer should start with lu - if not return empty - this tool is only for lookup lists
-            if layer.startswith("lu_"):
+            if layer.startswith("lu_") or layer.startswith("xwalk_"):
 
                 # unfortunately readonly user doesnt have access to information_schema
                 eng = g.eng # postgresql
