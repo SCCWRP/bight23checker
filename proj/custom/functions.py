@@ -348,3 +348,32 @@ def export_sdf_to_json(path, sdf):
     
     with open(path, "w", encoding="utf-8") as geojson_file:
        json.dump(data, geojson_file)
+
+# For benthic, we probably have to tack on a column that just contains values that say "Infauna" and then use that as the parameter column
+# For chemistry, we have to tack on the analyteclass column from lu_analytes and then use that as the parameter column
+def sample_assignment_check(eng, df, parameter_column, row_index_col = 'tmp_row', stationid_column = 'stationid', dataframe_agency_column = 'lab', assignment_agency_column = 'assigned_agency', assignment_table = 'vw_sample_assignment'):
+    '''
+        Simply Returns the "badrows" list of indices where the parameter and lab doesnt match the assignment table
+    '''
+    # No SQL injection
+    assignment_table = str(assignment_table).replace(';','').replace('"','').replace("'","")
+    stationid_column = str(stationid_column).replace(';','').replace('"','').replace("'","")
+    dataframe_agency_column = str(dataframe_agency_column).replace(';','').replace('"','').replace("'","")
+    assignment_agency_column = str(assignment_agency_column).replace(';','').replace('"','').replace("'","")
+    parameter_column = str(parameter_column).replace(';','').replace('"','').replace("'","")
+    
+    assignment = pd.read_sql(
+        f'''SELECT DISTINCT {stationid_column}, parameter AS {parameter_column}, {assignment_agency_column} AS {dataframe_agency_column}, 'yes' AS present FROM "{assignment_table}"; ''', 
+        eng
+    )
+
+    df = df.merge(assignment, on = [stationid_column, parameter_column, dataframe_agency_column], how = 'left')
+
+    print("df")
+    print(df)
+    print("df.columns")
+    print(df.columns)
+    badrows = df[(df.present.isnull()) & (df[stationid_column] != '0000')][row_index_col].tolist() if row_index_col != 'index' else df[(df.present.isnull() ) & (df[stationid_column] != '0000')].index.tolist()
+
+    return badrows
+

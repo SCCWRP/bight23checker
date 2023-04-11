@@ -14,7 +14,7 @@ def lookuplists():
             layer = request.args.get("layer")
 
             # layer should start with lu - if not return empty - this tool is only for lookup lists
-            if layer.startswith("lu_") or layer.startswith("xwalk_"):
+            if layer.startswith("lu_") or layer.startswith("xwalk_") or layer.endswith("_assignment"):
 
                 # unfortunately readonly user doesnt have access to information_schema
                 eng = g.eng # postgresql
@@ -44,8 +44,14 @@ def lookuplists():
                     try:
                         # get all fields first
                         print("get all fields first")
-
-                        scraper_results = pd.read_sql(f"SELECT * FROM {layer} ORDER BY {primary_key[0]} ASC;", eng)
+                        
+                        scrape_qry = f"SELECT * FROM {layer}"
+                        
+                        if primary_key:
+                            scrape_qry += f" ORDER BY {primary_key[0]} ASC;"
+                        
+                        scraper_results = pd.read_sql(scrape_qry, eng)
+                        
                         #print(scraper_results)
                         # for bight we dont want system columns
                         for fieldname in current_app.system_fields:
@@ -57,7 +63,7 @@ def lookuplists():
                         # turn dataframe into dictionary object
                         scraper_json = scraper_results.to_dict('records')
                         # give jinga the listname, primary key (to highlight row), and fields/rows
-                        return render_template('scraper.html', list=layer, primary=primary_key[0], scraper=scraper_json)
+                        return render_template('scraper.html', list=layer, primary=primary_key[0] if primary_key is not None else primary_key, scraper=scraper_json)
                     # if sql error just return empty 
                     except Exception as err:
                         print(err)

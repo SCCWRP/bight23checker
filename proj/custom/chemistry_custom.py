@@ -3,7 +3,7 @@
 from inspect import currentframe
 from flask import current_app, g
 from datetime import timedelta
-from .functions import checkData, checkLogic
+from .functions import checkData, checkLogic, sample_assignment_check
 from .chem_functions_custom import *
 import pandas as pd
 import re
@@ -112,6 +112,19 @@ def chemistry(all_dfs):
         # If they have mixed data, stop them here for the sake of time
         return {'errors': errs, 'warnings': warnings}
 
+    # Sample Assignment check - make sure they were assigned the analyteclasses that they are submitting
+    lu_analytes = pd.read_sql("SELECT analyte AS analytename, analyteclass FROM lu_analytes;", eng)
+    tmpresults = results.merge(lu_analytes, on = ['analytename'], how = 'left')
+    badrows = sample_assignment_check(eng = eng, df = tmpresults, parameter_column = 'analyteclass')
+    
+    results_args.update({
+        "badrows": badrows,
+        "badcolumn": "StationID,Lab,AnalyteName",
+        "error_type": "Logic Error",
+        "error_message": "Your lab was not assigned to submit data for this analyteclass from this station"
+    })
+    errs.append(checkData(**results_args))
+
     # ----- END LOGIC CHECKS ----- # 
     print('# ----- END LOGIC CHECKS ----- # ')
 
@@ -167,6 +180,7 @@ def chemistry(all_dfs):
 
     # ----- CUSTOM CHECKS - SEDIMENT RESULTS ----- #
     print('# ----- CUSTOM CHECKS - SEDIMENT RESULTS ----- #')
+
     
     # Check - TrueValue must be -88 for everything except CRM's and spikes (Matrix Spikes and blank spikes)
     # This is to be a Warning rather than an error

@@ -2,7 +2,7 @@
 
 from inspect import currentframe
 from flask import current_app, g, session
-from .functions import checkData, multivalue_lookup_check
+from .functions import checkData, multivalue_lookup_check, sample_assignment_check
 import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine
@@ -352,6 +352,18 @@ def toxicity(all_dfs):
         "error_message": "LabReplicates must be contiguous."
     })
     errs = [*errs, checkData(**toxresults_args)] 
+
+
+    # Sample Assignment checks
+    badrows = sample_assignment_check(eng = eng, df = toxresults,  parameter_column = 'species')
+    toxresults_args.update({
+        "badrows": badrows,
+        "badcolumn": "StationID,Species,Lab",
+        "error_type": "Logic Error",
+        "error_message": "<a href=https://checker.sccwrp.org/bight23checker/scraper?action=help&layer=vw_sample_assignment target=_blank>Your lab was not assigned to this species for this station</a>"
+    })
+    errs = [*errs, checkData(**toxresults_args)]
+
 
     ## END LOGIC CHECKS ##
     print("## END LOGIC CHECKS ##")
