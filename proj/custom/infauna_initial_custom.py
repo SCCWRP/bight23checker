@@ -43,8 +43,9 @@ def infauna_initial(all_dfs):
         "badrows": badrows,
         "badcolumn": "StationID,Lab",
         "error_type": "Logic Error",
-        "error_message": "Your agency is not assigned to submit Infauna for this station (<a href=https://checker.sccwrp.org/bight23checker/scraper?action=help&layer=vw_sample_assignment target=_blank>see sample assignments</a>)"
+        "error_message": "Your agency is not assigned to submit Infauna for this station (<a href=https://checker.sccwrp.org/bight23checker/scraper?action=help&layer=vw_sample_assignment&datatype=infauna target=_blank>see sample assignments</a>)"
     })
+    errs.append(checkData(**infaunalabundance_initial_args))
     
     
     print("## FORMATTING BUG FIX ##")
