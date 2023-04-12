@@ -360,9 +360,9 @@ def toxicity(all_dfs):
         "badrows": badrows,
         "badcolumn": "StationID,Species,Lab",
         "error_type": "Logic Error",
-        "error_message": "Your lab was not assigned to this species for this station (<a href=https://checker.sccwrp.org/bight23checker/scraper?action=help&layer=vw_sample_assignment target=_blank>see sample assignments</a>)"
+        "error_message": f"Your lab was not assigned to this species for this station (<a href=/{current_app.config.get('APP_SCRIPT_ROOT')}/scraper?action=help&layer=vw_sample_assignment&datatype=toxicity target=_blank>see sample assignments</a>)"
     })
-    errs = [*errs, checkData(**toxresults_args)]
+    warnings = [*warnings, checkData(**toxresults_args)]
 
 
     ## END LOGIC CHECKS ##

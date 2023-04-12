@@ -119,9 +119,9 @@ def chemistry(all_dfs):
         "badrows": badrows,
         "badcolumn": "StationID,Lab,AnalyteName",
         "error_type": "Logic Error",
-        "error_message": "Your lab was not assigned to submit data for this analyteclass from this station (<a href=https://checker.sccwrp.org/bight23checker/scraper?action=help&layer=vw_sample_assignment target=_blank>see sample assignments</a>)"
+        "error_message": f"Your lab was not assigned to submit data for this analyteclass from this station (<a href=/{current_app.config.get('APP_SCRIPT_ROOT')}/scraper?action=help&layer=vw_sample_assignment&datatype=chemistry target=_blank>see sample assignments</a>)"
     })
-    errs.append(checkData(**results_args))
+    warnings.append(checkData(**results_args))
 
     # ----- END LOGIC CHECKS ----- # 
     print('# ----- END LOGIC CHECKS ----- # ')
