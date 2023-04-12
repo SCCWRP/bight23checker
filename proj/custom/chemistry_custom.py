@@ -113,15 +113,13 @@ def chemistry(all_dfs):
         return {'errors': errs, 'warnings': warnings}
 
     # Sample Assignment check - make sure they were assigned the analyteclasses that they are submitting
-    lu_analytes = pd.read_sql("SELECT analyte AS analytename, analyteclass FROM lu_analytes;", eng)
-    tmpresults = results.merge(lu_analytes, on = ['analytename'], how = 'left')
-    badrows = sample_assignment_check(eng = eng, df = tmpresults, parameter_column = 'analyteclass')
+    badrows = sample_assignment_check(eng = eng, df = results, parameter_column = 'analyteclass')
     
     results_args.update({
         "badrows": badrows,
         "badcolumn": "StationID,Lab,AnalyteName",
         "error_type": "Logic Error",
-        "error_message": "Your lab was not assigned to submit data for this analyteclass from this station"
+        "error_message": "Your lab was not assigned to submit data for this analyteclass from this station (<a href=https://checker.sccwrp.org/bight23checker/scraper?action=help&layer=vw_sample_assignment target=_blank>see sample assignments</a>)"
     })
     errs.append(checkData(**results_args))
 
@@ -664,31 +662,31 @@ def chemistry(all_dfs):
     # In my understanding, its mainly for the reference material for inorganics in the sediment matrix, rather than a particular CRM
     inorg_sed_ref_mask = inorg_sed_mask & results.sampletype.str.contains('Reference', case = False)
     
-    crmvals = pd.read_sql(
-        f"""
-        SELECT analyte AS analytename, crm FROM lu_chemcrm 
-        WHERE analyte IN ('{"','".join(req_analytes_tbl53).replace(';','')}')
-        AND crmmatrix = 'sediment'
-        """,
-        eng
-    )
+    # crmvals = pd.read_sql(
+    #     f"""
+    #     SELECT analytename, crm FROM lu_chemcrm 
+    #     WHERE analyte IN ('{"','".join(req_analytes_tbl53).replace(';','')}')
+    #     AND matrix = 'sediment'
+    #     """,
+    #     eng
+    # )
     
-    checkdf = results[inorg_sed_ref_mask].merge(crmvals, on = 'analytename', how = 'inner')
+    # checkdf = results[inorg_sed_ref_mask].merge(crmvals, on = 'analytename', how = 'inner')
 
-    badrows = checkdf[
-        checkdf.apply(
-            lambda row: (row.result < float(row.crm.split('-')[0].strip()) ) | (row.result > float(row.crm.split('-')[1].strip())),
-            axis = 1
-        )
-    ].tmp_row.tolist()
+    # badrows = checkdf[
+    #     checkdf.apply(
+    #         lambda row: (row.result < float(row.crm.split('-')[0].strip()) ) | (row.result > float(row.crm.split('-')[1].strip())),
+    #         axis = 1
+    #     )
+    # ].tmp_row.tolist()
 
-    results_args.update({
-        "badrows": badrows,
-        "badcolumn": "Result",
-        "error_type": "Value Error",
-        "error_message": f"The value here is outside the expected range of what we would expect for reference material (see the crm column of <a href=https://nexus.sccwrp.org/bight23checker/scraper?action=help&layer=lu_chemcrm target=_blank>lu_chemcrm</a>"
-    })
-    warnings.append(checkData(**results_args))
+    # results_args.update({
+    #     "badrows": badrows,
+    #     "badcolumn": "Result",
+    #     "error_type": "Value Error",
+    #     "error_message": f"The value here is outside the expected range of what we would expect for reference material (see the crm column of <a href=https://nexus.sccwrp.org/bight23checker/scraper?action=help&layer=lu_chemcrm target=_blank>lu_chemcrm</a>"
+    # })
+    # warnings.append(checkData(**results_args))
     # --- END TABLE 5-3 Check #3 --- #
 
 
@@ -1016,42 +1014,42 @@ def chemistry(all_dfs):
 
     # --- TABLE 5-4 Check #5 --- #
     # Check - For reference materials - Result should be within 40% of the specified value (in lu_chemcrm) for 80% of the analytes
-    print('# Check - For reference materials - Result should be within 40% of the specified value (in lu_chemcrm) for 80% of the analytes')
-    crmvals = pd.read_sql(
-        f"""
-        SELECT analyte AS analytename, crm FROM lu_chemcrm 
-        WHERE analyte IN ('{"','".join(req_analytes_tbl54).replace(';','')}')
-        AND crmmatrix = 'sediment'
-        """,
-        eng
-    )
-    checkdf = results[pah_sed_mask & results.sampletype.str.contains('Reference', case = False)] 
-    if not checkdf.empty:
-        checkdf = checkdf.merge(crmvals, on = 'analytename', how = 'inner')
+    # print('# Check - For reference materials - Result should be within 40% of the specified value (in lu_chemcrm) for 80% of the analytes')
+    # crmvals = pd.read_sql(
+    #     f"""
+    #     SELECT analyte AS analytename, crm FROM lu_chemcrm 
+    #     WHERE analyte IN ('{"','".join(req_analytes_tbl54).replace(';','')}')
+    #     AND matrix = 'sediment'
+    #     """,
+    #     eng
+    # )
+    # checkdf = results[pah_sed_mask & results.sampletype.str.contains('Reference', case = False)] 
+    # if not checkdf.empty:
+    #     checkdf = checkdf.merge(crmvals, on = 'analytename', how = 'inner')
     
-    if not checkdf.empty:
-        checkdf['within40pct'] = checkdf.apply(
-                lambda row:
-                (0.6 * float(row.crm)) <= row.result <= (1.4 * float(row.crm)) if not pd.isnull(row.crm) else True,
-                axis = 1
-            )
-        checkdf = checkdf.merge(
-            checkdf.groupby('analysisbatchid') \
-                .apply(
-                    lambda df: sum(df.within40pct) / len(df) < 0.8
-                ) \
-                .reset_index(name = 'failedcheck'),
-            on = 'analysisbatchid',
-            how = 'inner'
-        )
-        checkdf = checkdf[checkdf.failedcheck]
-        results_args.update({
-            "badrows": checkdf.tmp_row.tolist(),
-            "badcolumn": "AnalysisBatchID",
-            "error_type": "Value Error",
-            "error_message": "Less than 80% of the analytes in this batch are within 40% of the CRM value"
-        })
-        warnings.append(checkData(**results_args))
+    # if not checkdf.empty:
+    #     checkdf['within40pct'] = checkdf.apply(
+    #             lambda row:
+    #             (0.6 * float(row.crm)) <= row.result <= (1.4 * float(row.crm)) if not pd.isnull(row.crm) else True,
+    #             axis = 1
+    #         )
+    #     checkdf = checkdf.merge(
+    #         checkdf.groupby('analysisbatchid') \
+    #             .apply(
+    #                 lambda df: sum(df.within40pct) / len(df) < 0.8
+    #             ) \
+    #             .reset_index(name = 'failedcheck'),
+    #         on = 'analysisbatchid',
+    #         how = 'inner'
+    #     )
+    #     checkdf = checkdf[checkdf.failedcheck]
+    #     results_args.update({
+    #         "badrows": checkdf.tmp_row.tolist(),
+    #         "badcolumn": "AnalysisBatchID",
+    #         "error_type": "Value Error",
+    #         "error_message": "Less than 80% of the analytes in this batch are within 40% of the CRM value"
+    #     })
+    #     warnings.append(checkData(**results_args))
 
     # --- END TABLE 5-4 Check #5 --- #
 
@@ -1206,16 +1204,16 @@ def chemistry(all_dfs):
     crmvals = pd.read_sql(
         f"""
         SELECT
-            lu_chemcrm.analyte AS analytename,
-            lu_chemcrm.crmmatrix,
+            lu_chemcrm.analytename,
+            lu_chemcrm.matrix,
             lu_chemcrm.crm,
             lu_analytes.analyteclass 
         FROM
             lu_chemcrm
-            JOIN lu_analytes ON lu_chemcrm.analyte = lu_analytes.analyte 
+            JOIN lu_analytes ON lu_chemcrm.analytename = lu_analytes.analyte 
         WHERE
             analyteclass IN ( '{"','".join(analyteclasses55)}' ) 
-            AND crmmatrix = 'sediment'
+            AND matrix = 'sediment'
         """,
         eng
     )

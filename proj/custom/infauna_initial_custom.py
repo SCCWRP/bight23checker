@@ -2,7 +2,7 @@
 
 from inspect import currentframe
 from flask import current_app, g
-from .functions import checkData
+from .functions import checkData, sample_assignment_check
 import re
 import pandas as pd
 
@@ -37,6 +37,14 @@ def infauna_initial(all_dfs):
     }
     
     eng = g.eng
+
+    badrows = sample_assignment_check(eng = eng, df = infaunalabundance_initial.assign(parameter = 'Infauna'), parameter_column = 'parameter')
+    infaunalabundance_initial_args.update({
+        "badrows": badrows,
+        "badcolumn": "StationID,Lab",
+        "error_type": "Logic Error",
+        "error_message": "Your agency is not assigned to submit Infauna for this station (<a href=https://checker.sccwrp.org/bight23checker/scraper?action=help&layer=vw_sample_assignment target=_blank>see sample assignments</a>)"
+    })
     
     
     print("## FORMATTING BUG FIX ##")

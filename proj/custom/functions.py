@@ -366,6 +366,10 @@ def sample_assignment_check(eng, df, parameter_column, row_index_col = 'tmp_row'
         f'''SELECT DISTINCT {stationid_column}, parameter AS {parameter_column}, {assignment_agency_column} AS {dataframe_agency_column}, 'yes' AS present FROM "{assignment_table}"; ''', 
         eng
     )
+    print("df")
+    print(df)
+    print("assignment")
+    print(assignment)
 
     df = df.merge(assignment, on = [stationid_column, parameter_column, dataframe_agency_column], how = 'left')
 

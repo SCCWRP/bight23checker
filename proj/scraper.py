@@ -12,6 +12,7 @@ def lookuplists():
         message = str(action)
         if request.args.get("layer"):
             layer = request.args.get("layer")
+            datatype = request.args.get('datatype')
 
             # layer should start with lu - if not return empty - this tool is only for lookup lists
             if layer.startswith("lu_") or layer.startswith("xwalk_") or layer.endswith("_assignment"):
@@ -45,8 +46,18 @@ def lookuplists():
                         # get all fields first
                         print("get all fields first")
                         
-                        scrape_qry = f"SELECT * FROM {layer}"
+                        # for field and sample assignment tables, it is too cluttered. We should reduce fields that are displayed
+                        fieldlist = ['stationid','latitude','longitude','stratum','region','parameter','assigned_agency']
+                        if layer.endswith('sample_assignment'):
+                            fieldlist.append('datatype')
                         
+                        fields = ','.join(fieldlist) if layer.endswith('_assignment') else '*'
+
+                        scrape_qry = f"SELECT {fields} FROM {layer}"
+                        
+                        if layer.endswith("sample_assignment") and (datatype is not None):
+                            scrape_qry += f" WHERE UPPER(datatype) = '{str(datatype).upper()}'"
+
                         if primary_key:
                             scrape_qry += f" ORDER BY {primary_key[0]} ASC;"
                         
