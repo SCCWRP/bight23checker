@@ -51,7 +51,7 @@ def lookuplists():
                         if layer.endswith('sample_assignment'):
                             fieldlist.append('datatype')
                         
-                        fields = ','.join(fieldlist) if layer.endswith('_assignment') else '*'
+                        fields = ','.join(fieldlist) if layer.endswith('_assignment') else 'sampleid,matrix' if layer.endswith("chem_intercal_samples") else '*'
 
                         scrape_qry = f"SELECT {fields} FROM {layer}"
                         
