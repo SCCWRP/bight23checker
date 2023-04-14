@@ -178,7 +178,7 @@ def chemistry_intercal(all_dfs):
         "badrows": results[(results.qualifier == 'none') & (results.result < results.rl)].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
-        "error_message": "if the qualifier is 'none' then the result must be greater than or equal to the RL (See the <a href=https://checker.sccwrp.org/bight23checker/scraper?action=help&layer=lu_chemqualifiercodes target=_blank>qualifier lookup list</a> for reference)"
+        "error_message": "if the qualifier is 'none' then the result must be greater than or equal to the RL (See the <a href=/bight23checker/scraper?action=help&layer=lu_chemqualifiercodes target=_blank>qualifier lookup list</a> for reference)"
     })
     errs.append(checkData(**results_args))
 
