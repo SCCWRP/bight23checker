@@ -1,4 +1,6 @@
 from .chemistry_custom import chemistry
+from .chemistry_tissue_custom import chemistry_tissue
+from .chemistry_intercal_custom import chemistry_intercal
 from .toxicity_custom import toxicity
 from .infauna_initial_custom import infauna_initial
 from .infauna_reid_custom import infauna_reid
