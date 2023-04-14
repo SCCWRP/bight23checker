@@ -199,7 +199,8 @@ def load():
         tables = all_dfs.keys(),
         eng = g.eng,
         mailserver = current_app.config['MAIL_SERVER'],
-        login_info = session.get('login_info')
+        login_info = session.get('login_info'),
+        cc = current_app.config.get("IM_GROUP")
     )
     
     # TODO Need to move submitted and marked files to a separate directory that stores submitted files
