@@ -199,9 +199,13 @@ def load():
     
     # So we know the massive argument list of the data receipt function, which is like the notification email for successful submission
     #def data_receipt(send_from, always_send_to, login_email, dtype, submissionid, originalfile, tables, eng, mailserver, *args, **kwargs):
+    send_to = current_app.maintainers
+    notify = current_app.datasets.get(session.get('datatype')).get("notify")
+    if notify is not None:
+        send_to = [*send_to, *notify]
     data_receipt(
         send_from = current_app.mail_from,
-        always_send_to = current_app.maintainers,
+        always_send_to = send_to,
         login_email = session.get('login_info').get('login_email'),
         dtype = session.get('datatype'),
         submissionid = session.get('submissionid'),
