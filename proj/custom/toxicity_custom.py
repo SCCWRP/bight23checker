@@ -833,8 +833,10 @@ def toxicity(all_dfs):
         print(toxsummary)
 
         # get all control records
+        print("# get all control records")
         cneg = toxsummary[grouping_columns + ['mean']].where(toxsummary['sampletypecode'] == 'CNEG')
         # get all non control records
+        print("# get all non control records")
         nocneg = toxsummary[grouping_columns + ['mean']].where(toxsummary['sampletypecode'] != 'CNEG')
 
         # get all reference toxicant records just save them for now
@@ -967,6 +969,7 @@ def toxicity(all_dfs):
         toxsummary['pvalue'].fillna(-88,inplace=True)
 
         # get summary dataframe with error columns before it is replaced - bug fix number 37 below for duplicate summary rows
+        print("# get summary dataframe with error columns before it is replaced - bug fix number 37 below for duplicate summary rows")
         toxsummary = toxsummary.drop_duplicates(subset = ['stationid','toxbatch','fieldreplicate','pvalue'],keep='first')
         toxsummary.reset_index(inplace = True, drop = True)
         toxsummary.drop('tmp_row', axis = 1, inplace = True)
