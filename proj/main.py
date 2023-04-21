@@ -103,12 +103,20 @@ def main():
         if ((sheet not in ignored_tabs) and (not sheet.startswith('lu_')))
     }
 
+    print("before filtering out empty dataframes")
     # filter out empty dataframes
     all_dfs = { dfname: df for dfname, df in all_dfs.items() if not df.empty }
+
+    if len(all_dfs) == 0:
+        returnvals = {
+            "critical_error": False,
+            "user_error_msg": "You submitted a file with all empty tabs.",
+        }
+        return jsonify(**returnvals)
     
+    #assert len(all_dfs) > 0, f"submissionid - {session.get('submissionid')} all_dfs is empty"
     
-    assert len(all_dfs) > 0, f"submissionid - {session.get('submissionid')} all_dfs is empty"
-    
+
     for tblname in all_dfs.keys():
         # lowercase the column names
         all_dfs[tblname].columns = [x.lower() for x in all_dfs[tblname].columns]
