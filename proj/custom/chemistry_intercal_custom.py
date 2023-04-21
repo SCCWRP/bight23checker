@@ -212,5 +212,28 @@ def chemistry_intercal(all_dfs):
     })
     errs.append(checkData(**results_args))
 
+    # Check - For sampletype Method blank, if Result is less than MDL, it must be -88
+    print('# Check - For sampletype Method blank, if Result is less than MDL, it must be -88')
+    # mb_mask = Method blank mask
+    print('# mb_mask = Method blank mask')
+    mb_mask = (results.sampletype == 'Method blank') 
+    results_args.update({
+        "badrows": results[mb_mask & ((results.result < results.mdl) & (results.result != -88))].tmp_row.tolist(),
+        "badcolumn": "Result",
+        "error_type": "Value Error",
+        "error_message": "For Method blank sampletypes, if Result is less than MDL, it must be -88"
+    })
+    errs.append(checkData(**results_args))
+
+    # Check - If SampleType=Method blank and Result=-88, then qualifier must be below MDL or none.
+    print('# Check - If SampleType=Method blank and Result=-88, then qualifier must be below MDL or none.')
+    results_args.update({
+        "badrows": results[(mb_mask & (results.result != -88)) & (~results.qualifier.isin(['below method detection limit','none'])) ].tmp_row.tolist(),
+        "badcolumn": "Qualifier",
+        "error_type": "Value Error",
+        "error_message": "If SampleType=Method blank and Result=-88, then qualifier must be 'below method detection limit' or 'none'"
+    })
+    errs.append(checkData(**results_args))
+
     
     return {'errors': errs, 'warnings': warnings}

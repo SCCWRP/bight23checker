@@ -1,8 +1,5 @@
-import json, os
-import numpy as np
 from inspect import currentframe
 import pandas as pd
-from flask import current_app
 
 # Typically filter condition should be the analytename restricted to certain values
 def chk_required_sampletypes(df, sampletypes, analyteclass, additional_grouping_cols = [], row_index_col = 'tmp_row'):
@@ -22,7 +19,7 @@ def chk_required_sampletypes(df, sampletypes, analyteclass, additional_grouping_
         due to the nature of these checks which require merging and groupby operations with multiple dataframes"
 
     assert type(additional_grouping_cols) == list, "additional_grouping_cols arg is not a list"
-    grouping_columns = ['analysisbatchid', 'analyteclass', *additional_grouping_cols]
+    grouping_columns = ['analysisbatchid', 'analytename', *additional_grouping_cols]
 
     # Assertions - for faster debugging if the function does not get used correctly for whatever reason
     assert set(grouping_columns).issubset(set(df.columns)), f"grouping_columns list ({','.join(grouping_columns)}) not all found in columns of the dataframe"
@@ -64,7 +61,7 @@ def chk_required_sampletypes(df, sampletypes, analyteclass, additional_grouping_
                 "badrows": row.tmp_row,
                 "badcolumn": "SampleType",
                 "error_type": "Missing Required Data",
-                "error_message": f"For the AnalysisBatch {row.analysisbatchid} and AnalyteClass {row.analyteclass}, you are missing the required sampletypes: {row.missing_sampletypes}"
+                "error_message": f"For the AnalysisBatch {row.analysisbatchid} and Analyte {row.analytename}, you are missing the required sampletypes: {row.missing_sampletypes}"
             },
             axis = 1
         ).tolist()
@@ -166,42 +163,44 @@ def pyrethroid_analyte_logic_check(df, analytes, row_index_col = 'tmp_row'):
     }
 
 
-def check_req_analytes(df, mask, groupingcols, required_analytes, analyteclass):
-    assert 'tmp_row' in df.columns, \
-        "in check_req_analytes - tmp_row column not defined in the dataframe - incorrect rows may be reported - aborting"
-    assert set(groupingcols).issubset(set(df.columns)), \
-        f"in check_req_analytes - grouping columns {', '.join(groupingcols)} not a subset of the dataframe's columns"
+# def check_req_analytes(df, mask, groupingcols, required_analytes, analyteclass):
+#     # Each stationid should have all required analytes if they have one from 
 
-    assert "analytename" in df.columns, \
-        f"dataframe has no column named analytename (in check required analytes function"
+#     assert 'tmp_row' in df.columns, \
+#         "in check_req_analytes - tmp_row column not defined in the dataframe - incorrect rows may be reported - aborting"
+#     assert set(groupingcols).issubset(set(df.columns)), \
+#         f"in check_req_analytes - grouping columns {', '.join(groupingcols)} not a subset of the dataframe's columns"
 
-    # initialize return value here, if no errors are found, an empty list will get returned
-    arglist = []
+#     assert "analytename" in df.columns, \
+#         f"dataframe has no column named analytename (in check required analytes function"
 
-    tmp = df[mask].groupby(groupingcols).apply(lambda df: set(required_analytes) - set(df.analytename.unique()) )
-    if not tmp.empty:
-        tmp = tmp.reset_index(name = 'missing_analytes')
-        tmp = df.merge(tmp, on = groupingcols, how = 'inner')
-        tmp = tmp[tmp.missing_analytes != set()]
-        if not tmp.empty:
-            tmp.missing_analytes = tmp.missing_analytes.apply(lambda anlts: ','.join(anlts))
-            tmp = tmp \
-                .groupby([*groupingcols,'missing_analytes']) \
-                .apply(lambda df: df.tmp_row.tolist()) \
-                .reset_index(name = 'badrows')
+#     # initialize return value here, if no errors are found, an empty list will get returned
+#     arglist = []
 
-            arglist = tmp.apply(
-                lambda row:
-                {
-                    "badrows": row.badrows,
-                    "badcolumn": "AnalyteName",
-                    "error_type": "Missing Required Data",
-                    "error_message": f"""For the grouping of {', '.join(['{}: {}'.format(x, row[x]) for x in groupingcols])}, you are missing the following required Analytes (For the {analyteclass} Analyteclass): {row.missing_analytes}"""
-                },
-                axis = 1
-            ).tolist()
+#     tmp = df[mask].groupby(groupingcols).apply(lambda df: set(required_analytes) - set(df.analytename.unique()) )
+#     if not tmp.empty:
+#         tmp = tmp.reset_index(name = 'missing_analytes')
+#         tmp = df.merge(tmp, on = groupingcols, how = 'inner')
+#         tmp = tmp[tmp.missing_analytes != set()]
+#         if not tmp.empty:
+#             tmp.missing_analytes = tmp.missing_analytes.apply(lambda anlts: ','.join(anlts))
+#             tmp = tmp \
+#                 .groupby([*groupingcols,'missing_analytes']) \
+#                 .apply(lambda df: df.tmp_row.tolist()) \
+#                 .reset_index(name = 'badrows')
 
-    return arglist
+#             arglist = tmp.apply(
+#                 lambda row:
+#                 {
+#                     "badrows": row.badrows,
+#                     "badcolumn": "AnalyteName",
+#                     "error_type": "Missing Required Data",
+#                     "error_message": f"""For the grouping of {', '.join(['{}: {}'.format(x, row[x]) for x in groupingcols])}, you are missing the following required Analytes (For the {analyteclass} Analyteclass): {row.missing_analytes}"""
+#                 },
+#                 axis = 1
+#             ).tolist()
+
+#     return arglist
 
 # Method blanks - result has to be less than MDL, or less than 5% of the measured concentration in the sample
 def MB_ResultLessThanMDL(dataframe):
@@ -248,7 +247,7 @@ def MB_ResultLessThanMDL(dataframe):
 
     return args
 
-def check_sample_dups(df, analyteclass, sampletype):
+def check_dups(df, analyteclass, sampletype):
     # Each analysis batch needs some kind of duplicate
     # Inorganics - Duplicate Matrix Spike or Sample Duplicate (Duplicate Results)
     # Organics - Duplicate Matrix Spike

@@ -179,7 +179,46 @@ def chemistry(all_dfs):
     # ----- CUSTOM CHECKS - SEDIMENT RESULTS ----- #
     print('# ----- CUSTOM CHECKS - SEDIMENT RESULTS ----- #')
 
+
+
+    # Check for All required analytes per station (All or nothing)
+    current_matrix = 'sediment' #sediment or tissue - affects query for required analytes
+    # Check for all required analytes per station - if a station has a certain analyteclass
+    req_anlts = pd.read_sql(f"SELECT analyte AS analytename, analyteclass FROM lu_analytes WHERE b23{current_matrix}='yes'", eng) \
+        .groupby('analyteclass')['analytename'] \
+        .apply(set) \
+        .to_dict()
     
+    chkdf = results.groupby(['stationid','analyteclass'])['analytename'].apply(set).reset_index()
+    chkdf['missing_analytes'] = chkdf.apply(
+        lambda row: ', '.join(list((req_anlts.get(row.analyteclass) if req_anlts.get(row.analyteclass) is not None else set()) - row.analytename)), axis = 1 
+    )
+
+    chkdf = chkdf[chkdf.missing_analytes != set()]
+    if not chkdf.empty:
+        chkdf = results.merge(chkdf[chkdf.missing_analytes != ''], how = 'inner', on = ['stationid','analyteclass'])
+        chkdf = chkdf.groupby(['stationid','analyteclass','missing_analytes']).agg({'tmp_row': list}).reset_index()
+        errs_args = chkdf.apply(
+            lambda row:
+            {
+                "badrows": row.tmp_row,
+                "badcolumn" : "stationid",
+                "error_type": "missing_data",
+                "error_message" : f"For the station {row.stationid}, you attempted to submit {row.analyteclass} but are missing some required analytes ({row.missing_analytes})"
+            },
+            axis = 1
+        ).tolist()
+
+        for argset in error_args:
+            results_args.update(argset)
+            errs.append(checkData(**results_args))
+    # End of checking all required analytes per station, if they attempted submission of an analyteclass
+    # No partial submissions of analyteclasses
+
+
+
+
+
     # Check - TrueValue must be -88 for everything except CRM's and spikes (Matrix Spikes and blank spikes)
     # This is to be a Warning rather than an error
     # checked lu_sampletypes as of 11/18/2022 and these two cases will cover Reference Materials, blank spikes and matrix spikes
@@ -314,7 +353,7 @@ def chemistry(all_dfs):
         "badrows": results[results.qualifier == "analyst error"].tmp_row.tolist(),
         "badcolumn": "Qualifier",
         "error_type": "Value Error",
-        "error_message": "We would like to be contacted concerning this record of data. Please contact bight23-im@sccwrp.org"
+        "error_message": "We would like to be contacted concerning this record of data. Please contact b23-im@sccwrp.org"
     })
     warnings.append(checkData(**results_args))
 
@@ -333,14 +372,14 @@ def chemistry(all_dfs):
     error_args = []
     
     required_sampletypes = {
-        "Inorganics": ['Method blank', 'Blank spiked', 'Result'],
-        "PAH": ['Method blank', 'Matrix spike', 'Result'],
-        "PCB": ['Method blank', 'Matrix spike', 'Result'],
-        "Chlorinated Hydrocarbons": ['Method blank', 'Matrix spike', 'Result'],
-        "PBDE": ['Method blank', 'Matrix spike', 'Result'],
-        "Pyrethroid": ['Method blank', 'Matrix spike', 'Result'],
-        "TN" : ['Method blank', 'Result'],
-        "TOC" : ['Method blank', 'Result']
+        "Inorganics": ['Lab blank', 'Blank spiked', 'Result'],
+        "PAH": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
+        "PCB": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
+        "Chlorinated Hydrocarbons": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
+        "PBDE": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
+        "Pyrethroid": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
+        "TN" : ['Lab blank', 'Result'],
+        "TOC" : ['Lab blank', 'Result']
     }
 
     # anltclass = analyteclass
@@ -354,8 +393,8 @@ def chemistry(all_dfs):
         if anltclass != 'Inorganics':
             print('Non-Inorganics')
             # For Inorganics, they can have either or, so the way we deal with inorganics must be different
-            error_args = [*error_args, *check_sample_dups(results, anltclass, 'Result')]
-            error_args = [*error_args, *check_sample_dups(results, anltclass, 'Matrix spike')]
+            error_args = [*error_args, *check_dups(results, anltclass, 'Result')]
+            error_args = [*error_args, *check_dups(results, anltclass, 'Matrix spike')]
         else:
             print('Inorganics')
             # Under the assumption of how we worded the error message. 
@@ -363,8 +402,8 @@ def chemistry(all_dfs):
             # Each batch has tp have at least one of those
 
             batch_regex = re.compile('The\s+AnalysisBatch\s+([^\s]*)')
-            resargs = check_sample_dups(results, anltclass, 'Result')
-            spikeargs = check_sample_dups(results, anltclass, 'Matrix spike')
+            resargs = check_dups(results, anltclass, 'Result')
+            spikeargs = check_dups(results, anltclass, 'Matrix spike')
             
             # If one of the lists is empty, then it means every single batch had a duplicate, 
             #  meaning the data is clean
@@ -398,7 +437,8 @@ def chemistry(all_dfs):
                     error_args = [*error_args, *argsdf.to_dict('records')]
 
     
-    requires_crm = ["Inorganics", "PAH", "PCB", "Chlorinated Hydrocarbons", "PBDE", "TOC"]
+    # NOTE needs to be updated
+    requires_crm = ["Inorganics", "PAH", "PCB", "Chlorinated Hydrocarbons", "PBDE", "TOC", "TN"]
     error_args = [*error_args, *check_required_crm(results, requires_crm)]
     
     for argset in error_args:
@@ -448,6 +488,16 @@ def chemistry(all_dfs):
         "badcolumn": "Qualifier",
         "error_type": "Value Error",
         "error_message": "If SampleType=Method blank and Result=-88, then qualifier must be 'below method detection limit' or 'none'"
+    })
+    errs.append(checkData(**results_args))
+
+    # Check - True Value should not be Zero
+    print('# Check - True Value should not be Zero')
+    results_args.update({
+        "badrows": results[results.truevalue == 0].tmp_row.tolist(),
+        "badcolumn": "truevalue",
+        "error_type": "Value Error",
+        "error_message": "The TrueValue should never be zero. If the TrueValue is unknown, then please fill in the cell with -88"
     })
     errs.append(checkData(**results_args))
 
@@ -624,21 +674,6 @@ def chemistry(all_dfs):
     # The filter mask to be used throughout the whole table 5-3 checks
     inorg_sed_mask = (results.analyteclass == 'Inorganics') & results.matrix.isin(['sediment','labwater'])
 
-    # NOTE Need to confirm with Ken and Charles that this is the correct grouping
-    tbl53_chk1_grouping_cols = ['analysisbatchid','sampleid','sampletype','labreplicate']
-    
-    req_analytes_tbl53 = pd.read_sql("SELECT * FROM lu_analytes WHERE analyteclass = 'Inorganics'", eng).analyte.tolist()
-
-    argslist = check_req_analytes(
-        df=results,
-        mask=inorg_sed_mask,
-        groupingcols=tbl53_chk1_grouping_cols,
-        required_analytes=req_analytes_tbl53,
-        analyteclass='Inorganics'
-    )
-    for args in argslist:
-        results_args.update(args)
-        errs.append(checkData(**results_args))
 
     # --- END TABLE 5-3 Check #1 --- #
 
@@ -701,20 +736,19 @@ def chemistry(all_dfs):
     # It is checking to see if all analytes in either the blank spike, or the duplicate, were inside of 15% of the TrueValue
     # I need to confirm that this is what it is supposed to do
     
-    pct_recovery_lowerbound = 85
-    pct_recovery_upperbound = 115
+    pct_recovery_thresh = 15
     checkdf = results[inorg_sed_mask & results.sampletype.str.contains('Blank spiked', case = False)] \
-        .groupby(['analysisbatchid']) \
+        .groupby(['analysisbatchid', 'labsampleid','labreplicate']) \
         .apply(
             lambda df: 
-            all((df[df.labreplicate == 1].percentrecovery > pct_recovery_lowerbound ) & (df[df.labreplicate == 1].percentrecovery < pct_recovery_upperbound ))
-            or all((df[df.labreplicate == 2].percentrecovery > pct_recovery_lowerbound) & (df[df.labreplicate == 2].percentrecovery < pct_recovery_upperbound))
+            all((df.percentrecovery.between(100 - pct_recovery_thresh, 100 + pct_recovery_thresh)))
         )
     if not checkdf.empty:
         checkdf = checkdf.reset_index(name = 'passed_within15_check')
-        checkdf = results.merge(checkdf, on = 'analysisbatchid', how = 'inner')
-        checkdf = checkdf[checkdf.sampletype.str.contains('Blank spiked', case = False)]
-        checkdf = checkdf[(~checkdf.passed_within15_check) & ((checkdf.percentrecovery < pct_recovery_lowerbound) | (checkdf.percentrecovery > pct_recovery_upperbound))]
+
+        # only bad analysis batches will remain
+        checkdf = results[inorg_sed_mask & results.sampletype.str.contains('Blank spiked', case = False) ] \
+            .merge(checkdf[~checkdf.passed_within15_check], on = 'analysisbatchid', how = 'inner')
 
         results_args.update({
             "badrows": checkdf.tmp_row.tolist(),
@@ -727,7 +761,7 @@ def chemistry(all_dfs):
     
 
 
-    # --- TABLE 5-3 Check #5 and #6--- #
+    # --- TABLE 5-3 Check --- #
     # Check - Duplicate Matrix spikes (or Results) need < 20% RPD for AnalysisMethods ICPAES, EPA200.7 and EPA 6010B
     print('# Check - Duplicate Matrix spikes (or Results) need < 20% RPD for AnalysisMethods ICPAES, EPA200.7 and EPA 6010B')
     
@@ -741,10 +775,10 @@ def chemistry(all_dfs):
     
     icpaes_methods = ['ICPAES', 'EPA200.7', 'EPA6010D','EPA6010B'] # methods that require 20% RPD - Inductively Coupled Plasma Atomic Emission Spectrometry
     icpaes_tolerance = .25 
-    icpaes_blankspike_tolerance = 0.25
+    #icpaes_blankspike_tolerance = 0.25
     icpms_methods = ['ICPMS', 'EPA200.8', 'EPA 6020Bm'] # methods that require 30% RPD - Inductively Coupled Plasma Mass Spectrometry
     icpms_tolerance = .25 
-    icpms_blankspike_tolerance = 0.15
+    #icpms_blankspike_tolerance = 0.15
     aa_methods = ['CVAA','FAA','GFAA','HAA','EPA245.7m','EPA245.5','EPA7473','SW846 7471','EPA7471B'] # - Atomic Absorbtion
     aa_tolerance = .3 
 
@@ -752,8 +786,6 @@ def chemistry(all_dfs):
         inorg_sed_mask 
         & (
             results.sampletype.isin(['Matrix spike', 'Result']) 
-            | 
-            ((results.sampletype == 'Blank spiked' ) & results.analysismethod.isin([*icpaes_methods, *icpms_methods])) 
         )
     )
     checkdf = results[rpdcheckmask]
@@ -766,10 +798,6 @@ def chemistry(all_dfs):
             if ( (row.analysismethod in icpms_methods) and (row.sampletype in ['Result','Matrix spike'] ) ) 
             else aa_tolerance 
             if ( (row.analysismethod in aa_methods) and (row.sampletype in ['Result','Matrix spike'] ) ) 
-            else icpaes_blankspike_tolerance 
-            if ( (row.analysismethod in icpaes_methods) and (row.sampletype == 'Blank spiked' ) ) 
-            else icpms_blankspike_tolerance 
-            if ( (row.analysismethod in icpms_methods) and (row.sampletype == 'Blank spiked' ) ) 
             else pd.NA
             ,
             axis = 1
@@ -778,7 +806,8 @@ def chemistry(all_dfs):
             lambda x: 'ICPAES' if x in icpaes_methods else 'ICPMS' if x in icpms_methods else 'AA'
         )
     )
-    checkdf = checkdf.groupby(['analysisbatchid', 'analysismethod', 'analysismethodgroup', 'sampletype', 'analytename','sampleid', 'tolerance']).apply(
+    # stationid and sampledate essentially functions as the sampleid
+    checkdf = checkdf.groupby(['analysisbatchid', 'analysismethod', 'analysismethodgroup', 'sampletype', 'analytename','stationid','sampledate', 'tolerance']).apply(
         lambda subdf:
         abs((subdf.result.max() - subdf.result.min()) / ((subdf.result.max() + subdf.result.min()) / 2))
     )
@@ -788,7 +817,7 @@ def chemistry(all_dfs):
             lambda row:
             (
                 f"For the AnalysisMethod {row.analysismethod}, "
-                f"{'Blank spike' if row.sampletype == 'Blank spiked' else 'Matrix spike' if row.sampletype == 'Matrix spike' else 'Sample'}"
+                f"{'Matrix spike' if row.sampletype == 'Matrix spike' else 'Sample'}"
                 f" duplicates should have an RPD under {(row.tolerance) * 100}%"
             )
             , axis = 1
@@ -800,7 +829,7 @@ def chemistry(all_dfs):
                     # We never multiplied RPD by 100, so it should be expressed as a decimal here
                     checkdf.apply(lambda x: x.rpd > x.tolerance, axis = 1)
                 ], 
-                on = ['analysisbatchid','analysismethod','sampletype','analytename','sampleid'], 
+                on = ['analysisbatchid','analysismethod','sampletype','analytename','stationid', 'sampledate'], 
                 how = 'inner'
             )
         
@@ -824,7 +853,88 @@ def chemistry(all_dfs):
                 results_args.update(args)
                 warnings.append(checkData(**results_args))
         
-    # --- END TABLE 5-3 Check #5 and #6 --- #
+    # PART 2 - Blank spikes/dupes
+
+    # Check - Duplicate Blank spikes need < 25% RPD for AnalysisMethods ICPAES, EPA200.7 and EPA 6010B, 15% for ICPMS
+    print('# Check - Duplicate Blank spikes need < 25% RPD for AnalysisMethods ICPAES, EPA200.7 and EPA 6010B, 15% for ICPMS')
+    
+    # for 'ICPAES', 'EPA200.7', 'EPA 6010B' it says  25% rpd
+    # for 'ICPMS', 'EPA200.8', 'EPA 6020Bm' it says within 15% RPD
+    
+    icpaes_blankspike_tolerance = 0.25
+    icpms_blankspike_tolerance = 0.15
+
+    rpdcheckmask = (
+        inorg_sed_mask 
+        & (
+            results.sampletype.isin(['Blank spiked']) 
+        )
+    )
+    checkdf = results[rpdcheckmask]
+    checkdf = checkdf.assign(
+        tolerance = checkdf.apply( 
+            lambda row: 
+            icpaes_blankspike_tolerance 
+            if ( (row.analysismethod in icpaes_methods) and (row.sampletype in ['Blank spiked'] ) ) 
+            else icpms_blankspike_tolerance 
+            if ( (row.analysismethod in icpms_methods) and (row.sampletype in ['Blank spiked'] ) ) 
+            else pd.NA
+            ,
+            axis = 1
+        ),
+        analysismethodgroup = checkdf.analysismethod.apply( 
+            lambda x: 'ICPAES' if x in icpaes_methods else 'ICPMS' if x in icpms_methods else ''
+        )
+    )
+    # stationid and sampledate essentially functions as the sampleid
+    checkdf = checkdf.groupby(['analysisbatchid', 'analysismethod', 'analysismethodgroup', 'sampletype', 'analytename', 'tolerance']).apply(
+        lambda subdf:
+        abs((subdf.result.max() - subdf.result.min()) / ((subdf.result.max() + subdf.result.min()) / 2))
+    )
+    if not checkdf.empty:
+        checkdf = checkdf.reset_index(name = 'rpd')
+        checkdf['errmsg'] = checkdf.apply(
+            lambda row:
+            (
+                f"For the AnalysisMethod {row.analysismethod}, "
+                f"Blank spike duplicates should have an RPD under {(row.tolerance) * 100}%"
+            )
+            , axis = 1
+        )
+        checkdf = results[rpdcheckmask] \
+            .merge(
+                checkdf[
+                    # just merge records that failed the check
+                    # We never multiplied RPD by 100, so it should be expressed as a decimal here
+                    checkdf.apply(lambda x: x.rpd > x.tolerance, axis = 1)
+                ], 
+                on = ['analysisbatchid','analysismethod','sampletype','analytename'], 
+                how = 'inner'
+            )
+        
+        tmp = checkdf.groupby(['errmsg']) \
+            .apply(lambda df: df.tmp_row.tolist())
+        if not tmp.empty:
+            argslist = tmp \
+                .reset_index(name = 'badrows') \
+                .apply(
+                    lambda row: 
+                    {
+                        "badrows": row.badrows,
+                        "badcolumn": "Result",
+                        "error_type": "Value Error",
+                        "error_message": row.errmsg
+                    },
+                    axis = 1
+                ).tolist()
+
+            for args in argslist:
+                results_args.update(args)
+                warnings.append(checkData(**results_args))
+        
+    # --- END TABLE 5-3 Check --- # (# Check - Duplicate Matrix spikes (or Results) need < 20% RPD for AnalysisMethods ICPAES, EPA200.7 and EPA 6010B)
+    ## Also blank spikes and dupes...
+
 
     # ------- END Table 5-3 - Inorganics, Non-tissue matrices (Sediment and labwater) -------#
 
@@ -840,23 +950,10 @@ def chemistry(all_dfs):
     # --- TABLE 5-4 Check #1 --- #
     # Check - Make sure they have all the required PAH anlaytes
     print('# Check - Make sure they have all the required PAH anlaytes')
-
-    # NOTE Need to confirm with Ken and Charles that this is the correct grouping
-    tbl54_chk1_grouping_cols = ['analysisbatchid','sampleid','sampletype','labreplicate']
-    
+ 
     # 24 required analytes from the PAH analyteclass
     req_analytes_tbl54 = pd.read_sql("SELECT * FROM lu_analytes WHERE analyteclass = 'PAH'", eng).analyte.tolist()
 
-    argslist = check_req_analytes(
-        df=results,
-        mask=pah_sed_mask,
-        groupingcols=tbl54_chk1_grouping_cols,
-        required_analytes=req_analytes_tbl54,
-        analyteclass = 'PAH'
-    )
-    for args in argslist:
-        results_args.update(args)
-        errs.append(checkData(**results_args))
 
     # --- END TABLE 5-4 Check #1 --- #
 
