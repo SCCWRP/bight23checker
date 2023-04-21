@@ -45,6 +45,7 @@ def load():
         sheet: pd.read_excel(
             excel_path, 
             sheet_name = sheet, 
+            keep_default_na=False,
             skiprows = current_app.excel_offset, 
             na_values = [''], 
             converters = converters

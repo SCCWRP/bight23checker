@@ -332,16 +332,18 @@ def toxicity(all_dfs):
         'sampletypecode',
         'samplecollectdate'
     ]
-    dflabrep = toxresults.groupby(grouping_cols)
-    dflabrep = toxresults.groupby(grouping_cols)['labrep', 'tmp_row'].apply(lambda x: tuple([x.labrep.tolist(), x.tmp_row.tolist()]))
-    dflabrep = dflabrep.reset_index(name='repsandrows')
-    dflabrep['reps'] = dflabrep.repsandrows.apply(lambda x: x[0]) # first value of the tuple is the labreplicate
-    dflabrep['rows'] = dflabrep.repsandrows.apply(lambda x: x[1]) # second value of the tuple is the row index number (tmp_row)
-    dflabrep.drop('repsandrows', axis=1, inplace=True)
+    #dflabrep = toxresults.groupby(grouping_cols)
+    #dflabrep = toxresults.groupby(grouping_cols)['labrep', 'tmp_row'].apply(lambda x: tuple([x.labrep.tolist(), x.tmp_row.tolist()]))
+    dflabrep = toxresults.groupby(grouping_cols)[['labrep', 'tmp_row']].agg({'labrep':list,'tmp_row':list})
+    dflabrep = dflabrep.reset_index()
+    dflabrep.rename(columns = {'labrep':'reps', 'tmp_row':'rows'}, inplace = True)
+    # dflabrep['reps'] = dflabrep.repsandrows.apply(lambda x: x[0]) # first value of the tuple is the labreplicate
+    # dflabrep['rows'] = dflabrep.repsandrows.apply(lambda x: x[1]) # second value of the tuple is the row index number (tmp_row)
+    #dflabrep.drop('repsandrows', axis=1, inplace=True)
     # checking to see if LabReplicated were labeled correctely
     # This is done using the sum of the first 'n' formula 1 + 2 + ... + n == n(n+1)/2
-    dflabrep['passed'] = dflabrep['reps'].apply(lambda x: (sum(x) == ((len(x) * (len(x) + 1)) / 2 )) & ([num > 0 for num in x] == [True] * len(x)) )
-    badrows = [item for sublist in dflabrep[dflabrep['passed'] == False].rows.tolist() for item in sublist]
+    dflabrep['passed'] = dflabrep['reps'].apply(lambda x: (sum(x) == ((len(x) * (len(x) + 1)) / 2 )) & (all([num > 0 for num in x])  ))
+    badrows = [item for sublist in dflabrep[~dflabrep.passed].rows.tolist() for item in sublist]
     toxresults_args.update({
         "dataframe": toxresults,
         "tablename": 'tbl_toxresults',
@@ -352,6 +354,7 @@ def toxicity(all_dfs):
         "error_message": "LabReplicates must be contiguous."
     })
     errs = [*errs, checkData(**toxresults_args)] 
+    print("Done with labrep check")
 
 
     # Sample Assignment checks
