@@ -62,9 +62,18 @@ def multitask(functions: list, *args):
 @lru_cache(maxsize=128, typed=True)
 def convert_dtype(t, x):
     try:
+
         if ((pd.isnull(x)) and (t == int)):
             return True
         t(x)
+
+        # if the type is an int, and it got this far, at least the literal matches that of a number
+        # if it matches the float pattern though, we have a problem
+        if (t == int):
+            floatpat = re.compile(r"^\d+\.0*[1-9]+")
+            # If it matches a float we want to return False
+            return not bool(re.match(floatpat, str(x)))
+        
         return True
     except Exception as e:
         if t == pd.Timestamp:
