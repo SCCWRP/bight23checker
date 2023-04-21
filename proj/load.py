@@ -1,7 +1,9 @@
 from flask import Blueprint, current_app, session, jsonify, g
-from .utils.db import GeoDBDataFrame
+from .utils.db import GeoDBDataFrame, next_objectid, registration_id
 from .utils.mail import data_receipt
 from .utils.exceptions import default_exception_handler
+
+import subprocess as sp
 
 from psycopg2.errors import ForeignKeyViolation
 
@@ -159,7 +161,67 @@ def load():
             ALTER TABLE "{tbl}" ADD COLUMN IF NOT EXISTS login_agency VARCHAR(50);
             """
         )
-        all_dfs[tbl].to_geodb(tbl, g.eng)
+
+        g.eng.execute(
+            f"""
+            ALTER TABLE {tbl} ALTER COLUMN globalid SET DEFAULT next_globalid();
+            ALTER TABLE {tbl} ALTER COLUMN objectid SET DEFAULT next_rowid('sde','{tbl}');
+            """
+        )
+
+        #all_dfs[tbl].to_geodb(tbl, g.eng)
+        # --- New loading routine, adapted from EMPA routine to handle logger submissions --- #
+
+        # This is what next_rowid would return - we manually enter these values to the objectid column of the dataframe
+        # then update the registration table accordingly after the data goes in
+        # objid = next_objectid(tbl, g.eng)
+
+        # all_dfs[tbl].globalid = None
+        # all_dfs[tbl].objectid = objid + all_dfs[tbl].index
+
+        # put the csv in the tmp folder
+        tmpcsvpath = os.path.join(session.get("submission_dir"), f'{tbl}.csv')
+
+        # NEW try dropping globalid and objectid - we ensured they had default values
+
+        staging_df = all_dfs[tbl].drop(['objectid', 'globalid'], axis = 'columns')
+        staging_df.to_csv(tmpcsvpath, index = False, header = False)
+
+        # This will ensure the data is copied with correct corresponding columns
+        # psql can execute since it authenticates with PGPASSWORD environment variable
+        cmdlist = [
+            'psql','-h', os.environ.get("DB_HOST"),'-d',os.environ.get("DB_NAME"),'-U', os.environ.get("DB_USER"),
+            '-c', 
+            f"\copy {tbl} ({','.join(staging_df.columns)}) FROM \'{tmpcsvpath}\' csv"
+        ]
+        print(f"load records to {tbl}")
+
+        # https://stackoverflow.com/questions/1996518/retrieving-the-output-of-subprocess-call
+        # sp is the subprocess module, imported up top
+        # NOTE: Apparently it would be better to use check_output and CalledProcessError according to chatGPT
+        proc = sp.run(cmdlist, stdout=sp.PIPE, stderr=sp.PIPE, universal_newlines = True)
+
+        # add the stdout/err to the email report
+        msg = f"Attempt to load {len(staging_df)} records to {tbl}:\n"
+        msg += "\nCommand:\n"
+        msg += ' '.join(cmdlist)
+        msg += '\n\nResult:\n'
+        msg += f"{proc.stderr}"
+        msg += f"{proc.stdout}"
+        print(msg)
+
+        if proc.stderr:
+            raise Exception(f"Error loading to {tbl}: {proc.stderr}")
+
+        # commenting out to see if enforcing a default value on objectid will work
+        # print("Update the registration table to have the correct object ids")
+        # reg_id = registration_id(tbl, g.eng)
+        # last_id = int(all_dfs[tbl].objectid.max())
+        # eng.execute(f"UPDATE i{reg_id} SET base_id = {last_id + 1}, last_id = {last_id}")
+
+
+        # --- END New loading routine, adapted from EMPA routine to handle logger submissions --- #
+
  
 
         print(f"done loading data to {tbl}")

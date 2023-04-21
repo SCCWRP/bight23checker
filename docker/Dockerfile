@@ -1,5 +1,6 @@
 # IMAGE NAME sccwrp/flask:bight23checker
 FROM debian
+FROM debian
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update 
 RUN apt-get install -y apt-utils
@@ -8,12 +9,14 @@ RUN apt-get install -y libpcre3 libpcre3-dev
 RUN apt-get install -y vim
 # install postgres to have psql command line utility
 RUN apt-get install -y postgresql postgresql-contrib
-RUN apt-get install -y libpq-dev && pip3 install psycopg2
+RUN apt-get install -y libpq-dev
 RUN apt-get install -y libgdal-dev
 RUN apt-get install -y libproj-dev
 RUN apt-get install -y cython3
 RUN apt-get install -y python3-pyproj
+
 RUN pip3 install wheel
+RUN pip3 install psycopg2
 RUN pip3 install uwsgi flask ipython
 RUN pip3 install xlrd flask_session
 RUN pip3 install flask_cors
@@ -73,8 +76,7 @@ RUN mkdir -p /var/www/checker/
 
 RUN pip3 install geopy
 
-# install postgres to have psql command line utility
-RUN apt-get install -y postgresql postgresql-contrib
+
 
 #CMD ["uwsgi","-s","/tmp/empachecker.sock","--uid","www-data","--gid","www-data","--manage-script-name","--mount","/checker=run:app","--chmod-socket=666"]
 # docker container run -it -d --name $1 \
