@@ -48,6 +48,7 @@
 		document.getElementById('track-auth-form')?.addEventListener('submit', (event) => {
 			event.preventDefault();
 			const formData = new FormData(event.target);
+			console.log(JSON.stringify(Object.fromEntries(formData.entries())))
 			fetch(
 				`{{request.script_root}}/trackauth`, 
 				{

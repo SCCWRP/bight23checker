@@ -30,7 +30,8 @@ def tracking():
 
 @track.route('/trackauth', methods = ['POST'])
 def trackauth():
-    trackpw = request.form.get("trackpw")
+
+    trackpw = request.get_json().get('trackpw')
     session['AUTHORIZED_FOR_TRACKER'] = trackpw == os.environ.get("TRACKER_PASSWORD")
     
     return jsonify(message=str(session.get("AUTHORIZED_FOR_TRACKER")).lower())

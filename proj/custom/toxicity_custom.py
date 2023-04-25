@@ -1071,10 +1071,9 @@ def toxicity(all_dfs):
         print(toxsummary)
 
         # write tox summary to the submission excel file
-        writer = pd.ExcelWriter(session.get('excel_path'), engine = 'openpyxl', mode = 'a')
-        toxsummary.to_excel(writer, index = False, sheet_name=current_app.config.get("TOXSUMMARY_TABLENAME"))
-        writer.save()
-        writer.close()
+        with pd.ExcelWriter(session.get('excel_path'), engine = 'openpyxl', mode = 'a') as writer:
+            toxsummary.to_excel(writer, index = False, sheet_name=current_app.config.get("TOXSUMMARY_TABLENAME"))
+
 
         # The session table to tab map must be updated so that the excel markup routine can find the newly created sheet
         # it also must be updated so that the javascript can correctly build the error report for the user to see in the browser
