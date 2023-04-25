@@ -549,8 +549,7 @@ def toxicity(all_dfs):
             "is_core_error": False,
             "error_message": "For records with Strongylocentrotus purpuratus, the ActualTestDuration should be 68 to 76 hours (about 3 days)."
         })
-        errs = [*errs, checkData(**toxbatch_args)]
-
+        warnings = [*warnings, checkData(**toxbatch_args)]
         ## END BATCH CHECKS ##
 
         ## RESULT CHECKS ##
