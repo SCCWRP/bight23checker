@@ -48,6 +48,8 @@ def chemistry(all_dfs):
             axis = 1
         )
 
+    # Later on we will most likely need to manipulate the labsampleid field to be what we need it to be 
+    results['sampleid'] = results.labsampleid
 
     batch_args = {
         "dataframe": batch,
@@ -179,8 +181,6 @@ def chemistry(all_dfs):
     # ----- CUSTOM CHECKS - SEDIMENT RESULTS ----- #
     print('# ----- CUSTOM CHECKS - SEDIMENT RESULTS ----- #')
 
-
-
     # Check for All required analytes per station (All or nothing)
     current_matrix = 'sediment' #sediment or tissue - affects query for required analytes
     # Check for all required analytes per station - if a station has a certain analyteclass
@@ -209,13 +209,20 @@ def chemistry(all_dfs):
             axis = 1
         ).tolist()
 
-        for argset in error_args:
+        for argset in errs_args:
             results_args.update(argset)
             errs.append(checkData(**results_args))
     # End of checking all required analytes per station, if they attempted submission of an analyteclass
     # No partial submissions of analyteclasses
 
-
+    # Check - If the sampletype is "Lab blank" or "Blank spiked" then the matrix must be labwater or Ottawa sand
+    results_args.update({
+        "badrows": results[(results.sampletype.isin(["Lab blank","Blank spiked"])) & (~results.matrix.isin(["labwater","Ottawa sand"]))].tmp_row.tolist(),
+        "badcolumn" : "matrix",
+        "error_type": "Value error",
+        "error_message" : "If the sampletype is a blank, the only options for matrices would be 'labwater' or 'Ottawa sand'"
+    })
+    errs.append(checkData(**results_args))
 
 
 
@@ -225,7 +232,6 @@ def chemistry(all_dfs):
     # case = False makes the string match not case sensitive
     spike_mask = results.sampletype.str.contains('spike', case = False) | results.sampletype.str.contains('Reference', case = False)
 
-    
     # badrows are deemed to be ones that are not in the "spike" or Reference category, but the TrueValue column is NOT a -88 (Warning)
     print('# badrows are deemed to be ones that are not in the "spike" or Reference category, but the TrueValue column is NOT a -88 (Warning)')
     badrows = results[(~spike_mask) & (results.truevalue != -88)].tmp_row.tolist()
@@ -237,7 +243,6 @@ def chemistry(all_dfs):
     })
     warnings.append(checkData(**results_args))
     
-    
     # badrows here could be considered as ones that ARE CRM's / spikes, but the TrueValue is missing (Warning)
     print('# badrows here could be considered as ones that ARE CRMs / spikes, but the TrueValue is missing (Warning)')
     badrows = results[(spike_mask) & (results.truevalue < 0)].tmp_row.tolist()
@@ -248,6 +253,7 @@ def chemistry(all_dfs):
         "error_message": "This row is a 'spike' or a CRM, so the TrueValue should not be -88 (or any negative number)"
     })
     warnings.append(checkData(**results_args))
+
 
     # Check - Result column should be a positive number (except -88) for SampleType == 'Result' (Error)
     print("""# Check - Result column should be a positive number (except -88) for SampleType == 'Result' (Error)""")
@@ -291,6 +297,17 @@ def chemistry(all_dfs):
     errs.append(checkData(**results_args))
 
 
+    # Check - if result > RL then the qualifier cannot say "below reporting limit or "below method detection limit"
+    print('# Check - if result > RL then the qualifier cannot say "below reporting limit or "below method detection limit"')
+    results_args.update({
+        "badrows": results[(results.result > results.rl) & (results.qualifier.isin(['below reporting limit','below method detection limit']))].tmp_row.tolist(),
+        "badcolumn": "Qualifier",
+        "error_type": "Value Error",
+        "error_message": """if result > RL then the qualifier cannot say 'below reporting limit' or 'below method detection limit'"""
+    })
+    errs.append(checkData(**results_args))
+
+
     
     # Check - if the qualifier is "less than" or "below method detection limit" Then the result must be -88 (Error)
     print('# Check - if the qualifier is "less than" or "below method detection limit" Then the result must be -88 (Error)')
@@ -306,7 +323,10 @@ def chemistry(all_dfs):
     print('# Check - if the qualifier is "estimated" or "below reporting level" then the result must be between the mdl and rl (inclusive) (Error)')
     results_args.update({
         "badrows": results[
-                (results.qualifier.isin(["estimated", "below reporting level"])) & ((results.result < results.mdl) | (results.result > results.rl))
+                ((results.qualifier.isin(["estimated", "below reporting level"])) & (results.sampletype != 'Lab blank'))
+                & (
+                    (results.result < results.mdl) | (results.result > results.rl)
+                )
             ].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
@@ -328,9 +348,14 @@ def chemistry(all_dfs):
     errs.append(checkData(**results_args))
 
     # Check - if the qualifier is "none" then the result must be greater than the RL (Error)
-    print('# Check - if the qualifier is "none" then the result must be greater than the RL (Error)')
+    print('# Check - if the qualifier is "none" or "equal to" then the result must be greater than the RL (Error)')
     results_args.update({
-        "badrows": results[(results.qualifier == 'none') & (results.result <= results.rl)].tmp_row.tolist(),
+        "badrows": results[
+            (
+                (results.qualifier.isin(['none', 'equal to'])) & (results.qualifier != 'Lab blank')
+            ) & 
+            (results.result <= results.rl)
+        ].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
         "error_message": "if the qualifier is 'none' then the result must be greater than the RL"
@@ -372,14 +397,16 @@ def chemistry(all_dfs):
     error_args = []
     
     required_sampletypes = {
-        "Inorganics": ['Lab blank', 'Blank spiked', 'Result'],
-        "PAH": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
-        "PCB": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
-        "Chlorinated Hydrocarbons": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
-        "PBDE": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
+        "Inorganics": ['Lab blank', 'Blank spiked', 'Result','Reference - ERA 540 Sed'],
+        "PAH": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result', 'Reference - SRM 1944 Sed'],
+        "PCB": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result', 'Reference - SRM 1944 Sed'],
+        "Chlorinated Hydrocarbons": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result', 'Reference - SRM 1944 Sed'],
+        "PBDE": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result', 'Reference - SRM 1944 Sed'],
         "Pyrethroid": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
+        "Neonicotinoids": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
+        "TIREWEAR": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
         "TN" : ['Lab blank', 'Result'],
-        "TOC" : ['Lab blank', 'Result']
+        "TOC" : ['Lab blank', 'Result', 'Reference - SRM 1944 Sed']
     }
 
     # anltclass = analyteclass
@@ -468,21 +495,21 @@ def chemistry(all_dfs):
     })
     errs.append(checkData(**results_args))
 
-    # Check - For sampletype Method blank, if Result is less than MDL, it must be -88
-    print('# Check - For sampletype Method blank, if Result is less than MDL, it must be -88')
-    # mb_mask = Method blank mask
-    print('# mb_mask = Method blank mask')
-    mb_mask = (results.sampletype == 'Method blank') 
+    # Check - For sampletype Lab blank, if Result is less than MDL, it must be -88
+    print('# Check - For sampletype Lab blank, if Result is less than MDL, it must be -88')
+    # mb_mask = Lab blank mask (lab blank is also called method blank)
+    print('# mb_mask = Lab blank mask')
+    mb_mask = (results.sampletype == 'Lab blank') 
     results_args.update({
         "badrows": results[mb_mask & ((results.result < results.mdl) & (results.result != -88))].tmp_row.tolist(),
         "badcolumn": "Result",
         "error_type": "Value Error",
-        "error_message": "For Method blank sampletypes, if Result is less than MDL, it must be -88"
+        "error_message": "For Lab blank sampletypes, if Result is less than MDL, it must be -88"
     })
     errs.append(checkData(**results_args))
 
-    # Check - If SampleType=Method blank and Result=-88, then qualifier must be below MDL or none.
-    print('# Check - If SampleType=Method blank and Result=-88, then qualifier must be below MDL or none.')
+    # Check - If SampleType=Lab blank and Result=-88, then qualifier must be below MDL or none.
+    print('# Check - If SampleType=Lab blank and Result=-88, then qualifier must be below MDL or none.')
     results_args.update({
         "badrows": results[(mb_mask & (results.result != -88)) & (~results.qualifier.isin(['below method detection limit','none'])) ].tmp_row.tolist(),
         "badcolumn": "Qualifier",
@@ -672,27 +699,16 @@ def chemistry(all_dfs):
     #   (if that batch is analyzing inorganics) (ERROR)
 
     # The filter mask to be used throughout the whole table 5-3 checks
-    inorg_sed_mask = (results.analyteclass == 'Inorganics') & results.matrix.isin(['sediment','labwater'])
+    inorg_sed_mask = (results.analyteclass == 'Inorganics') & results.matrix.isin(['sediment','labwater', 'Ottawa sand'])
 
 
     # --- END TABLE 5-3 Check #1 --- #
+    # Covered above
 
     # --- TABLE 5-3 Check #2 --- #
-    # Check - For Method blank sampletypes - Result < MDL or Result < 5% of measured concentration in samples (Warning)
-    # NOTE: Remains the same in Bight 2023
-    print('# Check - For Method blank sampletypes - Result < MDL or Result < 5% of measured concentration in samples (Warning)')
-    argslist = MB_ResultLessThanMDL(results[inorg_sed_mask])
-    print("done calling MB ResultLessThanMDL")
-    for args in argslist:
-        results_args.update(args)
-        warnings.append(checkData(**results_args))
-    # --- END TABLE 5-3 Check #2 --- #
-
-
-    # --- TABLE 5-3 Check #3 --- #
-    # Check - For the SampleType "Reference - ERA 540 Sed" - Result should match lu_chemcrm range
+    # Check - For the SampleType "Reference - ERA 540 Sed" - Result should match lu_chemcrm range (PT acceptance limits)
     # NOTE: I need the updated range values to update the lookup table - March 14, 2023 - Robert
-    print('# Check - For the SampleType "Reference - ERA 540 Sed" - Result should match lu_chemcrm range')
+    print('# Check - For the SampleType "Reference - ERA 540 Sed" - Result should match lu_chemcrm range (PT acceptance limits)')
     # In my understanding, its mainly for the reference material for inorganics in the sediment matrix, rather than a particular CRM
     # UPDATE - the only CRM for metals in sediment, is ERA 540
     inorg_sed_ref_mask = inorg_sed_mask & (results.sampletype == "Reference - ERA 540 Sed")
@@ -701,8 +717,8 @@ def chemistry(all_dfs):
         f"""
         SELECT 
             analytename, 
-            (reference_value * (1 - (uncertainty / 100) )) AS lower_bound,
-            (reference_value * (1 + (uncertainty / 100) )) AS upper_bound
+            pt_performance_lowerbound AS lower_bound,
+            pt_performance_upperbound AS upper_bound
         FROM lu_chemcrm 
         WHERE crm = 'Reference - ERA 540 Sed'
         """,
@@ -722,14 +738,60 @@ def chemistry(all_dfs):
         "badrows": badrows,
         "badcolumn": "Result",
         "error_type": "Value Error",
-        "error_message": f"The value here is outside the expected range for ERA 540 (<a href=https://nexus.sccwrp.org/bight23checker/scraper?action=help&layer=lu_chemcrm target=_blank>See the CRM Lookup lsit values</a>)"
+        "error_message": f"The value here is outside the PT performance limits for ERA 540 (<a href=https://nexus.sccwrp.org/bight23checker/scraper?action=help&layer=lu_chemcrm target=_blank>See the CRM Lookup lsit values</a>)"
     })
     warnings.append(checkData(**results_args))
+    # --- END TABLE 5-3 Check #2 --- #
+
+
+    # --- TABLE 5-3 Check #3 --- #
+    # Check - For Method blank sampletypes - Result < MDL or Result < 5% of measured concentration in samples (Warning)
+    # NOTE: Remains the same in Bight 2023
+    print('# Check - For Method blank sampletypes - Result < MDL or Result < 5% of measured concentration in samples (Warning)')
+    argslist = MB_ResultLessThanMDL(results[inorg_sed_mask])
+    print("done calling MB ResultLessThanMDL")
+    for args in argslist:
+        results_args.update(args)
+        warnings.append(checkData(**results_args))
     # --- END TABLE 5-3 Check #3 --- #
 
 
-
     # --- TABLE 5-3 Check #4 --- #
+    # Sample Duplicate or Matrix spike duplicate required for 10% of the samples in a batch
+    tmp = results[inorg_sed_mask].groupby(['analysisbatchid', 'sampleid','analytename']).apply(
+        lambda df: 
+        not df[(df.labreplicate == 2) & df.sampletype.isin(['Matrix spike','Result'])].empty
+    ) \
+    .reset_index(name = 'has_dup') 
+
+    # identify samples where not all analytes had their duplicates
+    tmp = tmp.groupby(['analysisbatchid','sampleid']).agg({'has_dup': all}).reset_index()
+    
+    # get percentage of samples within batch that had all analytes with their dupes
+    tmp = tmp.groupby('analysisbatchid') \
+        .agg({'has_dup': lambda x: sum(x) / len(x)}) \
+        .reset_index() \
+        .rename(columns = {'has_dup':'percent_samples_with_dupes'})
+    
+    # batches where 
+    badbatches = tmp[tmp.percent_samples_with_dupes < 0.1]
+
+    bad = results[results.analysisbatchid.isin(badbatches.analysisbatchid.tolist())]
+    if not bad.empty:
+        bad = bad.groupby('analysisbatchid').agg({'tmp_row': list}).reset_index()
+        for _, row in bad.iterrows():
+            results_args.update({
+                "badrows": row.tmp_row, # list of rows associated with the batch that doesnt meet the matrix/sample dup requirement
+                "badcolumn": "SampleType",
+                "error_type": "Incomplete data",
+                "error_message": f"Under 10% of samples in the batch {row.analysisbatchid} have a sample duplicate / matrix spike duplicate"
+            })
+            warnings.append(checkData(**results_args))
+
+    # --- END TABLE 5-3 Check #4 --- #
+
+
+    # --- TABLE 5-3 Check #5 --- #
     # Check - At least one blank spike result per batch should be within 15% of the TrueValue (85 to 115 percent recovery)
 
     print('# Check - At least one Blank spike result per batch should be within 15% of the TrueValue (85 to 115 percent recovery)')
@@ -738,7 +800,7 @@ def chemistry(all_dfs):
     
     pct_recovery_thresh = 15
     checkdf = results[inorg_sed_mask & results.sampletype.str.contains('Blank spiked', case = False)] \
-        .groupby(['analysisbatchid', 'labsampleid','labreplicate']) \
+        .groupby(['analysisbatchid', 'sampleid','labreplicate']) \
         .apply(
             lambda df: 
             all((df.percentrecovery.between(100 - pct_recovery_thresh, 100 + pct_recovery_thresh)))
@@ -757,11 +819,10 @@ def chemistry(all_dfs):
             "error_message": "Within this analysisbatch, at least one of the Blank spike sets should have had all their percent recoveries within 15 percent"
         })
         warnings.append(checkData(**results_args))
-    
+    # --- End Table 5-3 check #5 --- #
     
 
-
-    # --- TABLE 5-3 Check --- #
+    # --- TABLE 5-3 Check "#6" (a, b, and c) --- #
     # Check - Duplicate Matrix spikes (or Results) need < 20% RPD for AnalysisMethods ICPAES, EPA200.7 and EPA 6010B
     print('# Check - Duplicate Matrix spikes (or Results) need < 20% RPD for AnalysisMethods ICPAES, EPA200.7 and EPA 6010B')
     
@@ -775,28 +836,32 @@ def chemistry(all_dfs):
     
     icpaes_methods = ['ICPAES', 'EPA200.7', 'EPA6010D','EPA6010B'] # methods that require 20% RPD - Inductively Coupled Plasma Atomic Emission Spectrometry
     icpaes_tolerance = .25 
-    #icpaes_blankspike_tolerance = 0.25
+    icpaes_blankspike_tolerance = 0.25
     icpms_methods = ['ICPMS', 'EPA200.8', 'EPA 6020Bm'] # methods that require 30% RPD - Inductively Coupled Plasma Mass Spectrometry
     icpms_tolerance = .25 
-    #icpms_blankspike_tolerance = 0.15
+    icpms_blankspike_tolerance = 0.15
     aa_methods = ['CVAA','FAA','GFAA','HAA','EPA245.7m','EPA245.5','EPA7473','SW846 7471','EPA7471B'] # - Atomic Absorbtion
     aa_tolerance = .3 
 
     rpdcheckmask = (
         inorg_sed_mask 
         & (
-            results.sampletype.isin(['Matrix spike', 'Result']) 
+            results.sampletype.isin(['Matrix spike', 'Result', 'Blank spiked']) 
         )
     )
     checkdf = results[rpdcheckmask]
     checkdf = checkdf.assign(
         tolerance = checkdf.apply( 
             lambda row: 
-            icpaes_tolerance 
+            icpaes_tolerance
             if ( (row.analysismethod in icpaes_methods) and (row.sampletype in ['Result','Matrix spike'] ) ) 
-            else icpms_tolerance 
+            else icpaes_blankspike_tolerance
+            if ( (row.analysismethod in icpaes_methods) and (row.sampletype in ['Blank spiked'] ) ) 
+            else icpms_tolerance
             if ( (row.analysismethod in icpms_methods) and (row.sampletype in ['Result','Matrix spike'] ) ) 
-            else aa_tolerance 
+            else icpms_blankspike_tolerance
+            if ( (row.analysismethod in icpms_methods) and (row.sampletype in ['Blank spiked'] ) ) 
+            else aa_tolerance
             if ( (row.analysismethod in aa_methods) and (row.sampletype in ['Result','Matrix spike'] ) ) 
             else pd.NA
             ,
@@ -806,8 +871,12 @@ def chemistry(all_dfs):
             lambda x: 'ICPAES' if x in icpaes_methods else 'ICPMS' if x in icpms_methods else 'AA'
         )
     )
+
+    # drop records where the tolerance ended up as pd.NA
+    checkdf.dropna(subset = 'tolerance', inplace = True)
+
     # stationid and sampledate essentially functions as the sampleid
-    checkdf = checkdf.groupby(['analysisbatchid', 'analysismethod', 'analysismethodgroup', 'sampletype', 'analytename','stationid','sampledate', 'tolerance']).apply(
+    checkdf = checkdf.groupby(['analysisbatchid', 'analysismethod', 'analysismethodgroup', 'sampletype', 'analytename','sampleid', 'tolerance']).apply(
         lambda subdf:
         abs((subdf.result.max() - subdf.result.min()) / ((subdf.result.max() + subdf.result.min()) / 2))
     )
@@ -817,7 +886,7 @@ def chemistry(all_dfs):
             lambda row:
             (
                 f"For the AnalysisMethod {row.analysismethod}, "
-                f"{'Matrix spike' if row.sampletype == 'Matrix spike' else 'Sample'}"
+                f"{'Matrix spike' if row.sampletype == 'Matrix spike' else 'Blank spike' if row.sampletype == 'Blank spiked' else 'Sample'}"
                 f" duplicates should have an RPD under {(row.tolerance) * 100}%"
             )
             , axis = 1
@@ -853,87 +922,35 @@ def chemistry(all_dfs):
                 results_args.update(args)
                 warnings.append(checkData(**results_args))
         
-    # PART 2 - Blank spikes/dupes
 
-    # Check - Duplicate Blank spikes need < 25% RPD for AnalysisMethods ICPAES, EPA200.7 and EPA 6010B, 15% for ICPMS
-    print('# Check - Duplicate Blank spikes need < 25% RPD for AnalysisMethods ICPAES, EPA200.7 and EPA 6010B, 15% for ICPMS')
-    
-    # for 'ICPAES', 'EPA200.7', 'EPA 6010B' it says  25% rpd
-    # for 'ICPMS', 'EPA200.8', 'EPA 6020Bm' it says within 15% RPD
-    
-    icpaes_blankspike_tolerance = 0.25
-    icpms_blankspike_tolerance = 0.15
-
-    rpdcheckmask = (
-        inorg_sed_mask 
-        & (
-            results.sampletype.isin(['Blank spiked']) 
-        )
-    )
-    checkdf = results[rpdcheckmask]
-    checkdf = checkdf.assign(
-        tolerance = checkdf.apply( 
-            lambda row: 
-            icpaes_blankspike_tolerance 
-            if ( (row.analysismethod in icpaes_methods) and (row.sampletype in ['Blank spiked'] ) ) 
-            else icpms_blankspike_tolerance 
-            if ( (row.analysismethod in icpms_methods) and (row.sampletype in ['Blank spiked'] ) ) 
-            else pd.NA
-            ,
-            axis = 1
-        ),
-        analysismethodgroup = checkdf.analysismethod.apply( 
-            lambda x: 'ICPAES' if x in icpaes_methods else 'ICPMS' if x in icpms_methods else ''
-        )
-    )
-    # stationid and sampledate essentially functions as the sampleid
-    checkdf = checkdf.groupby(['analysisbatchid', 'analysismethod', 'analysismethodgroup', 'sampletype', 'analytename', 'tolerance']).apply(
-        lambda subdf:
-        abs((subdf.result.max() - subdf.result.min()) / ((subdf.result.max() + subdf.result.min()) / 2))
-    )
-    if not checkdf.empty:
-        checkdf = checkdf.reset_index(name = 'rpd')
-        checkdf['errmsg'] = checkdf.apply(
-            lambda row:
-            (
-                f"For the AnalysisMethod {row.analysismethod}, "
-                f"Blank spike duplicates should have an RPD under {(row.tolerance) * 100}%"
-            )
-            , axis = 1
-        )
-        checkdf = results[rpdcheckmask] \
-            .merge(
-                checkdf[
-                    # just merge records that failed the check
-                    # We never multiplied RPD by 100, so it should be expressed as a decimal here
-                    checkdf.apply(lambda x: x.rpd > x.tolerance, axis = 1)
-                ], 
-                on = ['analysisbatchid','analysismethod','sampletype','analytename'], 
-                how = 'inner'
-            )
-        
-        tmp = checkdf.groupby(['errmsg']) \
-            .apply(lambda df: df.tmp_row.tolist())
-        if not tmp.empty:
-            argslist = tmp \
-                .reset_index(name = 'badrows') \
-                .apply(
-                    lambda row: 
-                    {
-                        "badrows": row.badrows,
-                        "badcolumn": "Result",
-                        "error_type": "Value Error",
-                        "error_message": row.errmsg
-                    },
-                    axis = 1
-                ).tolist()
-
-            for args in argslist:
-                results_args.update(args)
-                warnings.append(checkData(**results_args))
         
     # --- END TABLE 5-3 Check --- # (# Check - Duplicate Matrix spikes (or Results) need < 20% RPD for AnalysisMethods ICPAES, EPA200.7 and EPA 6010B)
-    ## Also blank spikes and dupes...
+    
+    
+    # --- TABLE 5-3 Check --- #
+    # --- Table 5-3 - AnalysisMethods ICPAES and ICPMS, blank spike duplicates are required --- #
+    tmp_orig = results[inorg_sed_mask & tmp.analysismethod.isin([*icpaes_methods, *icpms_methods])] 
+    tmp = tmp_orig.groupby(['analysisbatchid', 'analytename']).apply(
+        lambda df:
+        not df[(df.sampletype == 'Blank spiked') & (df.labreplicate == 2)].empty # signifies whether or not a blank spiked duplicate is present
+    )
+    if not tmp.empty:
+        tmp = tmp.reset_index( name = 'has_blankspike_dup') 
+        tmp = tmp[~tmp.has_blankspike_dup] # get batches without the blank spike dupes
+        tmp = tmp_orig.merge(tmp, on = ['analysisbatchid', 'analytename'], how = 'inner')
+        tmp = tmp.groupby(['analysisbatchid', 'analytename']).agg({'tmp_row': list})
+        if not tmp.empty:
+            tmp = tmp.reset_index()
+            for _, row in tmp.iterrows():
+                results_args.update({
+                    "badrows": row.tmp_row, # list of rows associated with the batch that doesnt have a blank spike dup
+                    "badcolumn": "SampleType",
+                    "error_type": "Incomplete data",
+                    "error_message": f"The batch {row.analysisbatchid} is missing a blank spike duplicate for {row.analytename} (since it is a batch for metals with analysismethod ICPAES or ICPMS)"
+                })
+                warnings.append(checkData(**results_args))
+
+
 
 
     # ------- END Table 5-3 - Inorganics, Non-tissue matrices (Sediment and labwater) -------#
@@ -943,7 +960,7 @@ def chemistry(all_dfs):
 
     # ------- Table 5-4 - PAH, Non-tissue matrices (Sediment and labwater) -------#
     # The filter mask to be used throughout the whole table 5-4 checks
-    pah_sed_mask = (results.analyteclass == 'PAH') & results.matrix.isin(['sediment','labwater'])
+    pah_sed_mask = (results.analyteclass == 'PAH') & results.matrix.isin(['sediment','labwater', 'Ottawa sand'])
 
 
 
@@ -954,62 +971,78 @@ def chemistry(all_dfs):
     # 24 required analytes from the PAH analyteclass
     req_analytes_tbl54 = pd.read_sql("SELECT * FROM lu_analytes WHERE analyteclass = 'PAH'", eng).analyte.tolist()
 
-
     # --- END TABLE 5-4 Check #1 --- #
+    # Covered above
 
     # --- TABLE 5-4 Check #2 --- #
-    # Check - For SampleType = Method blank, we must require Result < 10 * MDL - if that criteria is met, the qualifier should be "none"
-    print('# Check - For SampleType = Method blank, we must require Result < 10 * MDL - if that criteria is met, the qualifier should be "none"')
+    # Check - For reference materials - Result should be within 40% of the specified value (in lu_chemcrm) for 80% of the analytes
+    # print('# Check - For reference materials - Result should be within 40% of the specified value (in lu_chemcrm) for 80% of the analytes')
+    crmvals = pd.read_sql(
+        f"""
+        SELECT analyte AS analytename, reference_value FROM lu_chemcrm 
+        WHERE analyte IN ('{"','".join(req_analytes_tbl54).replace(';','')}')
+        AND matrix = 'sediment'
+        """,
+        eng
+    )
+    checkdf = results[pah_sed_mask & results.sampletype.str.contains('Reference', case = False)] 
+    if not checkdf.empty:
+        checkdf = checkdf.merge(crmvals, on = 'analytename', how = 'inner')
     
-    # First check that the result is under 10 times the MDL
-    badrows = results[(pah_sed_mask & (results.sampletype == 'Method blank')) & (results.result >= (10 * results.mdl))].tmp_row.tolist()
-    results_args.update({
-        "badrows": badrows,
-        "badcolumn": "Result",
-        "error_type": "Value Error",
-        "error_message": f"For Method blanks, the result must be less than 10 times the MDL (for PAH)"
-    })
-    warnings.append(checkData(**results_args))
+    if not checkdf.empty:
+        checkdf['within40pct'] = checkdf.apply(
+                lambda row:
+                (0.6 * float(row.reference_value)) <= row.result <= (1.4 * float(row.reference_value)) if not pd.isnull(row.reference_value) else True,
+                axis = 1
+            )
+        checkdf = checkdf.merge(
+            checkdf.groupby('analysisbatchid') \
+                .apply(
+                    lambda df: sum(df.within40pct) / len(df) < 0.8
+                ) \
+                .reset_index(name = 'failedcheck'),
+            on = 'analysisbatchid',
+            how = 'inner'
+        )
+        checkdf = checkdf[checkdf.failedcheck]
+        results_args.update({
+            "badrows": checkdf.tmp_row.tolist(),
+            "badcolumn": "AnalysisBatchID",
+            "error_type": "Value Error",
+            "error_message": "Less than 80% of the analytes in this batch are within 40% of the CRM value"
+        })
+        warnings.append(checkData(**results_args))
 
-    # If the requirement is met, check that the qualifier says none
-    badrows = results[
-        ((pah_sed_mask & results.sampletype == 'Method blank') & (results.result < (10 * results.mdl))) & 
-        (results.qualifier != 'none')
-    ].tmp_row.tolist()
-
-    results_args.update({
-        "badrows": badrows,
-        "badcolumn": "Qualifier",
-        "error_type": "Value Error",
-        "error_message": f"For Method blanks, if the result is less than 10 times the MDL, then the qualifier should say 'none' (for PAH)"
-    })
-    warnings.append(checkData(**results_args))
     # --- END TABLE 5-4 Check #2 --- #
     
     
-    # --- TABLE 5-4 Check #3 --- #
-    # Check - within an analysisbatch, Matrix spikes should have 60-140% recovery of spiked mass for 80% of analytes
-    print('# Check - within an analysisbatch, Matrix spikes/Blank spikes should have 60-140% recovery of spiked mass for 80% of analytes')
-    checkdf = results[pah_sed_mask & results.sampletype.isin(['Matrix spike', 'Blank spiked'])] \
-        .groupby(['analysisbatchid', 'sampletype', 'sampleid', 'labreplicate']) \
-        .apply(
-            lambda df: 
-            (sum((df.percentrecovery > 60) & (df.percentrecovery < 140)) / len(df)) >= 0.8
-        )
-    if not checkdf.empty:
-        checkdf = checkdf.reset_index(name = 'passed_check')
-        checkdf = results.merge(checkdf, on = ['analysisbatchid', 'sampletype', 'sampleid', 'labreplicate'], how = 'inner')
-        checkdf = checkdf[checkdf.sampletype.isin(['Matrix spike', 'Blank spiked'])]
-        checkdf = checkdf[(~checkdf.passed_check) & ((checkdf.percentrecovery < 60) | (checkdf.percentrecovery > 140))]
 
-        results_args.update({
-            "badrows": checkdf.tmp_row.tolist(),
-            "badcolumn": "AnalysisBatchID, SampleType, SampleID, LabReplicate, Result",
-            "error_type": "Value Error",
-            "error_message": f"For Matrix spikes/Blank spikes, more than 80% of analytes should have 60-140% recovery"
-        })
-        warnings.append(checkData(**results_args))
+    # --- TABLE 5-4 Check #3 --- #
+    # Check - Matrix spike duplicate required (1 per batch)
+    print('# Check - Matrix spike duplicate required (1 per batch)')
+    tmp_orig = results[pah_sed_mask] 
+    tmp = tmp_orig.groupby(['analysisbatchid', 'analytename']).apply(
+        lambda df:
+        not df[(df.sampletype == 'Matrix spike') & (df.labreplicate == 2)].empty # signifies whether or not a Matrix spike duplicate is present
+    )
+    if not tmp.empty:
+        tmp = tmp.reset_index( name = 'has_matrixspike_dup') 
+        tmp = tmp[~tmp.has_matrixspike_dup] # get batches without the matrix spike dupes
+        tmp = tmp_orig.merge(tmp, on = ['analysisbatchid', 'analytename'], how = 'inner')
+        tmp = tmp.groupby(['analysisbatchid', 'analytename']).agg({'tmp_row': list})
+        if not tmp.empty:
+            tmp = tmp.reset_index()
+            for _, row in tmp.iterrows():
+                results_args.update({
+                    "badrows": row.tmp_row, # list of rows associated with the batch that doesnt have a matrix spike dup
+                    "badcolumn": "SampleType",
+                    "error_type": "Incomplete data",
+                    "error_message": f"The batch {row.analysisbatchid} is missing a matrix spike duplicate for {row.analytename}"
+                })
+                warnings.append(checkData(**results_args))
     # --- END TABLE 5-4 Check #3 --- #
+
+
     
 
 
@@ -1059,47 +1092,61 @@ def chemistry(all_dfs):
     # --- END TABLE 5-4 Check #4 --- #
     
     
-
-    # --- TABLE 5-4 Check #5 --- #
-    # Check - For reference materials - Result should be within 40% of the specified value (in lu_chemcrm) for 80% of the analytes
-    # print('# Check - For reference materials - Result should be within 40% of the specified value (in lu_chemcrm) for 80% of the analytes')
-    crmvals = pd.read_sql(
-        f"""
-        SELECT analyte AS analytename, reference_value FROM lu_chemcrm 
-        WHERE analyte IN ('{"','".join(req_analytes_tbl54).replace(';','')}')
-        AND matrix = 'sediment'
-        """,
-        eng
-    )
-    checkdf = results[pah_sed_mask & results.sampletype.str.contains('Reference', case = False)] 
-    if not checkdf.empty:
-        checkdf = checkdf.merge(crmvals, on = 'analytename', how = 'inner')
-    
-    if not checkdf.empty:
-        checkdf['within40pct'] = checkdf.apply(
-                lambda row:
-                (0.6 * float(row.reference_value)) <= row.result <= (1.4 * float(row.reference_value)) if not pd.isnull(row.reference_value) else True,
-                axis = 1
-            )
-        checkdf = checkdf.merge(
-            checkdf.groupby('analysisbatchid') \
-                .apply(
-                    lambda df: sum(df.within40pct) / len(df) < 0.8
-                ) \
-                .reset_index(name = 'failedcheck'),
-            on = 'analysisbatchid',
-            how = 'inner'
+    # --- TABLE 5-4 Check #5 and 6 --- #
+    # Check - within an analysisbatch, Matrix spikes should have 60-140% recovery of spiked mass for 80% of analytes
+    print('# Check - within an analysisbatch, Matrix spikes/Blank spikes should have 60-140% recovery of spiked mass for 80% of analytes')
+    checkdf = results[pah_sed_mask & results.sampletype.isin(['Matrix spike', 'Blank spiked'])] \
+        .groupby(['analysisbatchid', 'sampletype', 'sampleid', 'labreplicate']) \
+        .apply(
+            lambda df: 
+            (sum((df.percentrecovery > 60) & (df.percentrecovery < 140)) / len(df)) >= 0.8
         )
-        checkdf = checkdf[checkdf.failedcheck]
+    if not checkdf.empty:
+        checkdf = checkdf.reset_index(name = 'passed_check')
+        checkdf = results.merge(checkdf, on = ['analysisbatchid', 'sampletype', 'sampleid', 'labreplicate'], how = 'inner')
+        checkdf = checkdf[checkdf.sampletype.isin(['Matrix spike', 'Blank spiked'])]
+        checkdf = checkdf[(~checkdf.passed_check) & ((checkdf.percentrecovery < 60) | (checkdf.percentrecovery > 140))]
+
         results_args.update({
             "badrows": checkdf.tmp_row.tolist(),
-            "badcolumn": "AnalysisBatchID",
+            "badcolumn": "AnalysisBatchID, SampleType, SampleID, LabReplicate, Result",
             "error_type": "Value Error",
-            "error_message": "Less than 80% of the analytes in this batch are within 40% of the CRM value"
+            "error_message": f"For Matrix spikes/Blank spikes, more than 80% of analytes should have 60-140% recovery"
         })
         warnings.append(checkData(**results_args))
-
     # --- END TABLE 5-4 Check #5 --- #
+
+
+
+    # --- TABLE 5-4 Check #7 --- #
+    # Check - For SampleType = Lab blank, we must require Result < 10 * MDL - if that criteria is met, the qualifier should be "none"
+    print('# Check - For SampleType = Lab blank, we must require Result < 10 * MDL - if that criteria is met, the qualifier should be "none"')
+    
+    # First check that the result is under 10 times the MDL
+    badrows = results[(pah_sed_mask & (results.sampletype == 'Lab blank')) & (results.result >= (10 * results.mdl))].tmp_row.tolist()
+    results_args.update({
+        "badrows": badrows,
+        "badcolumn": "Result",
+        "error_type": "Value Error",
+        "error_message": f"For Lab blanks, the result must be less than 10 times the MDL (for PAH)"
+    })
+    warnings.append(checkData(**results_args))
+
+    # If the requirement is met, check that the qualifier says none
+    badrows = results[
+        ((pah_sed_mask & results.sampletype == 'Lab blank') & (results.result < (10 * results.mdl))) & 
+        (results.qualifier != 'none')
+    ].tmp_row.tolist()
+
+    results_args.update({
+        "badrows": badrows,
+        "badcolumn": "Qualifier",
+        "error_type": "Value Error",
+        "error_message": f"For Lab blanks, if the result is less than 10 times the MDL, then the qualifier should say 'none' (for PAH)"
+    })
+    warnings.append(checkData(**results_args))
+    # --- END TABLE 5-4 Check #7 --- #
+
 
     # --- TABLE 5-4 Check # --- #
     # Check - 
@@ -1113,140 +1160,18 @@ def chemistry(all_dfs):
 
     # ------- Table 5-5 - Pyrethroids, PCB, PBDE, Chlorinated Hydrocarbons, Non-tissue matrices (Sediment and labwater) -------#
 
-    # --- TABLE 5-5 Check #1 --- #
-    # Check - No partial submissions for: Pyrethroids, PCB, PBDE, Chlorinated Hydrocarbons (ERROR)
-    print('# Check - No partial submissions for: Pyrethroids, PCB, PBDE, Chlorinated Hydrocarbons (ERROR)')
-
-    analyteclasses55 = ['PCB','PBDE','Chlorinated Hydrocarbons','Pyrethroid']
+    analyteclasses55 = ['PCB','PBDE','Chlorinated Hydrocarbons','Pyrethroid','Neonicotinoids','PFAS','TIREWEAR']
     mask55 = results.analyteclass.isin(analyteclasses55)
     results55 = results[mask55]
 
 
-    for aclass in analyteclasses55:
-        req_analytes = pd.read_sql(f"SELECT analyte FROM lu_analytes WHERE analyteclass = '{aclass}';", eng).analyte.tolist()
-        tmp = results55[results55.analyteclass == aclass] 
-        if not tmp.empty:
-            tmp = tmp.groupby('analysisbatchid').apply(
-                lambda df:
-                set(req_analytes) - set(df.analytename.tolist())
-            ).reset_index(name = 'missing_analytes')
-
-            tmp = results55.merge(tmp, on = 'analysisbatchid', how = 'inner')
-            tmp = tmp[tmp.missing_analytes != set()]
-
-            # if the dataframe is not empty then there are some missing analytes
-            if not tmp.empty:
-                argslist = tmp.groupby('analysisbatchid').apply(
-                    lambda df:
-                    {
-                        "badrows": df.tmp_row.tolist() if not df.empty else [],
-                        "badcolumn": "AnalysisBatchID",
-                        "error_type": "Missing Data",
-                        "error_message": f"""This batch analyzed {aclass}{'s' if aclass != 'Chlorinated Hydrocarbons' else ''} but is missing the following analytes: {', '.join(set(req_analytes) - set(df.analytename.tolist()))}"""
-                    }
-                ).reset_index(name = 'errs')['errs'].tolist()
-                
-                for args in argslist:
-                    results_args.update(args)
-                    errs.append(checkData(**results_args))
-
+    # --- TABLE 5-5 Check #1 --- #
+    # Check - check for all required sampletypes
+    # covered above
     # --- END TABLE 5-5 Check #1 --- #
     
+
     # --- TABLE 5-5 Check #2 --- #
-    # Check - For Method Blanks, result has to be less than 10 * MDL and the Result must be less than the RL (WARNING)
-    print('# Check - For Method Blanks, result has to be less than 10 * MDL and the Result must be less than the RL (WARNING)')
-    #   if that criteria is met then the qualifier should be 'none'
-
-    tmpdf = results55[results55.sampletype == 'Method blank']
-    badrows = tmpdf[(tmpdf.result >= (10 * tmpdf.mdl)) | (tmpdf.result >= tmpdf.rl)].tmp_row.tolist()
-    results_args.update({
-        "badrows": badrows,
-        "badcolumn": "Result",
-        "error_type": "Value Error",
-        "error_message": "For Method blanks, the result should be less than 10 times the MDL, and less than the RL"
-    })
-    warnings.append(checkData(**results_args))
-    
-    # Second part of the check - if the criteria is met then the qualifier should be "none"
-    badrows = tmpdf[((tmpdf.result < 10 * tmpdf.mdl) & (tmpdf.result < tmpdf.rl)) & (tmpdf.qualifier.str.lower() != 'none')].tmp_row.tolist()
-    results_args.update({
-        "badrows": badrows,
-        "badcolumn": "Qualifier",
-        "error_type": "Value Error",
-        "error_message": "For Method blanks if the result is less than 10 times the MDL, and less than the RL, then the qualifer should say 'none'"
-    })
-    warnings.append(checkData(**results_args))
-
-    # --- END TABLE 5-5 Check #2 --- #
-    
-    # --- TABLE 5-5 Check #3 --- #
-    # Check - Within an analysisbatch, Matrix spikes should have 60-140% recovery of spiked mass for 70% of analytes (WARNING)
-    print('# Check - Within an analysisbatch, Matrix spikes/Blank spikes should have 60-140% recovery of spiked mass for 70% of analytes (WARNING)')
-    checkdf = results[mask55 & results.sampletype.isin(['Matrix spike', 'Blank spiked'])] \
-        .groupby(['analysisbatchid', 'sampletype', 'analyteclass','sampleid','labreplicate']) \
-        .apply(
-            lambda df: 
-            (sum((df.percentrecovery > 60) & (df.percentrecovery < 140)) / len(df)) >= 0.7
-        )
-    if not checkdf.empty:
-        checkdf = checkdf.reset_index(name = 'passed_check')
-        checkdf = results.merge(checkdf, on = ['analysisbatchid', 'sampletype', 'analyteclass','sampleid','labreplicate'], how = 'inner')
-        checkdf = checkdf[checkdf.sampletype.isin(['Matrix spike', 'Blank spiked'])]
-        checkdf = checkdf[(~checkdf.passed_check) & ((checkdf.percentrecovery < 60) | (checkdf.percentrecovery > 140))]
-
-        results_args.update({
-            "badrows": checkdf.tmp_row.tolist(),
-            "badcolumn": "AnalysisBatchID, SampleType, SampleID, LabReplicate, Result",
-            "error_type": "Value Error",
-            "error_message": f"For Matrix/blank spikes, over 70% of analytes should have 60-140% recovery"
-        })
-        warnings.append(checkData(**results_args))
-    # --- END TABLE 5-5 Check #3 --- #
-    
-    # --- TABLE 5-5 Check #4 --- #
-    # Check - Duplicate Matrix spikes must have RPD < 40% for 70% of the analytes
-    print('# Check - Duplicate Matrix spikes must have RPD < 40% for 70% of the analytes')
-    checkdf = results[mask55 & results.sampletype.str.contains('Matrix spike', case = False)]
-    checkdf = checkdf.groupby(['analysisbatchid', 'analyteclass', 'analytename','sampleid']).apply(
-        lambda subdf:
-        abs((subdf.result.max() - subdf.result.min()) / ((subdf.result.max() + subdf.result.min()) / 2)) <= 0.4
-    )
-
-    if not checkdf.empty:
-        checkdf = checkdf.reset_index(name = 'rpd_under_40')
-        checkdf = checkdf.groupby(['analysisbatchid','analyteclass']).apply(lambda df: sum(df.rpd_under_40) / len(df) >= 0.7 )
-        if not checkdf.empty:
-            checkdf = checkdf.reset_index(name = 'passed')
-            checkdf['errmsg'] = checkdf.apply(
-                lambda row:
-                f"Duplicate Matrix spikes should have an RPD under 40% for 70% of the analytes in the batch ({row.analysisbatchid}) (for the analyteclass {row.analyteclass})"
-                , axis = 1
-            )
-            checkdf = results[mask55 & results.sampletype.str.contains('Matrix spike', case = False)] \
-                .merge(checkdf[~checkdf.passed], on = ['analysisbatchid', 'analyteclass'], how = 'inner')
-            
-            if not checkdf.empty:
-                argslist = checkdf.groupby(['errmsg']) \
-                    .apply(lambda df: df.tmp_row.tolist()) \
-                    .reset_index(name = 'badrows') \
-                    .apply(
-                        lambda row: 
-                        {
-                            "badrows": row.badrows,
-                            "badcolumn": "Result",
-                            "error_type": "Value Error",
-                            "error_message": row.errmsg
-                        },
-                        axis = 1
-                    ).tolist()
-
-                for args in argslist:
-                    results_args.update(args)
-                    warnings.append(checkData(**results_args))
-    # --- END TABLE 5-5 Check #4 --- #
-
-
-    # --- TABLE 5-5 Check #5 --- #
     # Check - For reference materials - Result should be within 40% of the specified value (in lu_chemcrm) for 70% of the analytes
     print('# Check - For reference materials - Result should be within 40% of the specified value (in lu_chemcrm) for 70% of the analytes')
     crmvals = pd.read_sql(
@@ -1292,9 +1217,149 @@ def chemistry(all_dfs):
             "error_message": "Less than 70% of the analytes in this batch are within 40% of the CRM value"
         })
         warnings.append(checkData(**results_args))
-    # --- END TABLE 5-5 Check #5 --- #
-    
+    # --- END TABLE 5-5 Check #2 --- #
 
+    # --- TABLE 5-5 Check #3, #6 --- #
+    # Check - Matrix spike duplicate required (1 per batch)
+    print('# Check - Matrix spike duplicate required (1 per batch)')
+    tmp = results55.groupby(['analysisbatchid', 'analytename']).apply(
+        lambda df:
+        not df[(df.sampletype == 'Matrix spike') & (df.labreplicate == 2)].empty # signifies whether or not a Matrix spike duplicate is present
+    )
+    if not tmp.empty:
+        tmp = tmp.reset_index( name = 'has_matrixspike_dup') 
+        tmp = tmp[~tmp.has_matrixspike_dup] # get batches without the matrix spike dupes
+        tmp = results55.merge(tmp, on = ['analysisbatchid', 'analytename'], how = 'inner')
+        tmp = tmp.groupby(['analysisbatchid', 'analytename']).agg({'tmp_row': list})
+        if not tmp.empty:
+            tmp = tmp.reset_index()
+            for _, row in tmp.iterrows():
+                results_args.update({
+                    "badrows": row.tmp_row, # list of rows associated with the batch that doesnt have a matrix spike dup
+                    "badcolumn": "SampleType",
+                    "error_type": "Incomplete data",
+                    "error_message": f"The batch {row.analysisbatchid} is missing a matrix spike duplicate for {row.analytename}"
+                })
+                warnings.append(checkData(**results_args))
+    
+    #(Check #6, sample as check #3 except with Blank spikes)
+    print('# Check - Blank spike duplicate required (1 per batch)')
+    tmp = results55.groupby(['analysisbatchid', 'analytename']).apply(
+        lambda df:
+        not df[(df.sampletype == 'Blank spiked') & (df.labreplicate == 2)].empty # signifies whether or not a Matrix spike duplicate is present
+    )
+    if not tmp.empty:
+        tmp = tmp.reset_index( name = 'has_blankspike_dup') 
+        tmp = tmp[~tmp.has_blankspike_dup] # get batches without the matrix spike dupes
+        tmp = results55.merge(tmp, on = ['analysisbatchid', 'analytename'], how = 'inner')
+        tmp = tmp.groupby(['analysisbatchid', 'analytename']).agg({'tmp_row': list})
+        if not tmp.empty:
+            tmp = tmp.reset_index()
+            for _, row in tmp.iterrows():
+                results_args.update({
+                    "badrows": row.tmp_row, # list of rows associated with the batch that doesnt have a matrix spike dup
+                    "badcolumn": "SampleType",
+                    "error_type": "Incomplete data",
+                    "error_message": f"The batch {row.analysisbatchid} is missing a blank spike duplicate for {row.analytename}"
+                })
+                warnings.append(checkData(**results_args))
+    # --- END TABLE 5-5 Check #3 --- #
+
+
+    # --- TABLE 5-5 Check #4, #7 --- #
+    # Check - Within an analysisbatch, Matrix spikes/Blank spikes should have 60-140% recovery of spiked mass for 70% of analytes (WARNING)
+    print('# Check - Within an analysisbatch, Matrix spikes/Blank spikes should have 60-140% recovery of spiked mass for 70% of analytes (WARNING)')
+    checkdf = results[mask55 & results.sampletype.isin(['Matrix spike', 'Blank spiked'])] \
+        .groupby(['analysisbatchid', 'sampletype', 'analyteclass','sampleid','labreplicate']) \
+        .apply(
+            lambda df: 
+            (sum((df.percentrecovery > 60) & (df.percentrecovery < 140)) / len(df)) >= 0.7
+        )
+    if not checkdf.empty:
+        checkdf = checkdf.reset_index(name = 'passed_check')
+        checkdf = results.merge(checkdf, on = ['analysisbatchid', 'sampletype', 'analyteclass','sampleid','labreplicate'], how = 'inner')
+        checkdf = checkdf[checkdf.sampletype.isin(['Matrix spike', 'Blank spiked'])]
+        checkdf = checkdf[(~checkdf.passed_check) & ((checkdf.percentrecovery < 60) | (checkdf.percentrecovery > 140))]
+
+        results_args.update({
+            "badrows": checkdf.tmp_row.tolist(),
+            "badcolumn": "AnalysisBatchID, SampleType, SampleID, LabReplicate, Result",
+            "error_type": "Value Error",
+            "error_message": f"For Matrix/blank spikes, over 70% of analytes should have 60-140% recovery"
+        })
+        warnings.append(checkData(**results_args))
+    # --- END TABLE 5-5 Check #4 --- #
+    
+    # --- TABLE 5-5 Check #5, #8 --- #
+    # Check - Duplicate Matrix spikes must have RPD < 40% for 70% of the analytes
+    print('# Check - Duplicate Matrix spikes must have RPD < 40% for 70% of the analytes')
+    checkdf = results[mask55 & results.sampletype.isin(['Matrix spike', 'Blank spiked'])]
+    checkdf = checkdf.groupby(['analysisbatchid', 'analyteclass', 'sampletype', 'analytename','sampleid']).apply(
+        lambda subdf:
+        abs((subdf.result.max() - subdf.result.min()) / ((subdf.result.max() + subdf.result.min()) / 2)) <= 0.4
+    )
+
+    if not checkdf.empty:
+        checkdf = checkdf.reset_index(name = 'rpd_under_40')
+        checkdf = checkdf.groupby(['analysisbatchid','analyteclass']).apply(lambda df: sum(df.rpd_under_40) / len(df) >= 0.7 )
+        if not checkdf.empty:
+            checkdf = checkdf.reset_index(name = 'passed')
+            checkdf['errmsg'] = checkdf.apply(
+                lambda row:
+                f"Duplicate Matrix spikes/Blank spikes should have an RPD under 40% for 70% of the analytes in the batch ({row.analysisbatchid}) (for the analyteclass {row.analyteclass})"
+                , axis = 1
+            )
+            checkdf = results[mask55 & results.sampletype.str.contains('Matrix spike', case = False)] \
+                .merge(checkdf[~checkdf.passed], on = ['analysisbatchid', 'analyteclass'], how = 'inner')
+            
+            if not checkdf.empty:
+                argslist = checkdf.groupby(['errmsg']) \
+                    .apply(lambda df: df.tmp_row.tolist()) \
+                    .reset_index(name = 'badrows') \
+                    .apply(
+                        lambda row: 
+                        {
+                            "badrows": row.badrows,
+                            "badcolumn": "Result",
+                            "error_type": "Value Error",
+                            "error_message": row.errmsg
+                        },
+                        axis = 1
+                    ).tolist()
+
+                for args in argslist:
+                    results_args.update(args)
+                    warnings.append(checkData(**results_args))
+    # --- END TABLE 5-5 Check #5 --- #
+
+
+
+    # --- TABLE 5-5 Check #9 --- #
+    # Check - For Method Blanks, result has to be less than 10 * MDL and the Result must be less than the RL (WARNING)
+    print('# Check - For Method Blanks, result has to be less than 10 * MDL and the Result must be less than the RL (WARNING)')
+    #   if that criteria is met then the qualifier should be 'none'
+
+    tmpdf = results55[results55.sampletype == 'Method blank']
+    badrows = tmpdf[(tmpdf.result >= (10 * tmpdf.mdl)) | (tmpdf.result >= tmpdf.rl)].tmp_row.tolist()
+    results_args.update({
+        "badrows": badrows,
+        "badcolumn": "Result",
+        "error_type": "Value Error",
+        "error_message": "For Method blanks, the result should be less than 10 times the MDL, and less than the RL"
+    })
+    warnings.append(checkData(**results_args))
+    
+    # Second part of the check - if the criteria is met then the qualifier should be "none"
+    badrows = tmpdf[((tmpdf.result < 10 * tmpdf.mdl) & (tmpdf.result < tmpdf.rl)) & (tmpdf.qualifier.str.lower() != 'none')].tmp_row.tolist()
+    results_args.update({
+        "badrows": badrows,
+        "badcolumn": "Qualifier",
+        "error_type": "Value Error",
+        "error_message": "For Method blanks if the result is less than 10 times the MDL, and less than the RL, then the qualifer should say 'none'"
+    })
+    warnings.append(checkData(**results_args))
+
+    # --- END TABLE 5-5 Check #9 --- #
 
     # --- TABLE 5-5 Check # --- #
     # Check - 
@@ -1308,6 +1373,34 @@ def chemistry(all_dfs):
     # ------- END Table 5-6 - TOC and TN, Non-tissue matrices (Sediment and labwater) -------#
     
     # --- TABLE 5-6 Check #1 --- #
+    # Check for all required sampletypes (covered above)
+    # --- END TABLE 5-6 Check #1 --- #
+
+
+    # --- TABLE 5-6 Check #2 --- #
+    # Check if the value is within 20% of the CRM values (for the reference materials)
+    
+    # crmvals dataframe has been defined above, in section 5-3
+
+    checkdf = results[(results.analytename == 'TOC') & results.sampletype.str.contains('Reference', case = False)]
+    if not checkdf.empty:
+        checkdf = checkdf.merge(crmvals, on = 'analytename', how = 'left') 
+        checkdf = checkdf.assign(failedcheck = ((checkdf.reference_value * 0.8 > checkdf.result) | (checkdf.result > checkdf.reference_value * 1.2)))
+
+        checkdf = checkdf[checkdf.failedcheck]
+        results_args.update({
+            "badrows": checkdf.tmp_row.tolist(),
+            "badcolumn": "Result",
+            "error_type": "Value Error",
+            "error_message": f"The result should be within 20% of the reference value in <a href=/{current_app.config.get('APP_SCRIPT_ROOT')}/scraper?action=help&layer=lu_chemcrm>lu_chemcrm</a>"
+        })
+        warnings.append(checkData(**results_args))
+
+    # --- END TABLE 5-6 Check #2 --- #
+
+
+
+    # --- TABLE 5-6 Check #3 --- #
     # Check - For SampleType = Method blank, we must require Result < 10 * MDL (WARNING)
     print('# Check - For SampleType = Method blank, we must require Result < 10 * MDL (WARNING)')
     #   if that criteria is met, the qualifier should be "none" (WARNING)
@@ -1338,11 +1431,32 @@ def chemistry(all_dfs):
     })
     warnings.append(checkData(**results_args))
     
-    # --- END TABLE 5-6 Check #1 --- #
+    # --- END TABLE 5-6 Check #3 --- #
 
+    # --- Table 5-6 Check #4 --- #
+    print('# Check - Sample duplicate required (1 per batch)')
+    tmp = results55.groupby(['analysisbatchid', 'analytename']).apply(
+        lambda df:
+        not df[(df.sampletype == 'Result') & (df.labreplicate == 2)].empty # signifies whether or not a Matrix spike duplicate is present
+    )
+    if not tmp.empty:
+        tmp = tmp.reset_index( name = 'has_sample_dup') 
+        tmp = tmp[~tmp.has_sample_dup] # get batches without the matrix spike dupes
+        tmp = results55.merge(tmp, on = ['analysisbatchid', 'analytename'], how = 'inner')
+        tmp = tmp.groupby(['analysisbatchid', 'analytename']).agg({'tmp_row': list})
+        if not tmp.empty:
+            tmp = tmp.reset_index()
+            for _, row in tmp.iterrows():
+                results_args.update({
+                    "badrows": row.tmp_row, # list of rows associated with the batch that doesnt have a sample dup
+                    "badcolumn": "SampleType",
+                    "error_type": "Incomplete data",
+                    "error_message": f"The batch {row.analysisbatchid} is missing a sample duplicate for {row.analytename}"
+                })
+                warnings.append(checkData(**results_args))
+    # --- END Table 5-6 Check #4 --- #
 
-
-    # --- TABLE 5-6 Check #2 --- #
+    # --- TABLE 5-6 Check #5 --- #
     # Check - Duplicate Results must have RPD < 30% (WARNING)
     print('# Check - Duplicate Results must have RPD < 30% (WARNING)')
     checkdf = results[results.analyteclass.isin(['TOC','TN']) & (results.sampletype == 'Result')]
@@ -1386,7 +1500,9 @@ def chemistry(all_dfs):
                 results_args.update(args)
                 warnings.append(checkData(**results_args))
     
-    # --- END TABLE 5-6 Check #2 --- #
+    # --- END TABLE 5-6 Check #5 --- #
+
+
 
     # ------- END Table 5-6 - TOC and TN, Non-tissue matrices (Sediment and labwater) -------#
 
