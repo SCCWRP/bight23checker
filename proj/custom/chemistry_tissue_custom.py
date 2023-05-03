@@ -91,26 +91,6 @@ def chemistry_tissue(all_dfs):
     )
     errs.append(checkData(**results_args))
 
-    # Check to see if GrainSize was submitted along with Sediment Results
-    grain_analytes = pd.read_sql("SELECT analyte FROM lu_analytes WHERE analyteclass = 'GrainSize';", eng).analyte.tolist()
-    grain_bool = results.analytename.isin(grain_analytes)
-
-    # if there is a mixture of analyteclasses (GrainSize and non-GrainSize) the data should be flagged
-    if not ((all(grain_bool)) or (all(~grain_bool))):
-        n_grain = sum(grain_bool)
-        n_nongrain = sum(~grain_bool)
-
-        # If there are less grainsize records, flag them as being the bad rows. Otherwise flag the non grainsize rows
-        results_args.update({
-            "badrows": results[(grain_bool) if (n_grain < n_nongrain) else (~grain_bool)].tmp_row.tolist(),
-            "badcolumn": "AnalyteName",
-            "error_type": "Logic Error",
-            "error_message": "You are attempting to submit grainsize analytes along with other sediment chemistry analytes. Sediment Chemistry Results must be submitted separately from Grainsize data"
-        })
-        errs.append(checkData(**results_args))
-        
-        # If they have mixed data, stop them here for the sake of time
-        return {'errors': errs, 'warnings': warnings}
 
     # Sample Assignment check - make sure they were assigned the analyteclasses that they are submitting
     badrows = sample_assignment_check(eng = eng, df = results, parameter_column = 'analyteclass')
@@ -126,60 +106,22 @@ def chemistry_tissue(all_dfs):
     # ----- END LOGIC CHECKS ----- # 
     print('# ----- END LOGIC CHECKS ----- # ')
 
-        
-    # ----- CUSTOM CHECKS - GRAINSIZE RESULTS ----- #
-    if all(grain_bool):
-        print('# ----- CUSTOM CHECKS - GRAINSIZE RESULTS ----- #')
-        # Check - Units must be %
-        results_args.update({
-            "badrows": results[results.units != '%'].tmp_row.tolist(),
-            "badcolumn": "Units",
-            "error_type": "Value Error",
-            "error_message": "For GrainSize data, units must be %"
-        })
-        errs.append(checkData(**results_args))
-        
-        # Check - for each grouping of stationid, fieldduplicate, labreplicate, the sum of the results should be between 99.8 and 100.2
-        tmp = results.groupby(['stationid','fieldduplicate','labreplicate']).apply(lambda df: df.result.sum())
-        if tmp.empty:
-            return {'errors': errs, 'warnings': warnings}
+   
 
-        tmp = tmp.reset_index(name='resultsum')
-        tmp = tmp[(tmp.resultsum < 99.8) | (tmp.resultsum > 100.2)]
-        
-        if tmp.empty:
-            return {'errors': errs, 'warnings': warnings}
+    # ----- CUSTOM CHECKS - TISSUE RESULTS ----- #
+    print('# ----- CUSTOM CHECKS - TISSUE RESULTS ----- #')
 
-        checkdf = results.merge(tmp, on = ['stationid','fieldduplicate','labreplicate'], how = 'inner')
-        checkdf = checkdf \
-            .groupby(['stationid','fieldduplicate','labreplicate','resultsum']) \
-            .apply(lambda df: df.tmp_row.tolist()) \
-            .reset_index(name='badrows')
+    # Check - If the sampletype is "Lab blank" or "Blank spiked" then the matrix must be labwater or Ottawa sand
+    results_args.update({
+        "badrows": results[(results.sampletype.isin(["Lab blank","Blank spiked"])) & (~results.matrix.isin(["labwater","Ottawa sand"]))].tmp_row.tolist(),
+        "badcolumn" : "matrix",
+        "error_type": "Value error",
+        "error_message" : "If the sampletype is a blank, the only options for matrices would be 'labwater' or 'Ottawa sand'"
+    })
+    errs.append(checkData(**results_args))
 
-        tmp_argslist = checkdf.apply(
-            lambda row: 
-            {
-                "badrows": row.badrows,
-                "badcolumn": "Result",
-                "error_type": "Value Error",
-                "error_message": f"For this grouping of StationID: {row.stationid}, FieldDuplicate: {row.fieldduplicate}, and LabReplicate: {row.labreplicate}, the sum of the results was {row.resultsum}, which is outside of a range we would consider as normal (99.8 to 100.2)"
-            },
-            axis = 1
-        ).values
 
-        for argset in tmp_argslist:
-            results_args.update(argset)
-            errs.append(checkData(**results_args))
-        
-        print('# ----- END CUSTOM CHECKS - GRAINSIZE RESULTS ----- #')
-        return {'errors': errs, 'warnings': warnings}
-    # ----- END CUSTOM CHECKS - GRAINSIZE RESULTS ----- #
-    
 
-    # ----- CUSTOM CHECKS - SEDIMENT RESULTS ----- #
-    print('# ----- CUSTOM CHECKS - SEDIMENT RESULTS ----- #')
-
-    
     # Check - TrueValue must be -88 for everything except CRM's and spikes (Matrix Spikes and blank spikes)
     # This is to be a Warning rather than an error
     # checked lu_sampletypes as of 11/18/2022 and these two cases will cover Reference Materials, blank spikes and matrix spikes
@@ -201,7 +143,7 @@ def chemistry_tissue(all_dfs):
     
     # badrows here could be considered as ones that ARE CRM's / spikes, but the TrueValue is missing (Warning)
     print('# badrows here could be considered as ones that ARE CRMs / spikes, but the TrueValue is missing (Warning)')
-    badrows = results[(spike_mask) & (results.truevalue < 0)].tmp_row.tolist()
+    badrows = results[(spike_mask) & ((results.truevalue <= 0) | results.truevalue.isnull())].tmp_row.tolist()
     results_args.update({
         "badrows": badrows,
         "badcolumn": "TrueValue",
@@ -252,6 +194,17 @@ def chemistry_tissue(all_dfs):
     errs.append(checkData(**results_args))
 
 
+    # Check - if result > RL then the qualifier cannot say "below reporting limit or "below method detection limit"
+    print('# Check - if result > RL then the qualifier cannot say "below reporting limit or "below method detection limit"')
+    results_args.update({
+        "badrows": results[(results.result > results.rl) & (results.qualifier.isin(['below reporting limit','below method detection limit']))].tmp_row.tolist(),
+        "badcolumn": "Qualifier",
+        "error_type": "Value Error",
+        "error_message": """if result > RL then the qualifier cannot say 'below reporting limit' or 'below method detection limit'"""
+    })
+    errs.append(checkData(**results_args))
+
+
     
     # Check - if the qualifier is "less than" or "below method detection limit" Then the result must be -88 (Error)
     print('# Check - if the qualifier is "less than" or "below method detection limit" Then the result must be -88 (Error)')
@@ -267,7 +220,10 @@ def chemistry_tissue(all_dfs):
     print('# Check - if the qualifier is "estimated" or "below reporting level" then the result must be between the mdl and rl (inclusive) (Error)')
     results_args.update({
         "badrows": results[
-                (results.qualifier.isin(["estimated", "below reporting level"])) & ((results.result < results.mdl) | (results.result > results.rl))
+                ((results.qualifier.isin(["estimated", "below reporting level"])) & (results.sampletype != 'Lab blank'))
+                & (
+                    (results.result < results.mdl) | (results.result > results.rl)
+                )
             ].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
@@ -288,10 +244,15 @@ def chemistry_tissue(all_dfs):
     })
     errs.append(checkData(**results_args))
 
-    # Check - if the qualifier is "none" then the result must be greater than the RL (Error)
-    print('# Check - if the qualifier is "none" then the result must be greater than the RL (Error)')
+    # Check - if the qualifier is "none" then the result must be greater than the RL (Error) Except lab blanks
+    print('# Check - if the qualifier is "none" or "equal to" then the result must be greater than the RL (Error) Except lab blanks')
     results_args.update({
-        "badrows": results[(results.qualifier == 'none') & (results.result <= results.rl)].tmp_row.tolist(),
+        "badrows": results[
+            (
+                (results.qualifier.isin(['none', 'equal to'])) & (results.qualifier != 'Lab blank')
+            ) & 
+            (results.result <= results.rl)
+        ].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
         "error_message": "if the qualifier is 'none' then the result must be greater than the RL"
@@ -333,16 +294,12 @@ def chemistry_tissue(all_dfs):
     error_args = []
     
     required_sampletypes = {
-        "Inorganics": ['Method blank', 'Blank spiked', 'Result'],
-        "PAH": ['Method blank', 'Matrix spike', 'Result'],
-        "PCB": ['Method blank', 'Matrix spike', 'Result'],
-        "Chlorinated Hydrocarbons": ['Method blank', 'Matrix spike', 'Result'],
-        "PBDE": ['Method blank', 'Matrix spike', 'Result'],
-        "Pyrethroid": ['Method blank', 'Matrix spike', 'Result'],
-        "FIPRONIL" : ['Method blank', 'Matrix spike', 'Result'],
-        "TN" : ['Method blank', 'Result'],
-        "TOC" : ['Method blank', 'Result']
+        "Inorganics": ['Lab blank', 'Blank spiked', 'Result','Reference - SRM 2976 Mussel Tissue'],
+        "PCB": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result', 'Reference - SRM 1974c Mussel Tissue'],
+        "Chlorinated Hydrocarbons": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result', 'Reference - SRM 1974c Mussel Tissue'],
+        "PBDE": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result', 'Reference - SRM 1974c Mussel Tissue']
     }
+
 
     # anltclass = analyteclass
     # smpltyps = sampletypes
@@ -445,10 +402,20 @@ def chemistry_tissue(all_dfs):
     # Check - If SampleType=Method blank and Result=-88, then qualifier must be below MDL or none.
     print('# Check - If SampleType=Method blank and Result=-88, then qualifier must be below MDL or none.')
     results_args.update({
-        "badrows": results[(mb_mask & (results.result != -88)) & (~results.qualifier.isin(['below method detection limit','none'])) ].tmp_row.tolist(),
+        "badrows": results[(mb_mask & (results.result == -88)) & (~results.qualifier.isin(['below method detection limit','none'])) ].tmp_row.tolist(),
         "badcolumn": "Qualifier",
         "error_type": "Value Error",
         "error_message": "If SampleType=Method blank and Result=-88, then qualifier must be 'below method detection limit' or 'none'"
+    })
+    errs.append(checkData(**results_args))
+
+    # Check - True Value should not be Zero
+    print('# Check - True Value should not be Zero')
+    results_args.update({
+        "badrows": results[results.truevalue == 0].tmp_row.tolist(),
+        "badcolumn": "truevalue",
+        "error_type": "Value Error",
+        "error_message": "The TrueValue should never be zero. If the TrueValue is unknown, then please fill in the cell with -88"
     })
     errs.append(checkData(**results_args))
 
@@ -519,85 +486,68 @@ def chemistry_tissue(all_dfs):
     # ------------------------------------------------------------------------------------------------------------#
     print('# ------------------------------------------------------------------------------------------------------------#')
 
-    # Check - If sampletype is a Reference material, the matrix cannot be "labwater" - it must be sediment
-    print('# Check - If sampletype is a Reference material, the matrix cannot be "labwater" - it must be sediment')
+    # Check - If sampletype is a Reference material, the matrix cannot be "labwater"
+    print('# Check - If sampletype is a Reference material, the matrix cannot be "labwater"')
     results_args.update({
-        "badrows": results[results.sampletype.str.contains('Reference', case = False) & (results.matrix != 'sediment')].tmp_row.tolist(),
+        "badrows": results[results.sampletype.str.contains('Reference', case = False) & (results.matrix == 'labwater')].tmp_row.tolist(),
         "badcolumn": "SampleType, Matrix",
         "error_type": "Value Error",
-        "error_message": f"If sampletype is a Reference material, the matrix cannot be 'labwater' - Rather, it must be sediment"
+        "error_message": f"If sampletype is a Reference material, the matrix cannot be 'labwater'"
     })
     errs.append(checkData(**results_args))
     
     
     # -----------------------------------------------------------------------------------------------------------------------------------#
-    # Check - for PAH's, in the sediment matrix, the units must be ng/g dw (for CRM, ug/g dw or mg/kg dw are acceptable)
-    print("# Check - for PAH's, in the sediment matrix, the units must be ng/g dw (for CRM, ug/g dw or mg/kg dw are acceptable)")
-    pah_sed_mask = ((results.matrix == 'sediment') & (results.analyteclass == 'PAH'))
-    pah_unit_mask = (pah_sed_mask & (~results.sampletype.str.contains('Reference', case = False))) & (results.units != 'ng/g dw')
-    pah_unit_crm_mask = (pah_sed_mask & (results.sampletype.str.contains('Reference', case = False))) & (results.units.isin(['ug/g dw', 'mg/kg dw']))
+    # Units checks
+    print("# units checks for Mussel tissue")
+    organic_tissue_mask = ((results.matrix == 'tissue') & (results.analyteclass != 'Inorganics'))
+    metals_tissue_mask = ((results.matrix == 'tissue') & (results.analyteclass == 'Inorganics'))
     
+    # Non reference materials units must be ug/g ww for the tissue matrix (metals)
     results_args.update({
-        "badrows": results[pah_unit_mask].tmp_row.tolist(),
+        "badrows": results[ (metals_tissue_mask & (~results.sampletype.str.contains('Reference', case = False))) & (~results.units.isin('ug/g ww')) ].tmp_row.tolist(),
         "badcolumn": "Units",
         "error_type": "Value Error",
-        "error_message": f"for PAH's, the units must be ng/g dw"
+        "error_message": f"For metals in Mussel Tissue, units must be ug/g ww unless it is a Reference material"
     })
     errs.append(checkData(**results_args))
     
+    # If it is a CRM, then units must be mg/kg dw or ug/g dw (metals)
     results_args.update({
-        "badrows": results[pah_unit_crm_mask].tmp_row.tolist(),
+        "badrows": results[ (metals_tissue_mask & (results.sampletype.str.contains('Reference', case = False))) & (~results.units.isin(['ug/g dw', 'mg/kg dw'])) ].tmp_row.tolist(),
         "badcolumn": "Units",
         "error_type": "Value Error",
-        "error_message": f"for PAH's, and Reference Material sampletypes, the units must be in ug/g dw or mg/kg dw"
+        "error_message": f"For Reference materials (for metals) in Mussel Tissue, units must be mg/kg dw or ug/g dw"
     })
     errs.append(checkData(**results_args))
-    # -----------------------------------------------------------------------------------------------------------------------------------#
     
 
-    # -----------------------------------------------------------------------------------------------------------------------------------#
-    # Check - for Chlorinated Hydrocarbons, PBDE, PCB in the sediment matrix, the units must be ng/g dw (for CRM, ug/kg dw is also acceptable)
-    print('# Check - for Chlorinated Hydrocarbons, PBDE, PCB in the sediment matrix, the units must be ng/g dw (for CRM, ug/kg dw is also acceptable)')
-    # (for matrix = sediment)
-    sed_mask = ((results.matrix == 'sediment') & (results.analyteclass.isin(['Chlorinated Hydrocarbons', 'PBDE', 'PCB'])))
-    unit_mask = (sed_mask & (~results.sampletype.str.contains('Reference', case = False))) & (results.units != 'ng/g dw')
-    unit_crm_mask = (sed_mask & (results.sampletype.str.contains('Reference', case = False))) & (results.units.isin(['ng/g dw', 'ug/kg dw']))
-    
+    # Non reference materials units must be ng/g ww for the tissue matrix (organics)
     results_args.update({
-        "badrows": results[unit_mask].tmp_row.tolist(),
+        "badrows": results[ (organic_tissue_mask & (~results.sampletype.str.contains('Reference', case = False))) & (~results.units.isin('ng/g ww')) ].tmp_row.tolist(),
         "badcolumn": "Units",
         "error_type": "Value Error",
-        "error_message": f"for Chlorinated Hydrocarbons, PBDE, PCB, the units must be ng/g dw"
+        "error_message": f"For organics in Mussel Tissue, units must be ng/g ww unless it is a Reference material"
     })
     errs.append(checkData(**results_args))
     
+    # If it is a CRM, then units must be ug/kg ww (organics)
     results_args.update({
-        "badrows": results[unit_crm_mask].tmp_row.tolist(),
+        "badrows": results[ (organic_tissue_mask & (results.sampletype.str.contains('Reference', case = False))) & (~results.units.isin(['ug/kg ww'])) ].tmp_row.tolist(),
         "badcolumn": "Units",
         "error_type": "Value Error",
-        "error_message": f"for Chlorinated Hydrocarbons, PBDE, PCB (Reference Material sampletypes), the units must be in ng/g dw or ug/kg dw"
+        "error_message": f"For Reference materials (for organics) in Mussel Tissue, units must be ug/kg ww"
     })
     errs.append(checkData(**results_args))
-    # -----------------------------------------------------------------------------------------------------------------------------------#
-
-
-
-    # -----------------------------------------------------------------------------------------------------------------------------------#
-    # Check - for FIPRONIL and Pyrethroid, in the sediment matrix, the units must be ng/g dw
-    print('# Check - for FIPRONIL and Pyrethroid, in the sediment matrix, the units must be ng/g dw')
-    fip_pyre_mask = ((results.matrix == 'sediment') & (results.analyteclass.isin(['FIPRONIL','Pyrethroid']))) & (results.units != 'ng/g dw')
     
-    results_args.update({
-        "badrows": results[fip_pyre_mask].tmp_row.tolist(),
-        "badcolumn": "Units",
-        "error_type": "Value Error",
-        "error_message": f"for FIPRONIL and Pyrethroid (where matrix = sediment), the units must be ng/g dw"
-    })
+
     # -----------------------------------------------------------------------------------------------------------------------------------
 
-    # ----- END CUSTOM CHECKS - SEDIMENT RESULTS ----- #
+    # ----- END CUSTOM CHECKS - TISSUE RESULTS ----- #
+
 
     # If there are errors, dont waste time with the QA plan checks
+
     # For testing, let us not enforce this, or we will waste a lot of time cleaning data
     # if errs != []:
     #     return {'errors': errs, 'warnings': warnings}

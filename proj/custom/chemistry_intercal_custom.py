@@ -235,5 +235,68 @@ def chemistry_intercal(all_dfs):
     })
     errs.append(checkData(**results_args))
 
-    
+    # Units checks on CRMs
+    sed_mask = ((results.matrix == 'sediment') & (results.analyteclass.isin(['Chlorinated Hydrocarbons', 'PBDE', 'PCB'])))
+    unit_crm_mask = (sed_mask & (results.sampletype.str.contains('Reference', case = False))) & (results.units.isin(['ng/g dw', 'ug/kg dw']))
+    pah_sed_mask = ((results.matrix == 'sediment') & (results.analyteclass == 'PAH'))
+    pah_unit_crm_mask = (pah_sed_mask & (results.sampletype.str.contains('Reference', case = False))) & (results.units.isin(['ug/g dw', 'mg/kg dw']))
+    organic_tissue_mask = ((results.matrix == 'tissue') & (results.analyteclass != 'Inorganics'))
+    metals_tissue_mask = ((results.matrix == 'tissue') & (results.analyteclass == 'Inorganics'))
+
+    results_args.update({
+        "badrows": results[unit_crm_mask].tmp_row.tolist(),
+        "badcolumn": "Units",
+        "error_type": "Value Error",
+        "error_message": f"for Chlorinated Hydrocarbons, PBDE, PCB (Reference Material sampletypes), the units must be in ng/g dw or ug/kg dw"
+    })
+    errs.append(checkData(**results_args))
+
+    results_args.update({
+        "badrows": results[pah_unit_crm_mask].tmp_row.tolist(),
+        "badcolumn": "Units",
+        "error_type": "Value Error",
+        "error_message": f"for PAH's, and Reference Material sampletypes, the units must be in ug/g dw or mg/kg dw"
+    })
+    errs.append(checkData(**results_args))
+
+    # If it is a CRM, then units must be ug/kg ww (organics)
+    results_args.update({
+        "badrows": results[ (organic_tissue_mask & (results.sampletype.str.contains('Reference', case = False))) & (~results.units.isin(['ug/kg ww'])) ].tmp_row.tolist(),
+        "badcolumn": "Units",
+        "error_type": "Value Error",
+        "error_message": f"For Reference materials (for organics) in Mussel Tissue, units must be ug/kg ww"
+    })
+    errs.append(checkData(**results_args))
+        
+    # If it is a CRM, then units must be mg/kg dw or ug/g dw (metals)
+    results_args.update({
+        "badrows": results[ (metals_tissue_mask & (results.sampletype.str.contains('Reference', case = False))) & (~results.units.isin(['ug/g dw', 'mg/kg dw'])) ].tmp_row.tolist(),
+        "badcolumn": "Units",
+        "error_type": "Value Error",
+        "error_message": f"For Reference materials (for metals) in Mussel Tissue, units must be mg/kg dw or ug/g dw"
+    })
+    errs.append(checkData(**results_args))
+
+
+    print('# Check - If sampletype is a Reference material, the matrix cannot be "labwater" - it must be sediment')
+    results_args.update({
+        "badrows": results[results.sampletype.str.contains('Reference', case = False) & (results.matrix.isin(['sediment', 'tissue']))].tmp_row.tolist(),
+        "badcolumn": "SampleType, Matrix",
+        "error_type": "Value Error",
+        "error_message": f"If sampletype is a Reference material, the matrix cannot be 'labwater' - Rather, it must be sediment or tissue"
+    })
+    warnings.append(checkData(**results_args))
+
+    # ---------- check - if the matrix is Ottawa sand, the sampletype must be Lab blank ------------- #
+    results_args.update({
+        "badrows": results[(results.matrix == 'Ottawa sand') & (results.sampletype != 'Lab blank')].tmp_row.tolist(),
+        "badcolumn": "sampletype",
+        "error_type": "Value Error",
+        "error_message": f"if the matrix is Ottawa sand, the sampletype must be Lab blank"
+    })
+    warnings.append(checkData(**results_args))
+
+
+
+
     return {'errors': errs, 'warnings': warnings}
