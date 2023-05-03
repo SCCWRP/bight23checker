@@ -215,6 +215,8 @@ def chemistry(all_dfs):
     # End of checking all required analytes per station, if they attempted submission of an analyteclass
     # No partial submissions of analyteclasses
 
+    # ------------------------- Begin chemistry base checks ----------------------------- #
+
     # Check - If the sampletype is "Lab blank" or "Blank spiked" then the matrix must be labwater or Ottawa sand
     results_args.update({
         "badrows": results[(results.sampletype.isin(["Lab blank","Blank spiked"])) & (~results.matrix.isin(["labwater","Ottawa sand"]))].tmp_row.tolist(),
@@ -223,7 +225,6 @@ def chemistry(all_dfs):
         "error_message" : "If the sampletype is a blank, the only options for matrices would be 'labwater' or 'Ottawa sand'"
     })
     errs.append(checkData(**results_args))
-
 
 
     # Check - TrueValue must be -88 for everything except CRM's and spikes (Matrix Spikes and blank spikes)
@@ -245,7 +246,7 @@ def chemistry(all_dfs):
     
     # badrows here could be considered as ones that ARE CRM's / spikes, but the TrueValue is missing (Warning)
     print('# badrows here could be considered as ones that ARE CRMs / spikes, but the TrueValue is missing (Warning)')
-    badrows = results[(spike_mask) & (results.truevalue < 0)].tmp_row.tolist()
+    badrows = results[(spike_mask) & ((results.truevalue <= 0) | results.truevalue.isnull())].tmp_row.tolist()
     results_args.update({
         "badrows": badrows,
         "badcolumn": "TrueValue",
@@ -347,8 +348,8 @@ def chemistry(all_dfs):
     })
     errs.append(checkData(**results_args))
 
-    # Check - if the qualifier is "none" then the result must be greater than the RL (Error)
-    print('# Check - if the qualifier is "none" or "equal to" then the result must be greater than the RL (Error)')
+    # Check - if the qualifier is "none" then the result must be greater than the RL (Error) Except lab blanks
+    print('# Check - if the qualifier is "none" or "equal to" then the result must be greater than the RL (Error) Except lab blanks')
     results_args.update({
         "badrows": results[
             (
@@ -511,7 +512,7 @@ def chemistry(all_dfs):
     # Check - If SampleType=Lab blank and Result=-88, then qualifier must be below MDL or none.
     print('# Check - If SampleType=Lab blank and Result=-88, then qualifier must be below MDL or none.')
     results_args.update({
-        "badrows": results[(mb_mask & (results.result != -88)) & (~results.qualifier.isin(['below method detection limit','none'])) ].tmp_row.tolist(),
+        "badrows": results[(mb_mask & (results.result == -88)) & (~results.qualifier.isin(['below method detection limit','none'])) ].tmp_row.tolist(),
         "badcolumn": "Qualifier",
         "error_type": "Value Error",
         "error_message": "If SampleType=Method blank and Result=-88, then qualifier must be 'below method detection limit' or 'none'"
@@ -659,24 +660,30 @@ def chemistry(all_dfs):
 
 
     # -----------------------------------------------------------------------------------------------------------------------------------#
-    # Check - for FIPRONIL and Pyrethroid, in the sediment matrix, the units must be ng/g dw
-    print('# Check - for FIPRONIL and Pyrethroid, in the sediment matrix, the units must be ng/g dw')
-    fip_pyre_mask = ((results.matrix == 'sediment') & (results.analyteclass.isin(['FIPRONIL','Pyrethroid']))) & (results.units != 'ng/g dw')
+    # Check - for Pyrethroid, in the sediment matrix, the units must be ng/g dw
+    print('# Check - for Pyrethroid, in the sediment matrix, the units must be ng/g dw')
+    fip_pyre_mask = ((results.matrix == 'sediment') & (results.analyteclass.isin(['Pyrethroid']))) & (results.units != 'ng/g dw')
     
     results_args.update({
         "badrows": results[fip_pyre_mask].tmp_row.tolist(),
         "badcolumn": "Units",
         "error_type": "Value Error",
-        "error_message": f"for FIPRONIL and Pyrethroid (where matrix = sediment), the units must be ng/g dw"
+        "error_message": f"for Pyrethroid (where matrix = sediment), the units must be ng/g dw"
     })
     # -----------------------------------------------------------------------------------------------------------------------------------
 
     # ----- END CUSTOM CHECKS - SEDIMENT RESULTS ----- #
 
+
+
+
     # If there are errors, dont waste time with the QA plan checks
     # For testing, let us not enforce this, or we will waste a lot of time cleaning data
     # if errs != []:
     #     return {'errors': errs, 'warnings': warnings}
+
+
+
 
 
 
