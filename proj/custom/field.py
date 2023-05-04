@@ -609,11 +609,12 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
 
 
         ## Jordan - If PTSensor = Yes then PTSensorSerialNumber required. Added 9/18/18
+        ## Check - If PTSensor = Yes then PTSensorSerialNumber required
         print('## PTSENSOR SERIALNUMBER REQUIRED IF PT SENSOR IS YES##')
         print(trawl[(trawl.ptsensor == 'Yes')&(trawl.ptsensorserialnumber.isnull())].tmp_row.tolist())
         trawl_args.update({
-            "badrows": trawl[(trawl.ptsensor == 'Yes')&(trawl.ptsensormanufacturer.isnull())].tmp_row.tolist(),
-            "badcolumn": 'PTSensorManufacturer',
+            "badrows": trawl[(trawl.ptsensor == 'Yes')&(trawl.ptsensorserialnumber.isnull())].tmp_row.tolist(),
+            "badcolumn": 'PTSensorSerialNumber',
             "error_type": "Undefined Error",
             "error_message" : 'PT Sensor Serial Number is required if PT Sensor is Yes'
         })
