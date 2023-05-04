@@ -28,10 +28,18 @@ def collect_error_messages(errs):
             # This will be written to a json and stored in the submission directory
             # to be read in later during the final submission routine, 
             # or in the routine which marks up their excel file
+            # If i really wanted to do it officially, i'd probably make the message a json format
+            # I decided not to do it this way because i can imagine a lot of bugs happening, such as quotes being in error messages, 
+            #   colons in error messages, etc
+            # Instead i separate the columns and the associated error message with 3 hyphens
+            # As long as 3 consecutive hyphens with spaces on both sides doesnt show up in an error message, it will work
+            # I dont like doing it this way, but i'm thinking it might be the lesser of two evils, 
+            #   since doing it with json we will have to test every possible case that could break it
+            #   So this way is not elegant, but less likely to break with unexpected input
             "columns"         : e['columns'],
             "table"           : e['table'],
             "row_number"      : r,
-            "message"         : f"{e['columns']} - {e['error_message']}"
+            "message"         : f"{e['columns']} --- {e['error_message']}"
         }
         for e in errs
         for r in e['rows']
