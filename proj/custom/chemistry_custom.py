@@ -1316,7 +1316,7 @@ def chemistry(all_dfs):
                 f"Duplicate Matrix spikes/Blank spikes should have an RPD under 40% for 70% of the analytes in the batch ({row.analysisbatchid}) (for the analyteclass {row.analyteclass})"
                 , axis = 1
             )
-            checkdf = results[mask55 & results.sampletype.str.contains('Matrix spike', case = False)] \
+            checkdf = results[mask55 & results.sampletype.isin(['Matrix spike', 'Blank spiked'])] \
                 .merge(checkdf[~checkdf.passed], on = ['analysisbatchid', 'analyteclass'], how = 'inner')
             
             if not checkdf.empty:

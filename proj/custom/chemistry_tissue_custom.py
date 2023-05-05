@@ -47,7 +47,9 @@ def chemistry_tissue(all_dfs):
             float(x.result)/float(x.truevalue)*100 if ('spike' in x.sampletype.lower())|('reference' in x.sampletype.lower()) else -88, 
             axis = 1
         )
-
+    
+    # Later on we will most likely need to manipulate the labsampleid field to be what we need it to be 
+    results['sampleid'] = results.labsampleid
 
     batch_args = {
         "dataframe": batch,
@@ -297,7 +299,8 @@ def chemistry_tissue(all_dfs):
         "Inorganics": ['Lab blank', 'Blank spiked', 'Result','Reference - SRM 2976 Mussel Tissue'],
         "PCB": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result', 'Reference - SRM 1974c Mussel Tissue'],
         "Chlorinated Hydrocarbons": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result', 'Reference - SRM 1974c Mussel Tissue'],
-        "PBDE": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result', 'Reference - SRM 1974c Mussel Tissue']
+        "PBDE": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result', 'Reference - SRM 1974c Mussel Tissue'],
+        "PFAS":['Lab blank', 'Blank spiked', 'Matrix spike', 'Result']
     }
 
 
@@ -556,11 +559,204 @@ def chemistry_tissue(all_dfs):
 
     # -=======- BIGHT CHEMISTRY QA PLAN CHECKS -=======- #  
 
+    results62 = results[results.analyteclass == 'Inorganics']
+
     # ------- Table 6-2 - Inorganics (Mercury, Selenium, Arsenic), tissue matrices (tissue and labwater) -------#
+    # Table 6-2 Check #1 - Required SampleTypes Already covered above
+
+
+    # Table 6-2 Check #2 - Result for the CRM sampletype (Reference - SRM 2976 Mussel Tissue) should be within 30% of certified value
+    crmvals = pd.read_sql("SELECT crm AS sampletype, analytename, certified_value FROM lu_chemcrm WHERE crm = 'Reference - SRM 2976 Mussel Tissue';", eng)
+    
+    tmp = results.merge(crmvals, on = ['sampletype','analytename'], how = 'left')
+    
+    tmp['failed_crmcheck'] = tmp \
+        .apply(
+            lambda row: 
+            (row.result > row.certified_value * 1.3) & (row.result < row.certified_value * 0.7)
+        )
+    
+    results_args.update({
+        "badrows": tmp[tmp.failed_crmcheck].tmp_row.tolist(),
+        "badcolumn": "result",
+        "error_type": "Value Error",
+        "error_message": f"""For the reference material 'Reference - SRM 1974c Mussel Tissue' the result should be within 30% of the certified value (See the <a href={current_app.config.get("APP_SCRIPT_ROOT")}/scraper?action=help&layer=lu_chemcrm>CRM Lookup list</a>)"""
+    })
+    warnings.append(checkData(**results_args))
+    # END Table 6-2 Check #2 - Result for the CRM sampletype (Reference - SRM 2976 Mussel Tissue) should be within 30% of certified value
+
+
+    # Table 6-2 Check #3 and #6 within an analysisbatch, Matrix spikes should have 75-125% recovery of spiked mass for 100% of analytes
+    print('# Check - within an analysisbatch, Matrix spikes/Blank spikes should have 75-125% recovery of spiked mass for all analytes')
+    checkdf = results[(results.analyteclass == 'Inorganics') & results.sampletype.isin(['Matrix spike', 'Blank spiked'])] \
+        .groupby(['analysisbatchid', 'sampletype', 'sampleid', 'labreplicate']) \
+        .apply(
+            lambda df: 
+            (sum( (df.percentrecovery > 75) & (df.percentrecovery < 125)) / len(df)) == 1
+        )
+    if not checkdf.empty:
+        checkdf = checkdf.reset_index(name = 'passed_check')
+        checkdf = results.merge(checkdf, on = ['analysisbatchid', 'sampletype', 'sampleid', 'labreplicate'], how = 'inner')
+        checkdf = checkdf[checkdf.sampletype.isin(['Matrix spike', 'Blank spiked'])]
+        checkdf = checkdf[(~checkdf.passed_check) & ((checkdf.percentrecovery < 75) | (checkdf.percentrecovery > 125))]
+
+        results_args.update({
+            "badrows": checkdf.tmp_row.tolist(),
+            "badcolumn": "AnalysisBatchID, SampleType, SampleID, LabReplicate, Result",
+            "error_type": "Value Error",
+            "error_message": f"For Matrix spikes/Blank spikes, all analytes should have 75-125% recovery"
+        })
+        warnings.append(checkData(**results_args))
+    # --- END Table 6-2 Check #3 and #6 --- #
+
+
+
+    # --- Table 6-2 Check #4 and #7 --- #
+    # Blank spike and Matrix spike dupes are required
+    # Check #4 - Matrix spike duplicate required (1 per batch)
+    print('# Check - Matrix spike duplicate required (1 per batch)')
+    tmp = results62.groupby(['analysisbatchid', 'analytename']).apply(
+        lambda df:
+        not df[(df.sampletype == 'Matrix spike') & (df.labreplicate == 2)].empty # signifies whether or not a Matrix spike duplicate is present
+    )
+    if not tmp.empty:
+        tmp = tmp.reset_index( name = 'has_matrixspike_dup') 
+        tmp = tmp[~tmp.has_matrixspike_dup] # get batches without the matrix spike dupes
+        tmp = results62.merge(tmp, on = ['analysisbatchid', 'analytename'], how = 'inner')
+        tmp = tmp.groupby(['analysisbatchid', 'analytename']).agg({'tmp_row': list})
+        if not tmp.empty:
+            tmp = tmp.reset_index()
+            for _, row in tmp.iterrows():
+                results_args.update({
+                    "badrows": row.tmp_row, # list of rows associated with the batch that doesnt have a matrix spike dup
+                    "badcolumn": "SampleType",
+                    "error_type": "Incomplete data",
+                    "error_message": f"The batch {row.analysisbatchid} is missing a matrix spike duplicate for {row.analytename}"
+                })
+                warnings.append(checkData(**results_args))
+    
+    #(Check #7, sample as check #4 except with Blank spikes)
+    print('# Check - Blank spike duplicate required (1 per batch)')
+    tmp = results62.groupby(['analysisbatchid', 'analytename']).apply(
+        lambda df:
+        not df[(df.sampletype == 'Blank spiked') & (df.labreplicate == 2)].empty # signifies whether or not a Matrix spike duplicate is present
+    )
+    if not tmp.empty:
+        tmp = tmp.reset_index( name = 'has_blankspike_dup') 
+        tmp = tmp[~tmp.has_blankspike_dup] # get batches without the matrix spike dupes
+        tmp = results62.merge(tmp, on = ['analysisbatchid', 'analytename'], how = 'inner')
+        tmp = tmp.groupby(['analysisbatchid', 'analytename']).agg({'tmp_row': list})
+        if not tmp.empty:
+            tmp = tmp.reset_index()
+            for _, row in tmp.iterrows():
+                results_args.update({
+                    "badrows": row.tmp_row, # list of rows associated with the batch that doesnt have a matrix spike dup
+                    "badcolumn": "SampleType",
+                    "error_type": "Incomplete data",
+                    "error_message": f"The batch {row.analysisbatchid} is missing a blank spike duplicate for {row.analytename}"
+                })
+                warnings.append(checkData(**results_args))
+    # --- END TABLE 6-2 Check #7 --- #
+    # --- END Table 6-2 Check #4 and #7 --- #
+
+    # --- Table 6-2 Check #5 and #8 --- #
+    # Matrix/Blank spike duplicates need RPD under 25%
+    print('# Check - Duplicate Matrix spikes must have RPD < 25% for all analytes')
+    checkdf = results[(results.analyteclass == 'Inorganics') & results.sampletype.isin(['Matrix spike', 'Blank spiked'])]
+    checkdf = checkdf.groupby(['analysisbatchid', 'analyteclass', 'sampletype', 'analytename','sampleid']).apply(
+        lambda subdf:
+        abs((subdf.result.max() - subdf.result.min()) / ((subdf.result.max() + subdf.result.min()) / 2)) <= 0.25
+    )
+
+    if not checkdf.empty:
+        checkdf = checkdf.reset_index(name = 'rpd_under_25')
+        checkdf = checkdf.groupby(['analysisbatchid','analyteclass']).apply(lambda df: sum(df.rpd_under_25) / len(df) == 1 )
+        if not checkdf.empty:
+            checkdf = checkdf.reset_index(name = 'passed')
+            checkdf['errmsg'] = checkdf.apply(
+                lambda row:
+                f"Duplicate Matrix spikes/Blank spikes should have an RPD under 25% for all analytes in the batch ({row.analysisbatchid}) (for the analyteclass {row.analyteclass})"
+                , axis = 1
+            )
+            checkdf = results[(results.analyteclass == 'Inorganics') & results.sampletype.isin(['Matrix spike', 'Blank spiked'])] \
+                .merge(checkdf[~checkdf.passed], on = ['analysisbatchid', 'analyteclass'], how = 'inner')
+            
+            if not checkdf.empty:
+                argslist = checkdf.groupby(['errmsg']) \
+                    .apply(lambda df: df.tmp_row.tolist()) \
+                    .reset_index(name = 'badrows') \
+                    .apply(
+                        lambda row: 
+                        {
+                            "badrows": row.badrows,
+                            "badcolumn": "Result",
+                            "error_type": "Value Error",
+                            "error_message": row.errmsg
+                        },
+                        axis = 1
+                    ).tolist()
+
+                for args in argslist:
+                    results_args.update(args)
+                    warnings.append(checkData(**results_args))
+    # --- END Table 6-2 Check #5 and #8 --- #
+    
+    
+    # --- Table 6-2 Check #9 --- #
+    # For SampleType = Lab blank, we must require Result < MDL or less than 5% of measured concentration in sample
+    print('# Check - For Lab blank sampletypes - Result < MDL or Result < 5% of measured concentration in samples (Warning)')
+    argslist = MB_ResultLessThanMDL(results[results.analyteclass == 'Inorganics'])
+    print("done calling MB ResultLessThanMDL")
+    for args in argslist:
+        results_args.update(args)
+        warnings.append(checkData(**results_args))
+    # --- END Table 6-2 Check #9 --- #
+
+
     # ------- END Table 6-2 - Inorganics (Mercury, Selenium, Arsenic), tissue matrices (tissue and labwater) -------#
 
 
     # ------- Table 6-3 - PCBs, Chlorinated Pesticides, and PFAS, tissue matrices (tissue and labwater) -------#
+    # Check #1 - Required SampleTypes Already covered above
+
+    # Table 6-3 Check #2 - Result for the CRM sampletype (Reference - SRM 1974c Mussel Tissue) should be within 50% of certified value (70% of analytes)
+    # END Table 6-3 Check #2 - Result for the CRM sampletype (Reference - SRM 1974c Mussel Tissue) should be within 50% of certified value (70% of analytes)
+
+    # Table 6-3 Check #3 - % recovery must be 50 to 150% for at least 70% of analytes
+    # END Table 6-3 Check #3 - % recovery must be 50 to 150% for at least 70% of analytes
+
+    # Table 6-4 Check #4 Matrix spike duplicate required
+    # END Table 6-4 Check #4 Matrix spike duplicate required
+
+    # Table 6-4 Check #5 Matrix spike duplicate RPD < 50% for at least 70% of analytes
+    # END Table 6-4 Check #5 Matrix spike duplicate RPD < 50% for at least 70% of analytes
+
+
+
+    # ----- PFAS Only ----- #
+    # Table 6-3 Check #6 - Blank spiked % recovery must be 60 to 140% (PFAS ONLY)
+    # END Table 6-3 Check #6 - Blank spiked % recovery must be 60 to 140% (PFAS ONLY)
+
+    # Table 6-4 Check #7 Blank spike duplicate required (PFAS ONLY)
+    # END Table 6-4 Check #7 Blank spike duplicate required (PFAS ONLY)
+
+    # Table 6-4 Check #8 Blank spike duplicate RPD < 30% for all analytes (PFAS ONLY)
+    # END Table 6-4 Check #8 Blank spike duplicate RPD < 30% for all analytes (PFAS ONLY)
+    # ----- END PFAS Only ----- #
+
+
+    # Table 6-4 Check #9 Result must be less than 10*MDL for lab blanks
+    results_args.update({
+        "badrows": results[ (results.sampletype == 'Lab blank') & (results.result >= (results.mdl * 10))].tmp_row.tolist(),
+        "badcolumn": "Result",
+        "error_type": "Value Warning",
+        "error_message": "For Lab blanks, the result must be less than 10 times the MDL"
+    })
+    warnings.append(checkData(**results_args))
+    
+    # END Table 6-4 Check #9 Result must be less than 10*MDL
+
+
     # ------- END Table 6-3 - PCBs, Chlorinated Pesticides, and PFAS, tissue matrices (tissue and labwater) -------#
     
     return {'errors': errs, 'warnings': warnings}
