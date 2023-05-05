@@ -45,7 +45,10 @@ require([
         "rgba(117, 107, 177, 0.25)",
         "rgba(84, 39, 143, 0.25)"
     ];
-    const colorForTheSpecifiedRegionOfTheUser = '#db162f';  // fire engine red
+    const colorForTheSpecifiedRegionOfTheUser = '#f88379';  // coral pink
+    const targetLatLongColor = 
+    const actualGrabLatLongColor = 
+    const actualTrawlLineColor = 
     const strataRenderer = {
         type: "unique-value",  // autocasts as new UniqueValueRenderer()
         field: "stratum",

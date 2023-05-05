@@ -1186,7 +1186,7 @@ def chemistry(all_dfs):
         SELECT
             lu_chemcrm.analytename,
             lu_chemcrm.matrix,
-            lu_chemcrm.reference_value,
+            lu_chemcrm.certified_value,
             lu_analytes.analyteclass 
         FROM
             lu_chemcrm
@@ -1204,7 +1204,7 @@ def chemistry(all_dfs):
     if not checkdf.empty:
         checkdf['within40pct'] = checkdf.apply(
                 lambda row:
-                (0.6 * float(row.reference_value)) <= row.result <= (1.4 * float(row.reference_value)) if not pd.isnull(row.reference_value) else True
+                (0.6 * float(row.certified_value)) <= row.result <= (1.4 * float(row.certified_value)) if not pd.isnull(row.certified_value) else True
                 ,axis = 1
             )
         checkdf = checkdf.merge(
