@@ -46,9 +46,9 @@ require([
         "rgba(84, 39, 143, 0.25)"
     ];
     const colorForTheSpecifiedRegionOfTheUser = '#f88379';  // coral pink
-    const targetLatLongColor = 
-    const actualGrabLatLongColor = 
-    const actualTrawlLineColor = 
+    const targetLatLongColor = [0,255,0];
+    const actualGrabLatLongColor = [255,0,0];
+    const actualTrawlLineColor = [255,0,0];
     const strataRenderer = {
         type: "unique-value",  // autocasts as new UniqueValueRenderer()
         field: "stratum",
@@ -202,7 +202,7 @@ require([
         
         let targetStationSymbol = {
             type: "simple-marker",
-            color: [0,255,0],  // Green
+            color: targetLatLongColor,  // Green
             size: "15px",
             outline: {
                 color: [255, 255, 255], // White
@@ -212,7 +212,7 @@ require([
 
         let simpleMarkerSymbol = {
             type: "simple-marker",
-            color: [255,0,0],  // Red
+            color: actualGrabLatLongColor,  // Red
             size: "15px",
             outline: {
                 color: [255, 255, 255], // White
@@ -222,7 +222,7 @@ require([
 
         let simpleLineSymbol = {
             type: "simple-line",
-            color: [255,0,0], // RED
+            color: actualTrawlLineColor, // RED
             size: "15px",
             width: '3px'
         };
