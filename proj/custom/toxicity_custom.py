@@ -1013,13 +1013,13 @@ def toxicity(all_dfs):
         })
         errs = [*errs, checkData(**toxsummary_args)]
         
-        print("toxsummary[(toxsummary['species'].isin(['Mytilus galloprovinialis','MG'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['mean'] < 70)]")
-        print(toxsummary[(toxsummary['species'].isin(['Mytilus galloprovinialis','MG'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['mean'] < 70)])
+        print("toxsummary[(toxsummary['species'].isin(['Mytilus galloprovincialis','MG'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['mean'] < 80)]")
+        print(toxsummary[(toxsummary['species'].isin(['Mytilus galloprovincialis','MG'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['mean'] < 80)])
         toxsummary_args.update({
-            "badrows": toxsummary[(toxsummary['species'].isin(['Mytilus galloprovinialis','MG'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['mean'] < 70)].tmp_row.tolist(),
+            "badrows": toxsummary[(toxsummary['species'].isin(['Mytilus galloprovincialis','MG'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['mean'] < 80)].tmp_row.tolist(),
             "badcolumn": "mean",
             "error_type": "Undefined Error",
-            "error_message": 'Does not meet control acceptability criterion; mean control value < 70'
+            "error_message": 'Does not meet control acceptability criterion; mean control value < 80'
         })
         errs = [*errs, checkData(**toxsummary_args)]
         print("toxsummary[(toxsummary['species'].isin(['Eohaustorius estuarius','EE'])) & (toxsummary['sampletypecode'] == 'CNEG') & (toxsummary['coefficientvariance'] > 11.9)]")
