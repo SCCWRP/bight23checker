@@ -767,13 +767,95 @@ def chemistry_tissue(all_dfs):
         warnings.append(checkData(**results_args))
     # END Table 6-3 Check #2 - Result for the CRM sampletype (Reference - SRM 1974c Mussel Tissue) should be within 50% of certified value (70% of analytes)
 
+
+
     # Table 6-3 Check #3 - % recovery must be 50 to 150% for at least 70% of analytes
+    print('# Check - within an analysisbatch, Matrix spikes/Blank spikes should have 50-150% recovery of spiked mass for all analytes')
+    checkdf = results[(results.analyteclass == 'Inorganics') & results.sampletype.isin(['Matrix spike'])] \
+        .groupby(['analysisbatchid', 'sampletype', 'sampleid', 'labreplicate']) \
+        .apply(
+            lambda df: 
+            (sum( (df.percentrecovery > 50) & (df.percentrecovery < 150)) / len(df)) > 0.7
+        )
+    if not checkdf.empty:
+        checkdf = checkdf.reset_index(name = 'passed_check')
+        checkdf = results.merge(checkdf, on = ['analysisbatchid', 'sampletype', 'sampleid', 'labreplicate'], how = 'inner')
+        checkdf = checkdf[checkdf.sampletype.isin(['Matrix spike'])]
+        checkdf = checkdf[(~checkdf.passed_check) & ((checkdf.percentrecovery < 50) | (checkdf.percentrecovery > 150))]
+
+        results_args.update({
+            "badrows": checkdf.tmp_row.tolist(),
+            "badcolumn": "AnalysisBatchID, SampleType, SampleID, LabReplicate, Result",
+            "error_type": "Value Error",
+            "error_message": f"For Matrix spikes (for Organics in Tissue), all analytes should have 50-150% recovery"
+        })
+        warnings.append(checkData(**results_args))
     # END Table 6-3 Check #3 - % recovery must be 50 to 150% for at least 70% of analytes
 
     # Table 6-4 Check #4 Matrix spike duplicate required
+    print('# Check - Matrix spike duplicate required (1 per batch)')
+
+    tmp = results63pfas.groupby(['analysisbatchid', 'analytename']).apply(
+        lambda df:
+        not df[(df.sampletype == 'Matrix spike') & (df.labreplicate == 2)].empty # signifies whether or not a Matrix spike duplicate is present
+    )
+    if not tmp.empty:
+        tmp = tmp.reset_index( name = 'has_matrixspike_dup') 
+        tmp = tmp[~tmp.has_matrixspike_dup] # get batches without the matrix spike dupes
+        tmp = results63pfas.merge(tmp, on = ['analysisbatchid', 'analytename'], how = 'inner')
+        tmp = tmp.groupby(['analysisbatchid', 'analytename']).agg({'tmp_row': list})
+        if not tmp.empty:
+            tmp = tmp.reset_index()
+            for _, row in tmp.iterrows():
+                results_args.update({
+                    "badrows": row.tmp_row, # list of rows associated with the batch that doesnt have a matrix spike dup
+                    "badcolumn": "SampleType",
+                    "error_type": "Incomplete data",
+                    "error_message": f"The batch {row.analysisbatchid} is missing a matrix spike duplicate for {row.analytename}"
+                })
+                warnings.append(checkData(**results_args))
     # END Table 6-4 Check #4 Matrix spike duplicate required
 
     # Table 6-4 Check #5 Matrix spike duplicate RPD < 50% for at least 70% of analytes
+    print('# Check - Duplicate Matrix spikes must have RPD < 50% for all analytes')
+    checkdf = results63[results63.sampletype.isin(['Matrix spike'])]
+    checkdf = checkdf.groupby(['analysisbatchid', 'analyteclass', 'sampletype', 'analytename','sampleid']).apply(
+        lambda subdf:
+        abs((subdf.result.max() - subdf.result.min()) / ((subdf.result.max() + subdf.result.min()) / 2)) <= 0.5
+    )
+
+    if not checkdf.empty:
+        checkdf = checkdf.reset_index(name = 'rpd_under_50')
+        checkdf = checkdf.groupby(['analysisbatchid','analyteclass']).apply(lambda df: sum(df.rpd_under_50) / len(df) >= 0.7 )
+        if not checkdf.empty:
+            checkdf = checkdf.reset_index(name = 'passed')
+            checkdf['errmsg'] = checkdf.apply(
+                lambda row:
+                f"Duplicate Matrix spikes should have an RPD under 50% for at least 70% analytes in the batch ({row.analysisbatchid}) (for the analyteclass {row.analyteclass})"
+                , axis = 1
+            )
+            checkdf = results63[results63.sampletype.isin(['Matrix spike'])] \
+                .merge(checkdf[~checkdf.passed], on = ['analysisbatchid', 'analyteclass'], how = 'inner')
+            
+            if not checkdf.empty:
+                argslist = checkdf.groupby(['errmsg']) \
+                    .apply(lambda df: df.tmp_row.tolist()) \
+                    .reset_index(name = 'badrows') \
+                    .apply(
+                        lambda row: 
+                        {
+                            "badrows": row.badrows,
+                            "badcolumn": "Result",
+                            "error_type": "Value Error",
+                            "error_message": row.errmsg
+                        },
+                        axis = 1
+                    ).tolist()
+
+                for args in argslist:
+                    results_args.update(args)
+                    warnings.append(checkData(**results_args))
+
     # END Table 6-4 Check #5 Matrix spike duplicate RPD < 50% for at least 70% of analytes
 
 
@@ -804,33 +886,33 @@ def chemistry_tissue(all_dfs):
     # END Table 6-3 Check #6 - Blank spiked % recovery must be 60 to 140% (PFAS ONLY)
 
 
-    # Table 6-4 Check #7 Blank spike duplicate required (PFAS ONLY)
+    # Table 6-3 Check #7 Blank spike duplicate required (PFAS ONLY)
     print('# Check - Blank spike duplicate required (1 per batch)')
 
     tmp = results63pfas.groupby(['analysisbatchid', 'analytename']).apply(
         lambda df:
-        not df[(df.sampletype == 'Blank spiked') & (df.labreplicate == 2)].empty # signifies whether or not a Matrix spike duplicate is present
+        not df[(df.sampletype == 'Blank spiked') & (df.labreplicate == 2)].empty # signifies whether or not a blank spike duplicate is present
     )
     if not tmp.empty:
         tmp = tmp.reset_index( name = 'has_blankspike_dup') 
-        tmp = tmp[~tmp.has_blankspike_dup] # get batches without the matrix spike dupes
+        tmp = tmp[~tmp.has_blankspike_dup] # get batches without the blank spike dupes
         tmp = results63pfas.merge(tmp, on = ['analysisbatchid', 'analytename'], how = 'inner')
         tmp = tmp.groupby(['analysisbatchid', 'analytename']).agg({'tmp_row': list})
         if not tmp.empty:
             tmp = tmp.reset_index()
             for _, row in tmp.iterrows():
                 results_args.update({
-                    "badrows": row.tmp_row, # list of rows associated with the batch that doesnt have a matrix spike dup
+                    "badrows": row.tmp_row, # list of rows associated with the batch that doesnt have a blank spike dup
                     "badcolumn": "SampleType",
                     "error_type": "Incomplete data",
                     "error_message": f"The batch {row.analysisbatchid} is missing a blank spike duplicate for {row.analytename}"
                 })
                 warnings.append(checkData(**results_args))
-    # END Table 6-4 Check #7 Blank spike duplicate required (PFAS ONLY)
+    # END Table 6-3 Check #7 Blank spike duplicate required (PFAS ONLY)
 
 
 
-    # Table 6-4 Check #8 Blank spike duplicate RPD < 30% for all analytes (PFAS ONLY)
+    # Table 6-3 Check #8 Blank spike duplicate RPD < 30% for all analytes (PFAS ONLY)
     print('# Check - Duplicate Matrix spikes must have RPD < 30% for all analytes')
     checkdf = results63pfas[results63pfas.sampletype.isin(['Blank spiked'])]
     checkdf = checkdf.groupby(['analysisbatchid', 'analyteclass', 'sampletype', 'analytename','sampleid']).apply(
@@ -845,7 +927,7 @@ def chemistry_tissue(all_dfs):
             checkdf = checkdf.reset_index(name = 'passed')
             checkdf['errmsg'] = checkdf.apply(
                 lambda row:
-                f"Duplicate Matrix spikes/Blank spikes should have an RPD under 30% for all analytes in the batch ({row.analysisbatchid}) (for the analyteclass {row.analyteclass})"
+                f"Duplicate Blank spikes should have an RPD under 30% for all analytes in the batch ({row.analysisbatchid}) (for the analyteclass {row.analyteclass})"
                 , axis = 1
             )
             checkdf = results63pfas[results63pfas.sampletype.isin(['Blank spiked'])] \
@@ -869,11 +951,11 @@ def chemistry_tissue(all_dfs):
                 for args in argslist:
                     results_args.update(args)
                     warnings.append(checkData(**results_args))
-    # END Table 6-4 Check #8 Blank spike duplicate RPD < 30% for all analytes (PFAS ONLY)
+    # END Table 6-3 Check #8 Blank spike duplicate RPD < 30% for all analytes (PFAS ONLY)
     # ----- END PFAS Only ----- #
 
 
-    # Table 6-4 Check #9 Result must be less than 10*MDL for lab blanks
+    # Table 6-3 Check #9 Result must be less than 10*MDL for lab blanks
     results_args.update({
         "badrows": results[ (results.sampletype == 'Lab blank') & (results.result >= (results.mdl * 10))].tmp_row.tolist(),
         "badcolumn": "Result",
@@ -882,7 +964,7 @@ def chemistry_tissue(all_dfs):
     })
     warnings.append(checkData(**results_args))
     
-    # END Table 6-4 Check #9 Result must be less than 10*MDL
+    # END Table 6-3 Check #9 Result must be less than 10*MDL
 
 
     # ------- END Table 6-3 - PCBs, Chlorinated Pesticides, and PFAS, tissue matrices (tissue and labwater) -------#
