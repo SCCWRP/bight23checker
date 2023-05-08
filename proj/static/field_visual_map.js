@@ -46,9 +46,9 @@ require([
         "rgba(84, 39, 143, 0.25)"
     ];
     const colorForTheSpecifiedRegionOfTheUser = '#f88379';  // coral pink
-    const targetLatLongColor = 
-    const actualGrabLatLongColor = 
-    const actualTrawlLineColor = 
+    const targetLatLongColor = '#e7e1ef';
+    const actualGrabLatLongColor = '#dd1c77';
+    const actualTrawlLineColor = '#c994c7';
     const strataRenderer = {
         type: "unique-value",  // autocasts as new UniqueValueRenderer()
         field: "stratum",
