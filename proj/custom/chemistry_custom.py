@@ -76,22 +76,29 @@ def chemistry(all_dfs):
     # Batch and Results must have matching records on Lab, PreparationBatchID and SampleID
 
     # check records that are in batch but not in results
-    # checkLogic function will update the arguments
+    # checkLogic function is not being used since it marks incorrect rows on marked excel file return
     # Check for records in batch but not results
-    print("batch")
-    print(batch)
-    print("results")
-    print(results)
-    batch_args.update(
-        checkLogic(batch, results, ['lab','preparationbatchid'], df1_name = 'Batch', df2_name = 'Results')
-    )
+    badrows = batch[~batch[['lab','preparationbatchid']].isin(results[['lab','preparationbatchid']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    batch_args.update({
+        "badrows": badrows,
+        "badcolumn": "Lab, PreparationBatchID",
+        "error_type": "Logic Error",
+        "is_core_error": False,
+        "error_message": "Each record in Chemistry Batch must have a matching record in Chemistry Results. Records are matched on Lab and PreparationID."
+    })
     errs.append(checkData(**batch_args))
 
     # Check for records in results but not batch
-    results_args.update(
-        checkLogic(results, batch, ['lab','preparationbatchid'], df1_name = 'Results', df2_name = 'Batch')
-    )
+    badrows = results[~results[['lab','preparationbatchid']].isin(batch[['lab','preparationbatchid']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    results_args.update({
+        "badrows": badrows,
+        "badcolumn": "Lab, PreparationBatchID",
+        "error_type": "Logic Error",
+        "is_core_error": False,
+        "error_message": "Each record in Chemistry Results must have a matching record in Chemistry Batch. Records are matched on Lab and PreparationID."
+    })
     errs.append(checkData(**results_args))
+
 
     # Check to see if GrainSize was submitted along with Sediment Results
     grain_analytes = pd.read_sql("SELECT analyte FROM lu_analytes WHERE analyteclass = 'GrainSize';", eng).analyte.tolist()
