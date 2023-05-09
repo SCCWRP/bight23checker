@@ -43,7 +43,7 @@ def checkData(tablename, badrows, badcolumn, error_type, error_message = "Error"
 
 
 # checkLogic() returns indices of rows with logic errors
-def checkLogic(df1, df2, cols: list, error_type = "Logic Error", df1_name = "", df2_name = ""):
+def checkLogic(df1, df2, cols: list, error_type = "Logic Error", df1_name = "", df2_name = "", row_index_col = 'tmp_row'):
     ''' each record in df1 must have a corresponding record in df2'''
     print("checkLogic")
     assert \
@@ -63,9 +63,11 @@ def checkLogic(df1, df2, cols: list, error_type = "Logic Error", df1_name = "", 
     # 'Kristin wrote this code in ancient times.'
     lcols = [x.lower() for x in cols] # lowercase cols
     tmp_missing_val = 'missing_value'
-    badrows = df1[
+    badrowsdf = df1[
         ~df1[lcols].fillna(tmp_missing_val).isin(df2[lcols].fillna(tmp_missing_val).to_dict(orient='list')).all(axis=1)
-    ].index.tolist()
+    ]
+    
+    badrows = badrowsdf[row_index_col].tolist() if row_index_col != 'index' else badrowsdf.index.tolist()
 
     print("end checkLogic")
 
