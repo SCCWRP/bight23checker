@@ -229,7 +229,7 @@ def chemistry(all_dfs):
         "badrows": results[(results.sampletype.isin(["Lab blank","Blank spiked"])) & (~results.matrix.isin(["labwater","Ottawa sand"]))].tmp_row.tolist(),
         "badcolumn" : "matrix",
         "error_type": "Value error",
-        "error_message" : "If the sampletype is a blank, the only options for matrices would be 'labwater' or 'Ottawa sand'"
+        "error_message" : "If the sampletype is Lab blank or Blank spiked, the only options for matrices would be 'labwater' or 'Ottawa sand'"
     })
     errs.append(checkData(**results_args))
 
