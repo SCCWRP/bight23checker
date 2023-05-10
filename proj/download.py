@@ -2,6 +2,7 @@ import os, time
 from flask import send_file, Blueprint, jsonify, request, g, current_app, render_template, send_from_directory
 import pandas as pd
 from pandas import read_sql, DataFrame
+import re
 
 download = Blueprint('download', __name__)
 @download.route('/download/<submissionid>/<filename>', methods = ['GET','POST'])
@@ -214,6 +215,23 @@ def template_file():
 def data_query(export_name):
     return send_from_directory(os.path.join(os.getcwd(), "export", "data_query"), export_name, as_attachment=True)
 
+@download.route('/download/<table>', methods = ['GET','POST'])
+def get_table(table):
+    print(table)
+
+    pattern = "[^\w\s]"
+
+    if bool(re.search(pattern, table)):
+        return "special characters detected in the input"
+
+    qry = f"SELECT * FROM {table};"
+        
+    print(qry)
+    datapath = os.path.join(os.getcwd(), 'export', f'{table}.csv')
+    data = pd.read_sql(qry, g.eng)
+    data.drop(columns=[x for x in data.columns if x in current_app.system_fields]).to_csv(datapath, index=False)
+
+    return send_file(datapath, download_name = f'{table}.csv', as_attachment = True)
 
 # def template_file():
 #     filename = request.args.get('filename')
