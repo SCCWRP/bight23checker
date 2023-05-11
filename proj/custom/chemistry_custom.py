@@ -247,7 +247,7 @@ def chemistry(all_dfs):
         "badrows": badrows,
         "badcolumn": "TrueValue",
         "error_type": "Value Error",
-        "error_message": "This row is not a 'spike' or a CRM, so the TrueValue should be -88"
+        "error_message": "This row is not a Matrix spike, Blank spiked or a CRM Reference Material, so the TrueValue should be -88"
     })
     warnings.append(checkData(**results_args))
     
@@ -258,7 +258,7 @@ def chemistry(all_dfs):
         "badrows": badrows,
         "badcolumn": "TrueValue",
         "error_type": "Value Error",
-        "error_message": "This row is a 'spike' or a CRM, so the TrueValue should not be -88 (or any negative number)"
+        "error_message": "This row is a Matrix spike, Blank spiked, or a CRM Reference Material, so the TrueValue should not be -88 (or any negative number)"
     })
     warnings.append(checkData(**results_args))
 
