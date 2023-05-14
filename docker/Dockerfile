@@ -21,11 +21,11 @@ RUN pip3 install uwsgi flask ipython
 RUN pip3 install xlrd flask_session
 RUN pip3 install flask_cors
 RUN pip3 install Werkzeug
+RUN pip3 install "pandas<2.0.0" 
 RUN pip3 install "sqlalchemy<2.0.0"
 RUN pip3 install xlsxwriter
 RUN pip3 install openpyxl
 RUN pip3 install numpy 
-RUN pip3 install pandas 
 RUN pip3 install postgis
 ENV PROJ_DIR=/usr/
 RUN pip3 install fiona
@@ -76,7 +76,7 @@ RUN mkdir -p /var/www/checker/
 
 RUN pip3 install geopy
 
-RUN pip3 install "pandas<2.0"
+
 
 #CMD ["uwsgi","-s","/tmp/empachecker.sock","--uid","www-data","--gid","www-data","--manage-script-name","--mount","/checker=run:app","--chmod-socket=666"]
 # docker container run -it -d --name $1 \
