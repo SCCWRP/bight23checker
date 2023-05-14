@@ -96,4 +96,102 @@ def next_objectid(tablename, conn):
     else:
         raise Exception(f'No registration ID found for table {tablename}')
 
+# Get primary key of a table as a list of column names
+def primary_key(table, eng):
+    '''
+    table is the tablename you want the primary key for
+    eng is the database connection
+    '''
 
+    sql = f'''
+        SELECT
+            tc.TABLE_NAME,
+            C.COLUMN_NAME,
+            C.data_type 
+        FROM
+            information_schema.table_constraints tc
+            JOIN information_schema.constraint_column_usage AS ccu USING ( CONSTRAINT_SCHEMA, CONSTRAINT_NAME )
+            JOIN information_schema.COLUMNS AS C ON C.table_schema = tc.CONSTRAINT_SCHEMA 
+            AND tc.TABLE_NAME = C.TABLE_NAME 
+            AND ccu.COLUMN_NAME = C.COLUMN_NAME 
+        WHERE
+            constraint_type = 'PRIMARY KEY' 
+            AND tc.TABLE_NAME = '{table}';
+    '''
+
+    return read_sql(sql, eng).column_name.tolist()
+
+def foreign_keys(table, eng):
+    '''
+    table is the tablename you want the foreign key relationships for
+    eng is the database connection
+    '''
+
+    sql = f"""
+        SELECT
+        DISTINCT
+            kcu.column_name, 
+            ccu.table_name AS foreign_table_name
+        FROM 
+            information_schema.table_constraints AS tc 
+            JOIN information_schema.key_column_usage AS kcu
+            ON tc.constraint_name = kcu.constraint_name
+            AND tc.table_schema = kcu.table_schema
+            JOIN information_schema.constraint_column_usage AS ccu
+            ON ccu.constraint_name = tc.constraint_name
+            AND ccu.table_schema = tc.table_schema
+        WHERE tc.constraint_type = 'FOREIGN KEY' 
+        AND tc.table_name='{table}'
+        AND ccu.table_name LIKE 'lu_%%';
+    """
+
+    dat = read_sql(sql, eng)
+    return dat.set_index('column_name')['foreign_table_name'].to_dict() if not dat.empty else dict()
+
+
+def metadata_summary(table, eng):
+    sql = f"""
+        WITH fkeys AS (
+            SELECT DISTINCT
+                kcu.COLUMN_NAME,
+                ccu.TABLE_NAME AS foreign_table_name 
+            FROM
+                information_schema.table_constraints AS tc
+                JOIN information_schema.key_column_usage AS kcu ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME 
+                AND tc.table_schema = kcu.table_schema
+                JOIN information_schema.constraint_column_usage AS ccu ON ccu.CONSTRAINT_NAME = tc.CONSTRAINT_NAME 
+                AND ccu.table_schema = tc.table_schema 
+            WHERE
+                tc.constraint_type = 'FOREIGN KEY' 
+                AND tc.TABLE_NAME = '{table}' 
+                AND ccu.TABLE_NAME LIKE'lu_%%'
+            
+        ),
+        pkey AS (
+            SELECT
+                C.COLUMN_NAME,
+                'YES' AS primary_key 
+            FROM
+                information_schema.table_constraints tc
+                JOIN information_schema.constraint_column_usage AS ccu USING ( CONSTRAINT_SCHEMA, CONSTRAINT_NAME )
+                JOIN information_schema.COLUMNS AS C ON C.table_schema = tc.CONSTRAINT_SCHEMA 
+                AND tc.TABLE_NAME = C.TABLE_NAME 
+                AND ccu.COLUMN_NAME = C.COLUMN_NAME 
+            WHERE
+                constraint_type = 'PRIMARY KEY' 
+                AND tc.TABLE_NAME = '{table}' 
+        ) 
+        SELECT 
+            isc.table_name AS tablename,
+            isc.COLUMN_NAME,
+            isc.udt_name AS datatype,
+            CASE WHEN isc.is_nullable = 'NO' THEN 'YES' ELSE' NO' END AS required,
+            isc.character_maximum_length ,
+            pkey.primary_key,
+            fkeys.foreign_table_name AS lookuplist_table_name
+        FROM
+            information_schema.COLUMNS isc LEFT JOIN pkey ON isc.column_name = pkey.column_name LEFT JOIN fkeys ON fkeys.column_name = isc.column_name
+        WHERE
+            TABLE_NAME = '{table}';
+    """
+    return read_sql(sql, eng)
