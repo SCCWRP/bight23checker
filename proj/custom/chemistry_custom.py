@@ -360,7 +360,7 @@ def chemistry(all_dfs):
     results_args.update({
         "badrows": results[
             (
-                (results.qualifier.isin(['none', 'equal to'])) & (results.qualifier != 'Lab blank')
+                (results.qualifier.isin(['none', 'equal to'])) & (results.sampletype != 'Lab blank')
             ) & 
             (results.result <= results.rl)
         ].tmp_row.tolist(),
