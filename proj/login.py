@@ -95,6 +95,15 @@ def login():
     # login_info['login_startdate'] = date_range[0]
     # login_info['login_enddate'] = date_range[1]
 
+    # get whether or not they want to submit
+    # Adding the if statement in case Paul tells me to get rid of it, that way getting rid of that in the html form wont break the code here
+    if "check-or-submit" in login_info.keys():
+        # This way, final submit requested will be a bool
+        # True if they selected "Submit data" and False otherwise
+        # This will be used in Core Checks and in the javascript, so that:
+        #  1) Check for duplicates in production doesnt run (or maybe gets put as a warning)
+        #  2) Final submit button does not show if they dont want to submit
+        session['final_submit_requested'] = login_info.pop('check-or-submit') == 'submit'
 
     # Something that may or may not be specific for this project, but
     # based on the dataset, there are different login fields that are relevant
