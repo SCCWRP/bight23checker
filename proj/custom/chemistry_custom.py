@@ -366,7 +366,7 @@ def chemistry(all_dfs):
         ].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
-        "error_message": "if the qualifier is 'none' then the result must be greater than the RL"
+        "error_message": "if the qualifier is 'none' or 'equal to' then the result must be greater than the RL"
     })
     errs.append(checkData(**results_args))
 
