@@ -373,12 +373,13 @@ def chemistry(all_dfs):
     # Check - Comment is required if the qualifier says "analyst error" "contaminated" or "interference" (Error)
     print('# Check - Comment is required if the qualifier says "analyst error" "contaminated" or "interference" (Error)')
     results_args.update({
-        "badrows": results[(results.qualifier.isin(["analyst error","contaminated","interference"])) & (results.fillna('').comments == '')].tmp_row.tolist(),
+        "badrows": results[(results.qualifier.isin(["analyst error","contaminated","interference"])) & (results.comments.fillna('').str.replace('\s*','', regex = True) == '')].tmp_row.tolist(),
         "badcolumn": "Comments",
         "error_type": "Value Error",
         "error_message": "Comment is required if the qualifier says 'analyst error' 'contaminated' or 'interference'"
     })
     errs.append(checkData(**results_args))
+
     
     # Check - We would like the submitter to contact us if the qualifier says "analyst error" (Warning)
     print('# Check - We would like the submitter to contact us if the qualifier says "analyst error" (Warning)')
