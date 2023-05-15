@@ -398,7 +398,8 @@ def main():
         "submissionid": session.get("submissionid"),
         "critical_error": False,
         "all_datasets": list(current_app.datasets.keys()),
-        "table_to_tab_map" : session['table_to_tab_map']
+        "table_to_tab_map" : session['table_to_tab_map'],
+        "final_submit_requested" : session.get("final_submit_requested")
     }
     
     #print(returnvals)

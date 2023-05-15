@@ -205,6 +205,7 @@ def ocean_acidification(all_dfs):
 
     print("merging bottle and ctd")
     
+    # App is "criticaling" here because datatypes of sub_ctd and sub_bottle are not matching
     depths = sub_ctd.merge(sub_bottle, on = ['season', 'agency', 'sampledate', 'station', 'fieldrep', 'labrep'], how = 'inner')
     #result = df_bottle.merge(df_ctd, on=['sampledate','station'],how='inner')
     
