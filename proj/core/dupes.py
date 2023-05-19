@@ -85,9 +85,7 @@ def checkDuplicatesInProduction(dataframe, tablename, eng, *args, output = None,
             col = dt[0]
             typ = dt[1]
             assert len(dt) > 1, "Error in dupes - some item in current_recs.dtypes didnt have a length greater than 1"
-            # check if a primary key col is a system field, if not, then assert
-            if col not in current_app.system_fields:
-                assert col in dataframe.columns, f"supposed primary key column {col} not found in columns of the dataframe that was matched with {tablename}"
+            assert col in dataframe.columns, f"supposed primary key column {col} not found in columns of the dataframe that was matched with {tablename}"
 
             try:
                 # Coerce datatypes of primary key columns to match so that the two dataframes can merge 
