@@ -237,9 +237,9 @@ def chemistry_intercal(all_dfs):
 
     # Units checks on CRMs
     sed_mask = ((results.matrix == 'sediment') & (results.analyteclass.isin(['Chlorinated Hydrocarbons', 'PBDE', 'PCB'])))
-    unit_crm_mask = (sed_mask & (results.sampletype.str.contains('Reference', case = False))) & (results.units.isin(['ng/g dw', 'ug/kg dw']))
+    unit_crm_mask = (sed_mask & (results.sampletype.str.contains('Reference', case = False))) & (~results.units.isin(['ng/g dw', 'ug/kg dw']))
     pah_sed_mask = ((results.matrix == 'sediment') & (results.analyteclass == 'PAH'))
-    pah_unit_crm_mask = (pah_sed_mask & (results.sampletype.str.contains('Reference', case = False))) & (results.units.isin(['ug/g dw', 'mg/kg dw']))
+    pah_unit_crm_mask = (pah_sed_mask & (results.sampletype.str.contains('Reference', case = False))) & (~results.units.isin(['ug/g dw', 'mg/kg dw']))
     organic_tissue_mask = ((results.matrix == 'tissue') & (results.analyteclass != 'Inorganics'))
     metals_tissue_mask = ((results.matrix == 'tissue') & (results.analyteclass == 'Inorganics'))
 
@@ -280,7 +280,7 @@ def chemistry_intercal(all_dfs):
 
     print('# Check - If sampletype is a Reference material, the matrix cannot be "labwater" - it must be sediment')
     results_args.update({
-        "badrows": results[results.sampletype.str.contains('Reference', case = False) & (results.matrix.isin(['sediment', 'tissue']))].tmp_row.tolist(),
+        "badrows": results[results.sampletype.str.contains('Reference', case = False) & (~results.matrix.isin(['sediment', 'tissue']))].tmp_row.tolist(),
         "badcolumn": "SampleType, Matrix",
         "error_type": "Value Error",
         "error_message": f"If sampletype is a Reference material, the matrix cannot be 'labwater' - Rather, it must be sediment or tissue"
