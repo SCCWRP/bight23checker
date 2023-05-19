@@ -135,12 +135,12 @@ def clean_data(all_dfs):
     
     #disabled to test checks -- jk enabled to test submit data
     
-    print("fix case")
+    # print("fix case")
     # fix for lookup list values too, match to the lookup list value if case insensitivity is the only issue
-    all_dfs = fix_case(all_dfs)                
+    # all_dfs = fix_case(all_dfs)                
     
 
-    all_dfs = hardcoded_fixes(all_dfs)
+    # all_dfs = hardcoded_fixes(all_dfs)
 
     print('done')
     return all_dfs

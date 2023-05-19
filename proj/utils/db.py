@@ -59,7 +59,7 @@ class GeoDBDataFrame(DataFrame):
                                     # in which case we wrap in single quotes
                                     # single quotes within a string are escaped by doubling them
                                     # not by using a backslash
-                                    else "'{}'".format(str(val).replace("'","''"))  
+                                    else "'{}'".format(str(val).strip().replace("'","''"))  
                                     for val in x
                                 ]
                             )
