@@ -577,30 +577,30 @@ def chemistry(all_dfs):
     
 
 
-    # ------------------------------------------------------------------------------------------------------------#
-    print('# ------------------------------------------------------------------------------------------------------------#')
-    # Check - For analyteclass Pyrethroid - within the same analysisbatch, you cant have both:
-    print('# Check - For analyteclass Pyrethroid - within the same analysisbatch, you cant have both:')
-    # 1. "Deltamethrin/Tralomethrin" and "Deltamethrin"
-    print('# 1. "Deltamethrin/Tralomethrin" and "Deltamethrin"')
-    # 2. "Esfenvalerate/Fenvalerate" and "Esfenvalerate"
-    print('# 2. "Esfenvalerate/Fenvalerate" and "Esfenvalerate"')
-    # 3. "Permethrin, cis" and "Permethrin (cis/trans)"
-    print('# 3. "Permethrin, cis" and "Permethrin (cis/trans)"')
-    # 4. "Permethrin, trans" and "Permethrin (cis/trans)"
-    print('# 4. "Permethrin, trans" and "Permethrin (cis/trans)"')
+    # # ------------------------------------------------------------------------------------------------------------#
+    # print('# ------------------------------------------------------------------------------------------------------------#')
+    # # Check - For analyteclass Pyrethroid - within the same analysisbatch, you cant have both: - disabled since values do not exist in lookup - zaib 2may2025
+    # print('# Check - For analyteclass Pyrethroid - within the same analysisbatch, you cant have both:')
+    # # 1. "Deltamethrin/Tralomethrin" and "Deltamethrin"
+    # print('# 1. "Deltamethrin/Tralomethrin" and "Deltamethrin"')
+    # # 2. "Esfenvalerate/Fenvalerate" and "Esfenvalerate"
+    # print('# 2. "Esfenvalerate/Fenvalerate" and "Esfenvalerate"')
+    # # 3. "Permethrin, cis" and "Permethrin (cis/trans)"
+    # print('# 3. "Permethrin, cis" and "Permethrin (cis/trans)"')
+    # # 4. "Permethrin, trans" and "Permethrin (cis/trans)"
+    # print('# 4. "Permethrin, trans" and "Permethrin (cis/trans)"')
 
-    results_args.update(pyrethroid_analyte_logic_check(results, ["Deltamethrin/Tralomethrin", "Deltamethrin"]))
-    errs.append(checkData(**results_args))
-    results_args.update(pyrethroid_analyte_logic_check(results, ["Esfenvalerate/Fenvalerate", "Esfenvalerate"]))
-    errs.append(checkData(**results_args))
-    results_args.update(pyrethroid_analyte_logic_check(results, ["Permethrin, cis", "Permethrin (cis/trans)"]))
-    errs.append(checkData(**results_args))
-    results_args.update(pyrethroid_analyte_logic_check(results, ["Permethrin, trans", "Permethrin (cis/trans)"]))
-    errs.append(checkData(**results_args))
+    # results_args.update(pyrethroid_analyte_logic_check(results, ["Deltamethrin/Tralomethrin", "Deltamethrin"]))
+    # errs.append(checkData(**results_args))
+    # results_args.update(pyrethroid_analyte_logic_check(results, ["Esfenvalerate/Fenvalerate", "Esfenvalerate"]))
+    # errs.append(checkData(**results_args))
+    # results_args.update(pyrethroid_analyte_logic_check(results, ["Permethrin, cis", "Permethrin (cis/trans)"]))
+    # errs.append(checkData(**results_args))
+    # results_args.update(pyrethroid_analyte_logic_check(results, ["Permethrin, trans", "Permethrin (cis/trans)"]))
+    # errs.append(checkData(**results_args))
     
-    # END Check - For analyteclass Pyrethroid - within the same analysisbatch, you cant have both .......
-    print('# END Check - For analyteclass Pyrethroid - within the same analysisbatch, you cant have both .......')
+    # # END Check - For analyteclass Pyrethroid - within the same analysisbatch, you cant have both .......
+    # print('# END Check - For analyteclass Pyrethroid - within the same analysisbatch, you cant have both .......')
     # ------------------------------------------------------------------------------------------------------------#
     print('# ------------------------------------------------------------------------------------------------------------#')
 
