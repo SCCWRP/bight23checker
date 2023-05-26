@@ -900,7 +900,6 @@ def chemistry(all_dfs):
         # drop records where the tolerance ended up as pd.NA
         checkdf.dropna(subset = 'tolerance', inplace = True)
 
-        # stationid and sampledate essentially functions as the sampleid
         checkdf = checkdf.groupby(['analysisbatchid', 'analysismethod', 'analysismethodgroup', 'sampletype', 'analytename','sampleid', 'tolerance']).apply(
             lambda subdf:
             abs((subdf.result.max() - subdf.result.min()) / ((subdf.result.max() + subdf.result.min()) / 2))
@@ -923,7 +922,7 @@ def chemistry(all_dfs):
                         # We never multiplied RPD by 100, so it should be expressed as a decimal here
                         checkdf.apply(lambda x: x.rpd > x.tolerance, axis = 1)
                     ], 
-                    on = ['analysisbatchid','analysismethod','sampletype','analytename','stationid', 'sampledate'], 
+                    on = ['analysisbatchid','analysismethod','sampletype','analytename','sampleid'], 
                     how = 'inner'
                 )
             
