@@ -1484,7 +1484,12 @@ def chemistry(all_dfs):
             abs((subdf.result.max() - subdf.result.min()) / ((subdf.result.max() + subdf.result.min()) / 2))
         )
         if not checkdf.empty:
-            checkdf = checkdf.reset_index(name = 'rpd')
+            #checkdf = checkdf.reset_index(name = 'rpd')
+            checkdf = checkdf.reset_index()
+            checkdf = checkdf.rename(columns = {0:'rpd'})
+            print("checkdf has rpd column")
+            print(checkdf)
+  
             checkdf['errmsg'] = checkdf.apply(
                 lambda row:
                 f"Duplicate Matrix spikes should have an RPD under 30% (for TOC and TN)"
@@ -1499,24 +1504,24 @@ def chemistry(all_dfs):
                     on = ['analysisbatchid','analytename','sampleid'], 
                     how = 'inner'
                 )
-            
-            argslist = checkdf.groupby(['errmsg']) \
-                .apply(lambda df: df.tmp_row.tolist()) \
-                .reset_index(name = 'badrows') \
-                .apply(
-                    lambda row: 
-                    {
-                        "badrows": row.badrows,
-                        "badcolumn": "Result",
-                        "error_type": "Value Error",
-                        "error_message": row.errmsg
-                    },
-                    axis = 1
-                ).tolist()
-
-            for args in argslist:
-                results_args.update(args)
-                warnings.append(checkData(**results_args))
+            if not checkdf.empty:
+                argslist = checkdf.groupby(['errmsg']) \
+                    .apply(lambda df: df.tmp_row.tolist()) \
+                    .reset_index() \
+                    .rename(columns = {0:'badrows'}) \
+                    .apply(
+                        lambda row: 
+                        {
+                            "badrows": row.badrows,
+                            "badcolumn": "Result",
+                            "error_type": "Value Error",
+                            "error_message": row.errmsg
+                        },
+                        axis = 1
+                    ).tolist()
+                for args in argslist:
+                    results_args.update(args)
+                    warnings.append(checkData(**results_args))
     
     # --- END TABLE 5-6 Check #5 --- #
 
