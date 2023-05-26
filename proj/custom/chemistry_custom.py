@@ -1007,8 +1007,8 @@ def chemistry(all_dfs):
         # print('# Check - For reference materials - Result should be within 40% of the specified value (in lu_chemcrm) for 80% of the analytes')
         crmvals = pd.read_sql(
             f"""
-            SELECT analyte AS analytename, reference_value FROM lu_chemcrm 
-            WHERE analyte IN ('{"','".join(req_analytes_tbl54).replace(';','')}')
+            SELECT analytename, reference_value FROM lu_chemcrm 
+            WHERE analytename IN ('{"','".join(req_analytes_tbl54).replace(';','')}')
             AND matrix = 'sediment'
             """,
             eng
