@@ -1400,17 +1400,26 @@ def chemistry(all_dfs):
     
     # crmvals dataframe has been defined above, in section 5-3
 
-    checkdf = results[(results.analytename == 'TOC') & results.sampletype.str.contains('Reference', case = False)]
+    checkdf = results[(results.analytename == 'TOC') & (results.sampletype == 'Reference - SRM 1944 Sed')]
     if not checkdf.empty:
+        crmvals = pd.read_sql(
+            f"""
+            SELECT * FROM lu_chemcrm 
+            WHERE 
+                crm = 'Reference - SRM 1944 Sed'
+                AND analytename = 'TOC'
+            """,
+            eng
+        )
         checkdf = checkdf.merge(crmvals, on = 'analytename', how = 'left') 
-        checkdf = checkdf.assign(failedcheck = ((checkdf.reference_value * 0.8 > checkdf.result) | (checkdf.result > checkdf.reference_value * 1.2)))
+        checkdf = checkdf.assign(failedcheck = ((checkdf.certified_value * 0.8 > checkdf.result) | (checkdf.result > checkdf.certified_value * 1.2)))
 
         checkdf = checkdf[checkdf.failedcheck]
         results_args.update({
             "badrows": checkdf.tmp_row.tolist(),
             "badcolumn": "Result",
             "error_type": "Value Error",
-            "error_message": f"The result should be within 20% of the reference value in <a href=/{current_app.config.get('APP_SCRIPT_ROOT')}/scraper?action=help&layer=lu_chemcrm>lu_chemcrm</a>"
+            "error_message": f"The result should be within 20% of the certified value in <a href=/{current_app.config.get('APP_SCRIPT_ROOT')}/scraper?action=help&layer=lu_chemcrm>lu_chemcrm</a>"
         })
         warnings.append(checkData(**results_args))
 
