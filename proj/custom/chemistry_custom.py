@@ -41,6 +41,7 @@ def chemistry(all_dfs):
     )
 
     # Calculate percent recovery
+    # if truevalue is 0 - critical error: float division by zero BUG
     results['percentrecovery'] = \
         results.apply(
             lambda x: 
@@ -777,7 +778,7 @@ def chemistry(all_dfs):
             lambda df: 
             not df[(df.labreplicate == 2) & df.sampletype.isin(['Matrix spike','Result'])].empty
         ) \
-        .reset_index(names = 'has_dup')
+        .reset_index(name = 'has_dup')
 
         # identify samples where not all analytes had their duplicates
         tmp = tmp.groupby(['analysisbatchid','sampleid']).agg({'has_dup': all}).reset_index()
@@ -936,15 +937,17 @@ def chemistry(all_dfs):
                 for args in argslist:
                     results_args.update(args)
                     warnings.append(checkData(**results_args))
-            
+
 
             
         # --- END TABLE 5-3 Check --- # (# Check - Duplicate Matrix spikes (or Results) need < 20% RPD for AnalysisMethods ICPAES, EPA200.7 and EPA 6010B)
+        print("# --- END TABLE 5-3 Check --- # (# Check - Duplicate Matrix spikes (or Results) need < 20% RPD for AnalysisMethods ICPAES, EPA200.7 and EPA 6010B)")
         
         
         # --- TABLE 5-3 Check --- #
         # --- Table 5-3 - AnalysisMethods ICPAES and ICPMS, blank spike duplicates are required --- #
-        tmp_orig = results[inorg_sed_mask & tmp.analysismethod.isin([*icpaes_methods, *icpms_methods])] 
+        print("# --- Table 5-3 - AnalysisMethods ICPAES and ICPMS, blank spike duplicates are required --- #")
+        tmp_orig = results[inorg_sed_mask & results.analysismethod.isin([*icpaes_methods, *icpms_methods])] 
         tmp = tmp_orig.groupby(['analysisbatchid', 'analytename']).apply(
             lambda df:
             not df[(df.sampletype == 'Blank spiked') & (df.labreplicate == 2)].empty # signifies whether or not a blank spiked duplicate is present
@@ -969,11 +972,13 @@ def chemistry(all_dfs):
 
 
         # ------- END Table 5-3 - Inorganics, Non-tissue matrices (Sediment and labwater) -------#
+        print("# ------- END Table 5-3 - Inorganics, Non-tissue matrices (Sediment and labwater) -------#")
 
 
 
 
     # ------- Table 5-4 - PAH, Non-tissue matrices (Sediment and labwater) -------#
+    print("# ------- Table 5-4 - PAH, Non-tissue matrices (Sediment and labwater) -------#")
     # The filter mask to be used throughout the whole table 5-4 checks
     pah_sed_mask = (results.analyteclass == 'PAH') & results.matrix.isin(['sediment','labwater', 'Ottawa sand'])
 
@@ -1029,6 +1034,7 @@ def chemistry(all_dfs):
             warnings.append(checkData(**results_args))
 
         # --- END TABLE 5-4 Check #2 --- #
+        print("# --- END TABLE 5-4 Check #2 --- #")
         
         
 
@@ -1056,6 +1062,7 @@ def chemistry(all_dfs):
                     })
                     warnings.append(checkData(**results_args))
         # --- END TABLE 5-4 Check #3 --- #
+        print("# --- END TABLE 5-4 Check #3 --- #")
 
 
         
@@ -1105,6 +1112,7 @@ def chemistry(all_dfs):
                         warnings.append(checkData(**results_args))
 
         # --- END TABLE 5-4 Check #4 --- #
+        print("# --- END TABLE 5-4 Check #4 --- #")
         
         
         # --- TABLE 5-4 Check #5 and 6 --- #
@@ -1131,6 +1139,7 @@ def chemistry(all_dfs):
             })
             warnings.append(checkData(**results_args))
         # --- END TABLE 5-4 Check #5 --- #
+        print("# --- END TABLE 5-4 Check #5 --- #")
 
 
 
@@ -1170,11 +1179,13 @@ def chemistry(all_dfs):
         # --- END TABLE 5-4 Check # --- #
 
     # ------- END Table 5-4 - PAH, Non-tissue matrices (Sediment and labwater) -------#
+    print("# ------- END Table 5-4 - PAH, Non-tissue matrices (Sediment and labwater) -------#")
 
 
 
 
     # ------- Table 5-5 - Pyrethroids, PCB, PBDE, Chlorinated Hydrocarbons, Non-tissue matrices (Sediment and labwater) -------#
+    print("# ------- Table 5-5 - Pyrethroids, PCB, PBDE, Chlorinated Hydrocarbons, Non-tissue matrices (Sediment and labwater) -------#")
 
     analyteclasses55 = ['PCB','PBDE','Chlorinated Hydrocarbons','Pyrethroid','Neonicotinoids','PFAS','TIREWEAR']
     mask55 = results.analyteclass.isin(analyteclasses55)
@@ -1236,6 +1247,7 @@ def chemistry(all_dfs):
             })
             warnings.append(checkData(**results_args))
         # --- END TABLE 5-5 Check #2 --- #
+        print("# --- END TABLE 5-5 Check #2 --- #")
 
         # --- TABLE 5-5 Check #3, #6 --- #
         # Check - Matrix spike duplicate required (1 per batch)
@@ -1282,6 +1294,7 @@ def chemistry(all_dfs):
                     })
                     warnings.append(checkData(**results_args))
         # --- END TABLE 5-5 Check #3 --- #
+        print("# --- END TABLE 5-5 Check #3 --- #")
 
 
         # --- TABLE 5-5 Check #4, #7 --- #
@@ -1307,6 +1320,7 @@ def chemistry(all_dfs):
             })
             warnings.append(checkData(**results_args))
         # --- END TABLE 5-5 Check #4 --- #
+        print("# --- END TABLE 5-5 Check #4 --- #")
         
         # --- TABLE 5-5 Check #5, #8 --- #
         # Check - Duplicate Matrix spikes must have RPD < 40% for 70% of the analytes
@@ -1349,6 +1363,7 @@ def chemistry(all_dfs):
                         results_args.update(args)
                         warnings.append(checkData(**results_args))
         # --- END TABLE 5-5 Check #5 --- #
+        print("# --- END TABLE 5-5 Check #5 --- #")
 
 
 
@@ -1378,6 +1393,7 @@ def chemistry(all_dfs):
         warnings.append(checkData(**results_args))
 
         # --- END TABLE 5-5 Check #9 --- #
+        print("# --- END TABLE 5-5 Check #9 --- #")
 
         # --- TABLE 5-5 Check # --- #
         # Check - 
@@ -1397,6 +1413,7 @@ def chemistry(all_dfs):
 
     # --- TABLE 5-6 Check #2 --- #
     # Check if the value is within 20% of the CRM values (for the reference materials)
+    print("# Check if the value is within 20% of the CRM values (for the reference materials)")
     
     # crmvals dataframe has been defined above, in section 5-3
 
@@ -1424,6 +1441,7 @@ def chemistry(all_dfs):
         warnings.append(checkData(**results_args))
 
     # --- END TABLE 5-6 Check #2 --- #
+    print("# --- END TABLE 5-6 Check #2 --- #")
 
 
 
@@ -1537,6 +1555,7 @@ def chemistry(all_dfs):
 
 
     # ------- END Table 5-6 - TOC and TN, Non-tissue matrices (Sediment and labwater) -------#
+    print("# ------- END Table 5-6 - TOC and TN, Non-tissue matrices (Sediment and labwater) -------#")
 
 
     # -=======- END BIGHT CHEMISTRY QA PLAN CHECKS -=======- #  
