@@ -40,14 +40,14 @@ def chemistry(all_dfs):
         how = 'inner'
     )
 
-    # Calculate percent recovery
-    # if truevalue is 0 - critical error: float division by zero BUG
-    results['percentrecovery'] = \
-        results.apply(
-            lambda x: 
-            float(x.result)/float(x.truevalue)*100 if ('spike' in x.sampletype.lower())|('reference' in x.sampletype.lower()) else -88, 
-            axis = 1
-        )
+    # # Calculate percent recovery - moving this before Chemistry QA checks
+    # # if truevalue is 0 - critical error: float division by zero BUG
+    # results['percentrecovery'] = \
+    #     results.apply(
+    #         lambda x: 
+    #         float(x.result)/float(x.truevalue)*100 if ('spike' in x.sampletype.lower())|('reference' in x.sampletype.lower()) else -88, 
+    #         axis = 1
+    #     )
 
     # Later on we will most likely need to manipulate the labsampleid field to be what we need it to be 
     results['sampleid'] = results.labsampleid
@@ -697,6 +697,15 @@ def chemistry(all_dfs):
 
 
     # -=======- BIGHT CHEMISTRY QA PLAN CHECKS -=======- #  
+    # Percent Recovery is computed right before the QA Checks since the first stage of custom checks will issue an error for TrueValue as 0. 
+    # Calculate percent recovery
+    # if truevalue is 0 - critical error: float division by zero BUG
+    results['percentrecovery'] = \
+        results.apply(
+            lambda x: 
+            float(x.result)/float(x.truevalue)*100 if ('spike' in x.sampletype.lower())|('reference' in x.sampletype.lower()) else -88, 
+            axis = 1
+        )
 
     # ------- Table 5-3 - Inorganics, Non-tissue matrices (Sediment and labwater) -------#
 
