@@ -681,6 +681,31 @@ def chemistry(all_dfs):
     })
     # -----------------------------------------------------------------------------------------------------------------------------------
 
+    # -----------------------------------------------------------------------------------------------------------------------------------
+    # Check - For SampleType/CRM Reference Material and Matrix Sediment, Analyte must have units that match lu_chemcrm. (Error)"
+    print("# Check - For SampleType/CRM Reference Material and Matrix Sediment, Analyte must have units that match lu_chemcrm. (Error)")
+    crm_analyteclasses = pd.read_sql("SELECT DISTINCT analyteclass FROM lu_chemcrm WHERE matrix = 'sediment'", eng).analyteclass.tolist()
+    crmvals = pd.read_sql(
+        f"""
+        SELECT
+            matrix,
+            crm as sampletype, 
+            units as units_crm, 
+            analytename
+        FROM lu_chemcrm
+        """,
+        eng
+    )
+    checkdf = results.merge(crmvals, on = ['sampletype','analytename','matrix'], how = 'inner')
+    badrows = checkdf[checkdf.units != checkdf.units_crm].tmp_row.tolist()
+    results_args.update({
+        "badrows": badrows,
+        "badcolumn": "Units",
+        "error_type": "Value Error",
+        "error_message": f"For SampleTypes Reference - ERA 540 Sed and Reference SRM 1944 Sed, units must match <a href=https://nexus.sccwrp.org/bight23checker/scraper?action=help&layer=lu_chemcrm target=_blank>See the CRM Lookup list values</a>)"
+    })
+    errs.append(checkData(**results_args))
+    # -----------------------------------------------------------------------------------------------------------------------------------
     # ----- END CUSTOM CHECKS - SEDIMENT RESULTS ----- #
 
 
