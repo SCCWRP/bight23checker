@@ -49,8 +49,11 @@ def chemistry(all_dfs):
     #         axis = 1
     #     )
 
-    # Later on we will most likely need to manipulate the labsampleid field to be what we need it to be 
-    results['sampleid'] = results.labsampleid
+    
+    # sampleid should just be everything before the last occurrence of a hyphen character in the labsampleid
+    # if no hyphen, the sampleid is just the labsampleid
+    # checker_labsampleid is created in main.py for storing purposes in case it may be needed on how data is grouped for later use
+    results['sampleid'] = results.labsampleid.apply(lambda x: str(x).rpartition('-')[0 if '-' in str(x) else -1]  )
 
     batch_args = {
         "dataframe": batch,
@@ -132,6 +135,16 @@ def chemistry(all_dfs):
         "error_message": f"Your lab was not assigned to submit data for this analyteclass from this station (<a href=/{current_app.config.get('APP_SCRIPT_ROOT')}/scraper?action=help&layer=vw_sample_assignment&datatype=chemistry target=_blank>see sample assignments</a>)"
     })
     warnings.append(checkData(**results_args))
+
+    # Check - A sediment chemistry submission cannot have records with a matrix of "tissue"
+    results_args.update({
+        "badrows": results[results.matrix == 'tissue'].tmp_row.tolist(),
+        "badcolumn": "Matrix",
+        "error_type": "Logic Error",
+        "error_message": f"This is a sediment chemistry submission but this record has a matrix value of 'tissue'"
+    })
+    errs.append(checkData(**results_args))
+
 
     # ----- END LOGIC CHECKS ----- # 
     print('# ----- END LOGIC CHECKS ----- # ')
@@ -224,6 +237,22 @@ def chemistry(all_dfs):
     # No partial submissions of analyteclasses
 
     # ------------------------- Begin chemistry base checks ----------------------------- #
+
+    # Check for duplicates on stationid, sampledate, analysisbatchid, sampletype, matrix, analytename, fieldduplicate, labreplicate, SAMPLEID
+    # Cant be done in Core since there is no sampleid column that we are having them submit, but rather it is a field we create internally based off the labsampleid column
+    dupcols = ['stationid', 'sampledate', 'analysisbatchid', 'sampletype', 'matrix', 'analytename', 'fieldduplicate', 'labreplicate', 'sampleid']
+    
+    # Technically doing sort_values is unnecessary and irrelevant, 
+    #   but if you were to test the code and examine, you would see that it would put the duplicated records next to each other
+    #   duplicated() needs keep=False argument to flag all duplicated rows instead of marking last occurrence 
+    results_args.update({
+        "badrows": results.sort_values(dupcols)[results.duplicated(dupcols, keep=False)].tmp_row.tolist(),
+        "badcolumn" : 'StationID,SampleDate,AnalysisBatchID,SampleType,Matrix,AnalyteName,FieldDuplicate,LabReplicate,LabSampleID',
+        "error_type": "Value Error",
+        "error_message" : "These appear to be duplicated records that need to be distinguished with the labreplicate field (labrep 1, and labrep 2)"
+    })
+    errs.append(checkData(**results_args))
+
 
     # Check - If the sampletype is "Lab blank" or "Blank spiked" then the matrix must be labwater or Ottawa sand
     results_args.update({
@@ -486,25 +515,6 @@ def chemistry(all_dfs):
     
     # ----------------------------------------------------------------------------------------------------------------------------------#
 
-
-    # Check - For Inorganics, units must be in ug/g dw (for Reference Materials, mg/kg dw is ok too) (Error)
-    print('# Check - For Inorganics, units must be in ug/g dw (for Reference Materials, mg/kg dw is ok too) (Error)')
-    units_metals_mask = (
-        ((~results.sampletype.str.contains('Reference', case = False)) & (results.analyteclass == 'Inorganics')) 
-        & (results.units != 'ug/g dw')
-    ) 
-    units_metals_crm_mask = (
-        ((results.sampletype.str.contains('Reference', case = False)) & (results.analyteclass == 'Inorganics')) 
-        & (~results.units.isin(['mg/kg dw','ug/g dw']))
-    )
-    results_args.update({
-        "badrows": results[units_metals_mask | units_metals_crm_mask].tmp_row.tolist(),
-        "badcolumn": "Units",
-        "error_type": "Value Error",
-        "error_message": "For Inorganics, units must be in ug/g dw (for Reference Materials, mg/kg dw is ok too)"
-    })
-    errs.append(checkData(**results_args))
-
     # Check - For sampletype Lab blank, if Result is less than MDL, it must be -88
     print('# Check - For sampletype Lab blank, if Result is less than MDL, it must be -88')
     # mb_mask = Lab blank mask (lab blank is also called method blank)
@@ -615,70 +625,42 @@ def chemistry(all_dfs):
     })
     errs.append(checkData(**results_args))
     
-    
-    # -----------------------------------------------------------------------------------------------------------------------------------#
-    # Check - for PAH's, in the sediment matrix, the units must be ng/g dw (for CRM, ug/g dw or mg/kg dw are acceptable)
-    print("# Check - for PAH's, in the sediment matrix, the units must be ng/g dw (for CRM, ug/g dw or mg/kg dw are acceptable)")
-    pah_sed_mask = ((results.matrix == 'sediment') & (results.analyteclass == 'PAH'))
-    pah_unit_mask = (pah_sed_mask & (~results.sampletype.str.contains('Reference', case = False))) & (results.units != 'ng/g dw')
-    pah_unit_crm_mask = (pah_sed_mask & (results.sampletype.str.contains('Reference', case = False))) & (results.units.isin(['ug/g dw', 'mg/kg dw']))
-    
-    results_args.update({
-        "badrows": results[pah_unit_mask].tmp_row.tolist(),
-        "badcolumn": "Units",
-        "error_type": "Value Error",
-        "error_message": f"for PAH's, the units must be ng/g dw"
-    })
-    errs.append(checkData(**results_args))
-    
-    results_args.update({
-        "badrows": results[pah_unit_crm_mask].tmp_row.tolist(),
-        "badcolumn": "Units",
-        "error_type": "Value Error",
-        "error_message": f"for PAH's, and Reference Material sampletypes, the units must be in ug/g dw or mg/kg dw"
-    })
-    errs.append(checkData(**results_args))
-    # -----------------------------------------------------------------------------------------------------------------------------------#
-    
 
     # -----------------------------------------------------------------------------------------------------------------------------------#
-    # Check - for Chlorinated Hydrocarbons, PBDE, PCB in the sediment matrix, the units must be ng/g dw (for CRM, ug/kg dw is also acceptable)
-    print('# Check - for Chlorinated Hydrocarbons, PBDE, PCB in the sediment matrix, the units must be ng/g dw (for CRM, ug/kg dw is also acceptable)')
+
+    # Rewriting the Non CRM units checks (Organics and Tirewear)
+    # Check - for Chlorinated Hydrocarbons, PAH, PBDE, PCB, Pyrethroid, TIREWEAR in the sediment matrix, the units must be ng/g dw For non reference material sampletypes
+    print('# Check - for Chlorinated Hydrocarbons, PFAS, PBDE, PCB. TIREWEAR in the sediment matrix, the units must be ng/g dw For non reference material sampletypes')
     # (for matrix = sediment)
-    sed_mask = ((results.matrix == 'sediment') & (results.analyteclass.isin(['Chlorinated Hydrocarbons', 'PBDE', 'PCB'])))
-    unit_mask = (sed_mask & (~results.sampletype.str.contains('Reference', case = False))) & (results.units != 'ng/g dw')
-    unit_crm_mask = (sed_mask & (results.sampletype.str.contains('Reference', case = False))) & (results.units.isin(['ng/g dw', 'ug/kg dw']))
+    ng_over_g_analyteclasses = ['Chlorinated Hydrocarbons', 'PAH', 'PFAS', 'PBDE', 'PCB', 'Pyrethroid', 'TIREWEAR']
+    ng_over_g_mask =  (results.analyteclass.isin(ng_over_g_analyteclasses))
+    unit_mask = (ng_over_g_mask & (~results.sampletype.str.contains('Reference', case = False))) & (results.units != 'ng/g dw')
     
     results_args.update({
         "badrows": results[unit_mask].tmp_row.tolist(),
         "badcolumn": "Units",
         "error_type": "Value Error",
-        "error_message": f"for Chlorinated Hydrocarbons, PBDE, PCB, the units must be ng/g dw"
+        "error_message": f"For {','.join(ng_over_g_analyteclasses)} the units must be ng/g dw"
     })
     errs.append(checkData(**results_args))
+
+    # Rewriting the Non CRM units checks (Inorganics)
+    # Check - for Inorganics (aka Metals) in the sediment matrix, the units must be ug/g dw For non reference material sampletypes
+    print('# Check - for Inorganics (aka Metals) in the sediment matrix, the units must be ug/g dw For non reference material sampletypes')
+    # (for matrix = sediment)
+    ug_over_g_analyteclasses = ['Inorganics']
+    ug_over_g_mask =  (results.analyteclass.isin(ug_over_g_analyteclasses))
+    unit_mask = (ug_over_g_mask & (~results.sampletype.str.contains('Reference', case = False))) & (results.units != 'ug/g dw')
     
     results_args.update({
-        "badrows": results[unit_crm_mask].tmp_row.tolist(),
+        "badrows": results[unit_mask].tmp_row.tolist(),
         "badcolumn": "Units",
         "error_type": "Value Error",
-        "error_message": f"for Chlorinated Hydrocarbons, PBDE, PCB (Reference Material sampletypes), the units must be in ng/g dw or ug/kg dw"
+        "error_message": f"For {(', ').join(ug_over_g_analyteclasses)} the units must be ug/g dw"
     })
     errs.append(checkData(**results_args))
     # -----------------------------------------------------------------------------------------------------------------------------------#
 
-
-
-    # -----------------------------------------------------------------------------------------------------------------------------------#
-    # Check - for Pyrethroid, in the sediment matrix, the units must be ng/g dw
-    print('# Check - for Pyrethroid, in the sediment matrix, the units must be ng/g dw')
-    fip_pyre_mask = ((results.matrix == 'sediment') & (results.analyteclass.isin(['Pyrethroid']))) & (results.units != 'ng/g dw')
-    
-    results_args.update({
-        "badrows": results[fip_pyre_mask].tmp_row.tolist(),
-        "badcolumn": "Units",
-        "error_type": "Value Error",
-        "error_message": f"for Pyrethroid (where matrix = sediment), the units must be ng/g dw"
-    })
     # -----------------------------------------------------------------------------------------------------------------------------------
 
     # -----------------------------------------------------------------------------------------------------------------------------------
@@ -702,7 +684,22 @@ def chemistry(all_dfs):
         "badrows": badrows,
         "badcolumn": "Units",
         "error_type": "Value Error",
-        "error_message": f"For SampleTypes Reference - ERA 540 Sed and Reference SRM 1944 Sed, units must match <a href=https://nexus.sccwrp.org/bight23checker/scraper?action=help&layer=lu_chemcrm target=_blank>See the CRM Lookup list values</a>)"
+        "error_message": f"For SampleTypes Reference - ERA 540 Sed and Reference SRM 1944 Sed, units must match those in the reference material document. <a href=/{current_app.script_root}/scraper?action=help&layer=lu_chemcrm target=_blank>See the CRM Lookup list values</a>)"
+    })
+    errs.append(checkData(**results_args))
+
+    # Check - For sediment matrix, sampletype CRM cannot be a tissue Reference Material
+    # Get the tissue CRMs from the lookup list (this way if we ever decide to change their names we dont need to change any code)
+    forbidden_crms = pd.read_sql("""SELECT DISTINCT crm FROM lu_chemcrm WHERE matrix = 'tissue';""", eng)
+    assert not forbidden_crms.empty, "CRM lookup list lu_chemcrm has no reference materials for the tissue matrix. Check the table in the database, it is likely not configured correctly"
+    
+    forbidden_crms = forbidden_crms.crm.tolist()
+    
+    results_args.update({
+        "badrows": results[results.sampletype.isin(forbidden_crms)].tmp_row.tolist(),
+        "badcolumn": "SampleType",
+        "error_type": "Value Error",
+        "error_message": f"You are making a sediment chemistry submission but this Reference Material is for Mussel Tissue"
     })
     errs.append(checkData(**results_args))
     # -----------------------------------------------------------------------------------------------------------------------------------
@@ -788,7 +785,7 @@ def chemistry(all_dfs):
             "badrows": badrows,
             "badcolumn": "Result",
             "error_type": "Value Error",
-            "error_message": f"The value here is outside the PT performance limits for ERA 540 (<a href=https://nexus.sccwrp.org/bight23checker/scraper?action=help&layer=lu_chemcrm target=_blank>See the CRM Lookup lsit values</a>)"
+            "error_message": f"The value here is outside the PT performance limits for ERA 540 (<a href=/{current_app.script_root}/scraper?action=help&layer=lu_chemcrm target=_blank>See the CRM Lookup lsit values</a>)"
         })
         warnings.append(checkData(**results_args))
         # --- END TABLE 5-3 Check #2 --- #
