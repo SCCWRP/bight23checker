@@ -123,7 +123,7 @@ def chemistry_tissue(all_dfs):
         "error_type": "Logic Error",
         "error_message": f"This is a tissue chemistry submission but this record has a matrix value of 'sediment'"
     })
-    warnings.append(checkData(**results_args))
+    errs.append(checkData(**results_args))
 
     # ----- END LOGIC CHECKS ----- # 
     print('# ----- END LOGIC CHECKS ----- # ')
