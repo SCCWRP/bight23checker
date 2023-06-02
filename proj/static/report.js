@@ -118,7 +118,7 @@ const buildReport = (res) => {
                             ${e.error_message}
                         </div>
                         <div class="errors-report-cell error-description-list-item col-sm">
-                            <span id="error-row-numbers-${i}"> ${e.rows.join(", ") }</span>
+                            <span id="error-row-numbers-${i}"> ${e.rows.sort((a, b) => a - b).join(", ") }</span>
                         </div>
                         <div class="errors-report-cell error-description-list-item col-sm">
                             <button class="btn btn-secondary hide-row-numbers-btn" data-role="hide" data-error-type="error" data-iteration-number="${i}">
@@ -217,7 +217,7 @@ const buildReport = (res) => {
                             ${e.error_message}
                         </div>
                         <div class="warnings-report-cell error-description-list-item col-sm">
-                            <span id="warning-row-numbers-${i}"> ${e.rows.join(", ") }</span>
+                            <span id="warning-row-numbers-${i}"> ${e.rows.sort((a, b) => a - b).join(", ") }</span>
                         </div>
                         <div class="warnings-report-cell error-description-list-item col-sm">
                             <button class="btn btn-secondary hide-row-numbers-btn" data-role="hide" data-error-type="warning" data-iteration-number="${i}">

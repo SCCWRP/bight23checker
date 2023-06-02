@@ -120,7 +120,13 @@ def fix_case(all_dfs: dict):
 # because every project will have those non-generalizable, one off, "have to hard code" kind of fixes
 # and this project is no exception
 def hardcoded_fixes(all_dfs):
-    
+    if 'tbl_chemresults' in all_dfs.keys():
+        all_dfs['tbl_chemresults']['units'] = all_dfs['tbl_chemresults'] \
+            .apply(
+                lambda row: str(row.units).replace('ug/kg ww','ng/g ww').replace('ug/kg dw','ng/g dw') if not ('Reference' in str(row.sampletype)) else row.units, 
+                axis = 1
+            )
+    print('hardcorde fixes - done')
     return all_dfs
 
 
