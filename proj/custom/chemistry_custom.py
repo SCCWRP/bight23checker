@@ -406,17 +406,19 @@ def chemistry(all_dfs):
     # TOC: Method blank, Reference Material
     error_args = []
     
+    # Robert - Removed 1944 Sed from required sampletypes
+    # @Zaib there is that check below that uses the "check_required_crm" function - does it work?
     required_sampletypes = {
         "Inorganics": ['Lab blank', 'Blank spiked', 'Result','Reference - ERA 540 Sed'],
-        "PAH": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result', 'Reference - SRM 1944 Sed'],
-        "PCB": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result', 'Reference - SRM 1944 Sed'],
-        "Chlorinated Hydrocarbons": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result', 'Reference - SRM 1944 Sed'],
-        "PBDE": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result', 'Reference - SRM 1944 Sed'],
+        "PAH": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
+        "PCB": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
+        "Chlorinated Hydrocarbons": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
+        "PBDE": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
         "Pyrethroid": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
         "Neonicotinoids": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
         "TIREWEAR": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
         "TN" : ['Lab blank', 'Result'],
-        "TOC" : ['Lab blank', 'Result', 'Reference - SRM 1944 Sed']
+        "TOC" : ['Lab blank', 'Result']
     }
 
     # anltclass = analyteclass
@@ -484,7 +486,7 @@ def chemistry(all_dfs):
 
     
     
-    # ----------------------------------------------------------------------------------------------------------------------------------#
+    # ---------------------------------------------------------------------------------------------------------------------------------- #
 
 
     # Check - For Inorganics, units must be in ug/g dw (for Reference Materials, mg/kg dw is ok too) (Error)
