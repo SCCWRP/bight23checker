@@ -175,12 +175,12 @@ def chemistry_tissue(all_dfs):
 
     # Check - Result column should be a positive number (except -88) for SampleType == 'Result' (Error)
     print("""# Check - Result column should be a positive number (except -88) for SampleType == 'Result' (Error)""")
-    badrows = results[(results.sampletype == 'Result') & (results.result != -88) & (results.result <= 0)].tmp_row.tolist()
+    badrows = results[(results.result != -88) & (results.result <= 0)].tmp_row.tolist()
     results_args.update({
         "badrows": badrows,
         "badcolumn": "Result",
         "error_type": "Value Error",
-        "error_message": "The Result column (for SampleType = 'Result') should be a positive number (unless it is -88)"
+        "error_message": "The Result column for all SampleTypes should be a positive number (unless it is -88)"
     })
     errs.append(checkData(**results_args))
 
