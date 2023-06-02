@@ -281,14 +281,15 @@ def chemistry(all_dfs):
     })
     warnings.append(checkData(**results_args))
     
-    # badrows here could be considered as ones that ARE CRM's / spikes, but the TrueValue is missing (Warning)
-    print('# badrows here could be considered as ones that ARE CRMs / spikes, but the TrueValue is missing (Warning)')
-    badrows = results[(spike_mask) & ((results.truevalue <= 0) | results.truevalue.isnull())].tmp_row.tolist()
+    # badrows here could be considered as ones that ARE spikes (matrix spike and blank spiked), but the TrueValue is missing (Warning)
+    print('# badrows here could be considered as ones that ARE spikes (matrix spike and blank spiked), but the TrueValue is missing (Warning)')
+    spike_only_mask = results.sampletype.str.contains('spike', case = False)
+    badrows = results[(spike_only_mask) & ((results.truevalue <= 0) | results.truevalue.isnull())].tmp_row.tolist()
     results_args.update({
         "badrows": badrows,
         "badcolumn": "TrueValue",
         "error_type": "Value Error",
-        "error_message": "This row is a Matrix spike, Blank spiked, or a CRM Reference Material, so the TrueValue should not be -88 (or any negative number)"
+        "error_message": "This row is a Matrix spike or Blank spiked, so the TrueValue should not be -88 (or any negative number)"
     })
     warnings.append(checkData(**results_args))
 
