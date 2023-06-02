@@ -28,7 +28,7 @@ def chemistry_tissue(all_dfs):
     warnings = []
 
     batch = all_dfs['tbl_chembatch']
-    results = all_dfs['tbl_chemresults']
+    results = all_dfs['tbl_chemresults_tissue']
 
     batch['tmp_row'] = batch.index
     results['tmp_row'] = results.index
@@ -63,7 +63,7 @@ def chemistry_tissue(all_dfs):
 
     results_args = {
         "dataframe": results,
-        "tablename": 'tbl_chemresults',
+        "tablename": 'tbl_chemresults_tissue',
         "badrows": [],
         "badcolumn": "",
         "error_type": "",
@@ -82,28 +82,38 @@ def chemistry_tissue(all_dfs):
     print(batch)
     print("results")
     print(results)
-    batch_args.update(
-        checkLogic(batch, results, ['lab','preparationbatchid'], df1_name = 'Batch', df2_name = 'Results')
-    )
+    badrows = batch[~batch[['lab','preparationbatchid']].isin(results[['lab','preparationbatchid']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    batch_args.update({
+        "badrows": badrows,
+        "badcolumn": "Lab, PreparationBatchID",
+        "error_type": "Logic Error",
+        "is_core_error": False,
+        "error_message": "Each record in Chemistry Batch must have a matching record in Chemistry Results. Records are matched on Lab and PreparationID."
+    })
     errs.append(checkData(**batch_args))
 
     # Check for records in results but not batch
-    results_args.update(
-        checkLogic(results, batch, ['lab','preparationbatchid'], df1_name = 'Results', df2_name = 'Batch')
-    )
-    errs.append(checkData(**results_args))
-
-
-    # Sample Assignment check - make sure they were assigned the analyteclasses that they are submitting
-    badrows = sample_assignment_check(eng = eng, df = results, parameter_column = 'analyteclass')
-    
+    badrows = results[~results[['lab','preparationbatchid']].isin(batch[['lab','preparationbatchid']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
     results_args.update({
         "badrows": badrows,
-        "badcolumn": "StationID,Lab,AnalyteName",
+        "badcolumn": "Lab, PreparationBatchID",
         "error_type": "Logic Error",
-        "error_message": f"Your lab was not assigned to submit data for this analyteclass from this station (<a href=/{current_app.config.get('APP_SCRIPT_ROOT')}/scraper?action=help&layer=vw_sample_assignment&datatype=chemistry target=_blank>see sample assignments</a>)"
+        "is_core_error": False,
+        "error_message": "Each record in Chemistry Results must have a matching record in Chemistry Batch. Records are matched on Lab and PreparationID."
     })
-    warnings.append(checkData(**results_args))
+    errs.append(checkData(**results_args))
+
+    # # commented out since tbl_chemresults_tissue DOES NOT have a stationid column - zaib 2june2023
+    # # Sample Assignment check - make sure they were assigned the analyteclasses that they are submitting
+    # badrows = sample_assignment_check(eng = eng, df = results, parameter_column = 'analyteclass')
+    
+    # results_args.update({
+    #     "badrows": badrows,
+    #     "badcolumn": "StationID,Lab,AnalyteName",
+    #     "error_type": "Logic Error",
+    #     "error_message": f"Your lab was not assigned to submit data for this analyteclass from this station (<a href=/{current_app.config.get('APP_SCRIPT_ROOT')}/scraper?action=help&layer=vw_sample_assignment&datatype=chemistry target=_blank>see sample assignments</a>)"
+    # })
+    # warnings.append(checkData(**results_args))
 
     # May 28, 2023 - Robert
     # Check - A tissue chemistry submission cannot have records with a matrix of "sediment"
@@ -517,8 +527,9 @@ def chemistry_tissue(all_dfs):
     metals_tissue_mask = (results.analyteclass == 'Inorganics')
     
     # Non reference materials units must be ug/g ww for the tissue matrix (metals)
+    print('# Non reference materials units must be ug/g ww for the tissue matrix (metals)')
     results_args.update({
-        "badrows": results[ (metals_tissue_mask & (~results.sampletype.str.contains('Reference', case = False))) & (~results.units.isin('ug/g ww')) ].tmp_row.tolist(),
+        "badrows": results[ (metals_tissue_mask & (~results.sampletype.str.contains('Reference', case = False))) & (~results.units.isin(['ug/g ww'])) ].tmp_row.tolist(),
         "badcolumn": "Units",
         "error_type": "Value Error",
         "error_message": f"For metals in Mussel Tissue, units must be ug/g ww for non Reference material sampletypes"
@@ -527,8 +538,9 @@ def chemistry_tissue(all_dfs):
     
 
     # Non reference materials units must be ng/g ww for the tissue matrix (organics)
+    print('# Non reference materials units must be ng/g ww for the tissue matrix (organics)')
     results_args.update({
-        "badrows": results[ (organic_tissue_mask & (~results.sampletype.str.contains('Reference', case = False))) & (~results.units.isin('ng/g ww')) ].tmp_row.tolist(),
+        "badrows": results[ (organic_tissue_mask & (~results.sampletype.str.contains('Reference', case = False))) & (~results.units.isin(['ng/g ww'])) ].tmp_row.tolist(),
         "badcolumn": "Units",
         "error_type": "Value Error",
         "error_message": f"For organics in Mussel Tissue, units must be ng/g ww for non Reference material sampletypes"
@@ -590,8 +602,9 @@ def chemistry_tissue(all_dfs):
     # If there are errors, dont waste time with the QA plan checks
 
     # For testing, let us not enforce this, or we will waste a lot of time cleaning data
-    # if errs != []:
-    #     return {'errors': errs, 'warnings': warnings}
+    # uncommented to test basic chemistry tissue checks - zaib 2june2023
+    if errs != []:
+        return {'errors': errs, 'warnings': warnings}
 
 
 
