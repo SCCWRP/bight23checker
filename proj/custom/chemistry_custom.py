@@ -254,12 +254,12 @@ def chemistry(all_dfs):
     errs.append(checkData(**results_args))
 
 
-    # Check - If the sampletype is "Lab blank" or "Blank spiked" then the matrix must be labwater or Ottawa sand
+    # Check - If the sampletype is "Lab blank" or "Blank spiked" then the matrix must be labwater    
     results_args.update({
-        "badrows": results[(results.sampletype.isin(["Lab blank","Blank spiked"])) & (~results.matrix.isin(["labwater","Ottawa sand"]))].tmp_row.tolist(),
+        "badrows": results[(results.sampletype.isin(["Lab blank","Blank spiked"])) & (~results.matrix.isin(["labwater"]))].tmp_row.tolist(),
         "badcolumn" : "matrix",
         "error_type": "Value error",
-        "error_message" : "If the sampletype is Lab blank or Blank spiked, the only options for matrices would be 'labwater' or 'Ottawa sand'"
+        "error_message" : "If the sampletype is Lab blank or Blank spiked, the matrix must be 'labwater'"
     })
     errs.append(checkData(**results_args))
 
@@ -748,7 +748,7 @@ def chemistry(all_dfs):
     #   (if that batch is analyzing inorganics) (ERROR)
 
     # The filter mask to be used throughout the whole table 5-3 checks
-    inorg_sed_mask = (results.analyteclass == 'Inorganics') & results.matrix.isin(['sediment','labwater', 'Ottawa sand'])
+    inorg_sed_mask = (results.analyteclass == 'Inorganics') & results.matrix.isin(['sediment','labwater'])
 
 
     # --- END TABLE 5-3 Check #1 --- #
@@ -1012,7 +1012,7 @@ def chemistry(all_dfs):
     # ------- Table 5-4 - PAH, Non-tissue matrices (Sediment and labwater) -------#
     print("# ------- Table 5-4 - PAH, Non-tissue matrices (Sediment and labwater) -------#")
     # The filter mask to be used throughout the whole table 5-4 checks
-    pah_sed_mask = (results.analyteclass == 'PAH') & results.matrix.isin(['sediment','labwater', 'Ottawa sand'])
+    pah_sed_mask = (results.analyteclass == 'PAH') & results.matrix.isin(['sediment','labwater'])
 
 
     if not results[pah_sed_mask].empty:
