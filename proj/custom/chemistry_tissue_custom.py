@@ -115,7 +115,6 @@ def chemistry_tissue(all_dfs):
     # })
     # warnings.append(checkData(**results_args))
 
-    # May 28, 2023 - Robert
     # Check - A tissue chemistry submission cannot have records with a matrix of "sediment"
     results_args.update({
         "badrows": results[results.matrix == 'sediment'].tmp_row.tolist(),
@@ -133,12 +132,12 @@ def chemistry_tissue(all_dfs):
     # ----- CUSTOM CHECKS - TISSUE RESULTS ----- #
     print('# ----- CUSTOM CHECKS - TISSUE RESULTS ----- #')
 
-    # Check - If the sampletype is "Lab blank" or "Blank spiked" then the matrix must be labwater or Ottawa sand
+    # Check - If the sampletype is "Lab blank" or "Blank spiked" then the matrix must be labwater
     results_args.update({
-        "badrows": results[(results.sampletype.isin(["Lab blank","Blank spiked"])) & (~results.matrix.isin(["labwater","Ottawa sand"]))].tmp_row.tolist(),
-        "badcolumn" : "matrix",
+        "badrows": results[(results.sampletype.isin(["Lab blank","Blank spiked"])) & (~results.matrix.isin(["labwater"]))].tmp_row.tolist(),
+        "badcolumn" : "Matrix",
         "error_type": "Value error",
-        "error_message" : "If the sampletype is a blank, the only options for matrices would be 'labwater' or 'Ottawa sand'"
+        "error_message" : "If the SampleType is Lab blank or Blank spiked, the matrix must be 'labwater'"
     })
     errs.append(checkData(**results_args))
 
