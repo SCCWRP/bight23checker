@@ -127,8 +127,58 @@ def chemistry_tissue(all_dfs):
     # ----- END LOGIC CHECKS ----- # 
     print('# ----- END LOGIC CHECKS ----- # ')
 
-   
+    # ----- CUSTOM CHECKS - TISSUE RESULTS ----- #
+    print('# ----- CUSTOM CHECKS - SEDIMENT RESULTS ----- #')
 
+    # Check for All required analytes per bioaccumulationsampleid (All or nothing)
+    current_matrix = 'tissue' #sediment or tissue - affects query for required analytes
+    # sediment uses stationid, but tissue uses bioaccumulationsampleid (in place of stationid)
+    # Check for all required analytes per bioaccumulationsampleid - if a bioaccumulationsampleid has a certain analyteclass
+    req_anlts = pd.read_sql(f"SELECT analyte AS analytename, analyteclass FROM lu_analytes WHERE b23{current_matrix}='yes'", eng) \
+        .groupby('analyteclass')['analytename'] \
+        .apply(set) \
+        .to_dict()
+    
+    print(" ============ TESTING THE NO PARTIAL SUBMISSION CHECK ==== YAAAAAAAAAAA ==========")
+    print(" ================================================================================= ")
+    print("req_anlts")
+    print(req_anlts)
+    
+    chkdf = results.groupby(['bioaccumulationsampleid','analyteclass'])['analytename'].apply(set).reset_index()
+    print("chkdf")
+    print(chkdf)
+    chkdf['missing_analytes'] = chkdf.apply(
+        lambda row: ', '.join(list((req_anlts.get(row.analyteclass) if req_anlts.get(row.analyteclass) is not None else set()) - row.analytename)), axis = 1 
+    )
+
+    chkdf = chkdf[chkdf.missing_analytes != set()]
+    print("chkdf")
+    print(chkdf)
+
+    if not chkdf.empty:
+        print("inside if chkdf not empty")
+        chkdf = results.merge(chkdf[chkdf.missing_analytes != ''], how = 'inner', on = ['bioaccumulationsampleid','analyteclass'])
+        print("chkdf")
+        print(chkdf)
+        chkdf = chkdf.groupby(['bioaccumulationsampleid','analyteclass','missing_analytes']).agg({'tmp_row': list}).reset_index()
+        errs_args = chkdf.apply(
+            lambda row:
+            {
+                "badrows": row.tmp_row,
+                "badcolumn" : "BioAccumulationSampleID",
+                "error_type": "missing_data",
+                "error_message" : f"For the BioAccumulationSampleID {row.bioaccumulationsampleid}, you attempted to submit {row.analyteclass} but are missing some required analytes ({row.missing_analytes})"
+            },
+            axis = 1
+        ).tolist()
+
+        for argset in errs_args:
+            results_args.update(argset)
+            errs.append(checkData(**results_args))
+    # End of checking all required analytes per station, if they attempted submission of an analyteclass
+    # No partial submissions of analyteclasses
+   
+    # ------------------------- Begin chemistry base checks ----------------------------- #
     # ----- CUSTOM CHECKS - TISSUE RESULTS ----- #
     print('# ----- CUSTOM CHECKS - TISSUE RESULTS ----- #')
 
