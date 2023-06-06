@@ -347,7 +347,6 @@ def chemistry(all_dfs):
     errs.append(checkData(**results_args))
 
 
-    
     # Check - if the qualifier is "less than" or "below method detection limit" Then the result must be -88 (Error)
     print('# Check - if the qualifier is "less than" or "below method detection limit" Then the result must be -88 (Error)')
     results_args.update({
@@ -358,8 +357,8 @@ def chemistry(all_dfs):
     })
     errs.append(checkData(**results_args))
 
-    # Check - if the qualifier is "estimated" or "below reporting level" then the result must be between the mdl and rl (inclusive) (Error)
-    print('# Check - if the qualifier is "estimated" or "below reporting level" then the result must be between the mdl and rl (inclusive) (Error)')
+    # Check - if the qualifier is "estimated" or "below reporting level" then the result must be between the mdl and rl (inclusive) EXCEPT Lab blank sampletypes (Error)
+    print('# Check - if the qualifier is "estimated" or "below reporting level" then the result must be between the mdl and rl (inclusive) EXCEPT Lab blank sampletypes (Error)')
     results_args.update({
         "badrows": results[
                 ((results.qualifier.isin(["estimated", "below reporting level"])) & (results.sampletype != 'Lab blank'))

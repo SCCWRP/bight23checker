@@ -271,12 +271,11 @@ def chemistry_tissue(all_dfs):
         "badrows": results[(results.result > results.rl) & (results.qualifier.isin(['below reporting limit','below method detection limit']))].tmp_row.tolist(),
         "badcolumn": "Qualifier",
         "error_type": "Value Error",
-        "error_message": """if result > RL then the qualifier cannot say 'below reporting limit' or 'below method detection limit'"""
+        "error_message": """If result > RL then the qualifier cannot say 'below reporting limit' or 'below method detection limit'."""
     })
     errs.append(checkData(**results_args))
 
 
-    
     # Check - if the qualifier is "less than" or "below method detection limit" Then the result must be -88 (Error)
     print('# Check - if the qualifier is "less than" or "below method detection limit" Then the result must be -88 (Error)')
     results_args.update({
@@ -287,8 +286,8 @@ def chemistry_tissue(all_dfs):
     })
     errs.append(checkData(**results_args))
 
-    # Check - if the qualifier is "estimated" or "below reporting level" then the result must be between the mdl and rl (inclusive) (Error)
-    print('# Check - if the qualifier is "estimated" or "below reporting level" then the result must be between the mdl and rl (inclusive) (Error)')
+    # Check - if the qualifier is "estimated" or "below reporting level" then the result must be between the mdl and rl (inclusive) EXCEPT Lab blank sampletypes (Error)
+    print('# Check - if the qualifier is "estimated" or "below reporting level" then the result must be between the mdl and rl (inclusive) EXCEPT Lab blank sampletypes (Error)')
     results_args.update({
         "badrows": results[
                 ((results.qualifier.isin(["estimated", "below reporting level"])) & (results.sampletype != 'Lab blank'))
@@ -298,7 +297,7 @@ def chemistry_tissue(all_dfs):
             ].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
-        "error_message": "If the Qualifier is 'estimated' or 'below reporting level' then the Result should be between the MDL and RL (Inclusive)"
+        "error_message": "If the Qualifier is 'estimated' or 'below reporting level' then the Result should be between the MDL and RL (Inclusive). (This does not apply to Lab blanks.)"
     })
     errs.append(checkData(**results_args))
     
