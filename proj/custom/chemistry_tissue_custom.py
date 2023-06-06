@@ -305,7 +305,7 @@ def chemistry_tissue(all_dfs):
     print('# Check - if the qualifier is less than or equal to, below mdl, below reporting limit, or estimated, but the result > rl, then the wrong qualifier was used')
     results_args.update({
         "badrows": results[
-                (results.qualifier.isin(["estimated", "below reporting limit", "below method detection limit", "estimated"])) 
+                (results.qualifier.isin(["less than or equal to", "below reporting limit", "below method detection limit", "estimated"])) 
                 & (results.result > results.rl)
             ].tmp_row.tolist(),
         "badcolumn": "Qualifier",
@@ -325,7 +325,7 @@ def chemistry_tissue(all_dfs):
         ].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
-        "error_message": "if the qualifier is 'none' then the result must be greater than the RL"
+        "error_message": "if the qualifier is 'none' or 'equal to' then the result must be greater than the RL. (This does not apply to Lab blanks.)"
     })
     errs.append(checkData(**results_args))
 
