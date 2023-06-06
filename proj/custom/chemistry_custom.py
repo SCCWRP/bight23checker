@@ -347,13 +347,13 @@ def chemistry(all_dfs):
     errs.append(checkData(**results_args))
 
 
-    # Check - if the qualifier is "less than" or "below method detection limit" Then the result must be -88 (Error)
-    print('# Check - if the qualifier is "less than" or "below method detection limit" Then the result must be -88 (Error)')
+    # Check - if the qualifier is "less than or equal to" or "below method detection limit" Then the result must be -88 (Error)
+    print('# Check - if the qualifier is "less than or equal to" or "below method detection limit" Then the result must be -88 (Error)')
     results_args.update({
-        "badrows": results[results.qualifier.isin(["less than", "below method detection limit"]) & (results.result.astype(float) != -88)].tmp_row.tolist(),
+        "badrows": results[results.qualifier.isin(["less than or equal to", "below method detection limit"]) & (results.result.astype(float) != -88)].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
-        "error_message": "If the Qualifier is 'less than' or 'below method detection limit' then the Result should be -88"
+        "error_message": "If the Qualifier is 'less than or equal to' or 'below method detection limit' then the Result should be -88"
     })
     errs.append(checkData(**results_args))
 
@@ -372,16 +372,16 @@ def chemistry(all_dfs):
     })
     errs.append(checkData(**results_args))
     
-    # Check - if the qualifier is less than, below mdl, below reporting level, or estimated, but the result > rl, then the wrong qualifier was used
-    print('# Check - if the qualifier is less than, below mdl, below reporting level, or estimated, but the result > rl, then the wrong qualifier was used')
+    # Check - if the qualifier is less than or equal to, below mdl, below reporting level, or estimated, but the result > rl, then the wrong qualifier was used
+    print('# Check - if the qualifier is less than or equal to, below mdl, below reporting level, or estimated, but the result > rl, then the wrong qualifier was used')
     results_args.update({
         "badrows": results[
-                (results.qualifier.isin(["estimated", "below reporting level", "below method detection limit", "estimated"])) 
+                (results.qualifier.isin(["less than or equal to", "below reporting level", "below method detection limit", "estimated"])) 
                 & (results.result > results.rl)
             ].tmp_row.tolist(),
         "badcolumn": "Qualifier",
         "error_type": "Value Error",
-        "error_message": "if qualifier is 'less than', 'below method detection limit', 'below reporting level' or 'estimated', but the Result > RL, then the incorrect qualifier was used"
+        "error_message": "if qualifier is 'less than or equal to', 'below method detection limit', 'below reporting level' or 'estimated', but the Result > RL, then the incorrect qualifier was used"
     })
     errs.append(checkData(**results_args))
 
