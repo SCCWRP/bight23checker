@@ -138,11 +138,7 @@ def chemistry_tissue(all_dfs):
         .groupby('analyteclass')['analytename'] \
         .apply(set) \
         .to_dict()
-    
-    print(" ============ TESTING THE NO PARTIAL SUBMISSION CHECK ==== YAAAAAAAAAAA ==========")
-    print(" ================================================================================= ")
-    print("req_anlts")
-    print(req_anlts)
+
     
     chkdf = results.groupby(['bioaccumulationsampleid','analyteclass'])['analytename'].apply(set).reset_index()
     print("chkdf")
@@ -175,6 +171,7 @@ def chemistry_tissue(all_dfs):
         for argset in errs_args:
             results_args.update(argset)
             errs.append(checkData(**results_args))
+    print("# End of checking all required analytes per station, if they attempted submission of an analyteclass")
     # End of checking all required analytes per station, if they attempted submission of an analyteclass
     # No partial submissions of analyteclasses
    
@@ -353,14 +350,15 @@ def chemistry_tissue(all_dfs):
     # ----------------------------------------------------------------------------------------------------------------------------------#
     # Check that each analysis batch has all the required sampletypes (All of them should have "Result" for obvious reasons) (Error)
     print('# Check that each analysis batch has all the required sampletypes (All of them should have "Result" for obvious reasons) (Error)')
-    # Analyte classes: Inorganics, PAH, PCB, Chlorinated Hydrocarbons, Pyrethroid, PBDE, FIPRONIL, Lipids, TN, TOC
+    # Analyte classes: Inorganics, PAH, PCB, Chlorinated Hydrocarbons, Pyrethroid, PBDE
+    # EDIT: From lu_analytes it seems like the Analyte Classes to check are the following: Inorganics, PCB, PCB, Chlorinated Hydrocarbons
     # Required sampletypes by analyteclass:
     # Inorganics: Method blank, Reference Material, Matrix Spike, Blank Spike
-    # PAH: Method blank, Reference Material, Matrix Spike
-    # PCB, Chlorinated Hydrocarbons, PBDE: Method blank, Reference Material, Matrix Spike
-    # Pyrethroid, FIPRONIL: Method blank, Matrix Spike
-    # TN: Method blank
-    # TOC: Method blank, Reference Material
+    # PCB: Lab blank, Blank spiked, Result, Reference Material
+    # Chlorinated Hydrocarbons: Lab blank, Blank spiked, Matrix spike, Result, Reference - SRM 1974c Mussel Tissue
+    # PBDE: Method blank, Reference Material, Matrix Spike
+    # PFAS: Lab blank, Blank spiked, Matrix spike, Result
+    # Lipids: does NOT need to be checked for required sampletypes
     error_args = []
     
     required_sampletypes = {
