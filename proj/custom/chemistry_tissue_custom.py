@@ -496,11 +496,12 @@ def chemistry_tissue(all_dfs):
     print('# ---------------------------------------------------------------------------------------------------------------------------------#')
     # Check - Holding times for AnalyteClasses: 
     print('# Check - Holding times for AnalyteClasses: ')
-    #  Inorganics, PAH, PCB, Chlorinated Hydrocarbons, PBDE, Pyrethroid, FIPRONIL, TOC/TN is 1 year (see notes)
-    print('#  Inorganics, PAH, PCB, Chlorinated Hydrocarbons, PBDE, Pyrethroid, FIPRONIL, TOC/TN is 1 year (see notes)')
+    # FIPRONIL has been removed from thsi check (and should be from all checks)
+    #  Inorganics, PAH, PCB, Chlorinated Hydrocarbons, PBDE, Pyrethroid, TOC/TN is 1 year (see notes)
+    print('#  Inorganics, PAH, PCB, Chlorinated Hydrocarbons, PBDE, Pyrethroid, TOC/TN is 1 year (see notes)')
 
     holding_time_mask = (results.analysisdate - results.sampledate >= timedelta(days=365))
-    holding_time_classes = ['Inorganics', 'PAH', 'PCB', 'Chlorinated Hydrocarbons', 'PBDE', 'Pyrethroid', 'FIPRONIL', 'TOC', 'TN']
+    holding_time_classes = ['Inorganics', 'PAH', 'PCB', 'Chlorinated Hydrocarbons', 'PBDE', 'Pyrethroid', 'TOC', 'TN']
     results_args.update({
         "badrows": results[
                 results.analyteclass.isin(holding_time_classes) 
