@@ -747,7 +747,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
 
         # Matthew M - Check that user has entered a comment if they selected a grabfail code that requires comment. See lu_grabfails, commentrequired field.
         print("## Check that user has entered a comment if they selected a grabfail code that requires comment. See lu_grabfails, commentrequired field. ##")
-        results = eng.execute("select lu_grabfails.grabfail, lu_grabfails.commentrequired from lu_grabfails where commentrequired = 'yes';")
+        results = eng.execute("select lu_grabfails.grabfail, lu_grabfails.commentrequired from lu_grabfails where UPPER(commentrequired) = 'YES';")
         lu_gf= pd.DataFrame(results.fetchall())
         lu_gf.columns=results.keys()
         lu_gf.columns = [x.lower() for x in lu_gf.columns]
