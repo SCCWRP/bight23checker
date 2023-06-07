@@ -28,7 +28,7 @@ def chemistry_tissue(all_dfs):
     warnings = []
 
     batch = all_dfs['tbl_chembatch']
-    results = all_dfs['tbl_chemresults']
+    results = all_dfs['tbl_chemresults_tissue']
 
     batch['tmp_row'] = batch.index
     results['tmp_row'] = results.index
@@ -63,7 +63,7 @@ def chemistry_tissue(all_dfs):
 
     results_args = {
         "dataframe": results,
-        "tablename": 'tbl_chemresults',
+        "tablename": 'tbl_chemresults_tissue',
         "badrows": [],
         "badcolumn": "",
         "error_type": "",
@@ -82,43 +82,109 @@ def chemistry_tissue(all_dfs):
     print(batch)
     print("results")
     print(results)
-    batch_args.update(
-        checkLogic(batch, results, ['lab','preparationbatchid'], df1_name = 'Batch', df2_name = 'Results')
-    )
+    badrows = batch[~batch[['lab','preparationbatchid']].isin(results[['lab','preparationbatchid']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    batch_args.update({
+        "badrows": badrows,
+        "badcolumn": "Lab, PreparationBatchID",
+        "error_type": "Logic Error",
+        "is_core_error": False,
+        "error_message": "Each record in Chemistry Batch must have a matching record in Chemistry Results. Records are matched on Lab and PreparationID."
+    })
     errs.append(checkData(**batch_args))
 
     # Check for records in results but not batch
-    results_args.update(
-        checkLogic(results, batch, ['lab','preparationbatchid'], df1_name = 'Results', df2_name = 'Batch')
-    )
-    errs.append(checkData(**results_args))
-
-
-    # Sample Assignment check - make sure they were assigned the analyteclasses that they are submitting
-    badrows = sample_assignment_check(eng = eng, df = results, parameter_column = 'analyteclass')
-    
+    badrows = results[~results[['lab','preparationbatchid']].isin(batch[['lab','preparationbatchid']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
     results_args.update({
         "badrows": badrows,
-        "badcolumn": "StationID,Lab,AnalyteName",
+        "badcolumn": "Lab, PreparationBatchID",
         "error_type": "Logic Error",
-        "error_message": f"Your lab was not assigned to submit data for this analyteclass from this station (<a href=/{current_app.config.get('APP_SCRIPT_ROOT')}/scraper?action=help&layer=vw_sample_assignment&datatype=chemistry target=_blank>see sample assignments</a>)"
+        "is_core_error": False,
+        "error_message": "Each record in Chemistry Results must have a matching record in Chemistry Batch. Records are matched on Lab and PreparationID."
     })
-    warnings.append(checkData(**results_args))
+    errs.append(checkData(**results_args))
+
+    # # commented out since tbl_chemresults_tissue DOES NOT have a stationid column - zaib 2june2023
+    # # Sample Assignment check - make sure they were assigned the analyteclasses that they are submitting
+    # badrows = sample_assignment_check(eng = eng, df = results, parameter_column = 'analyteclass')
+    
+    # results_args.update({
+    #     "badrows": badrows,
+    #     "badcolumn": "StationID,Lab,AnalyteName",
+    #     "error_type": "Logic Error",
+    #     "error_message": f"Your lab was not assigned to submit data for this analyteclass from this station (<a href=/{current_app.config.get('APP_SCRIPT_ROOT')}/scraper?action=help&layer=vw_sample_assignment&datatype=chemistry target=_blank>see sample assignments</a>)"
+    # })
+    # warnings.append(checkData(**results_args))
+
+    # Check - A tissue chemistry submission cannot have records with a matrix of "sediment"
+    results_args.update({
+        "badrows": results[results.matrix == 'sediment'].tmp_row.tolist(),
+        "badcolumn": "Matrix",
+        "error_type": "Logic Error",
+        "error_message": f"This is a tissue chemistry submission but this record has a matrix value of 'sediment'"
+    })
+    errs.append(checkData(**results_args))
 
     # ----- END LOGIC CHECKS ----- # 
     print('# ----- END LOGIC CHECKS ----- # ')
 
-   
+    # ----- CUSTOM CHECKS - TISSUE RESULTS ----- #
+    print('# ----- CUSTOM CHECKS - SEDIMENT RESULTS ----- #')
 
+    # Check for All required analytes per bioaccumulationsampleid (All or nothing)
+    current_matrix = 'tissue' #sediment or tissue - affects query for required analytes
+    # sediment uses stationid, but tissue uses bioaccumulationsampleid (in place of stationid)
+    # Check for all required analytes per bioaccumulationsampleid - if a bioaccumulationsampleid has a certain analyteclass
+    req_anlts = pd.read_sql(f"SELECT analyte AS analytename, analyteclass FROM lu_analytes WHERE b23{current_matrix}='yes'", eng) \
+        .groupby('analyteclass')['analytename'] \
+        .apply(set) \
+        .to_dict()
+
+    
+    chkdf = results.groupby(['bioaccumulationsampleid','analyteclass'])['analytename'].apply(set).reset_index()
+    print("chkdf")
+    print(chkdf)
+    chkdf['missing_analytes'] = chkdf.apply(
+        lambda row: ', '.join(list((req_anlts.get(row.analyteclass) if req_anlts.get(row.analyteclass) is not None else set()) - row.analytename)), axis = 1 
+    )
+
+    chkdf = chkdf[chkdf.missing_analytes != set()]
+    print("chkdf")
+    print(chkdf)
+
+    if not chkdf.empty:
+        print("inside if chkdf not empty")
+        chkdf = results.merge(chkdf[chkdf.missing_analytes != ''], how = 'inner', on = ['bioaccumulationsampleid','analyteclass'])
+        print("chkdf")
+        print(chkdf)
+        chkdf = chkdf.groupby(['bioaccumulationsampleid','analyteclass','missing_analytes']).agg({'tmp_row': list}).reset_index()
+        errs_args = chkdf.apply(
+            lambda row:
+            {
+                "badrows": row.tmp_row,
+                "badcolumn" : "BioAccumulationSampleID",
+                "error_type": "missing_data",
+                "error_message" : f"For the BioAccumulationSampleID {row.bioaccumulationsampleid}, you attempted to submit {row.analyteclass} but are missing some required analytes ({row.missing_analytes})"
+            },
+            axis = 1
+        ).tolist()
+
+        for argset in errs_args:
+            results_args.update(argset)
+            errs.append(checkData(**results_args))
+    print("# End of checking all required analytes per station, if they attempted submission of an analyteclass")
+    # End of checking all required analytes per station, if they attempted submission of an analyteclass
+    # No partial submissions of analyteclasses
+   
+    # ------------------------- Begin chemistry base checks ----------------------------- #
     # ----- CUSTOM CHECKS - TISSUE RESULTS ----- #
     print('# ----- CUSTOM CHECKS - TISSUE RESULTS ----- #')
 
-    # Check - If the sampletype is "Lab blank" or "Blank spiked" then the matrix must be labwater or Ottawa sand
+    # Check - If the sampletype is "Lab blank" or "Blank spiked" then the matrix must be labwater
     results_args.update({
-        "badrows": results[(results.sampletype.isin(["Lab blank","Blank spiked"])) & (~results.matrix.isin(["labwater","Ottawa sand"]))].tmp_row.tolist(),
-        "badcolumn" : "matrix",
+        "badrows": results[(results.sampletype.isin(["Lab blank","Blank spiked"])) & (~results.matrix.isin(["labwater"]))].tmp_row.tolist(),
+        "badcolumn" : "Matrix",
         "error_type": "Value error",
-        "error_message" : "If the sampletype is a blank, the only options for matrices would be 'labwater' or 'Ottawa sand'"
+        "error_message" : "If the SampleType is Lab blank or Blank spiked, the matrix must be 'labwater'"
     })
     errs.append(checkData(**results_args))
 
@@ -156,12 +222,12 @@ def chemistry_tissue(all_dfs):
 
     # Check - Result column should be a positive number (except -88) for SampleType == 'Result' (Error)
     print("""# Check - Result column should be a positive number (except -88) for SampleType == 'Result' (Error)""")
-    badrows = results[(results.sampletype == 'Result') & (results.result != -88) & (results.result <= 0)].tmp_row.tolist()
+    badrows = results[(results.result != -88) & (results.result <= 0)].tmp_row.tolist()
     results_args.update({
         "badrows": badrows,
         "badcolumn": "Result",
         "error_type": "Value Error",
-        "error_message": "The Result column (for SampleType = 'Result') should be a positive number (unless it is -88)"
+        "error_message": "The Result column for all SampleTypes should be a positive number (unless it is -88)"
     })
     errs.append(checkData(**results_args))
 
@@ -202,47 +268,46 @@ def chemistry_tissue(all_dfs):
         "badrows": results[(results.result > results.rl) & (results.qualifier.isin(['below reporting limit','below method detection limit']))].tmp_row.tolist(),
         "badcolumn": "Qualifier",
         "error_type": "Value Error",
-        "error_message": """if result > RL then the qualifier cannot say 'below reporting limit' or 'below method detection limit'"""
+        "error_message": """If result > RL then the qualifier cannot say 'below reporting limit' or 'below method detection limit'."""
     })
     errs.append(checkData(**results_args))
 
 
-    
     # Check - if the qualifier is "less than" or "below method detection limit" Then the result must be -88 (Error)
-    print('# Check - if the qualifier is "less than" or "below method detection limit" Then the result must be -88 (Error)')
+    print('# Check - if the qualifier is "less than or equal to" or "below method detection limit" Then the result must be -88 (Error)')
     results_args.update({
-        "badrows": results[results.qualifier.isin(["less than", "below method detection limit"]) & (results.result.astype(float) != -88)].tmp_row.tolist(),
+        "badrows": results[results.qualifier.isin(["less than or equal to", "below method detection limit"]) & (results.result.astype(float) != -88)].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
-        "error_message": "If the Qualifier is 'less than' or 'below method detection limit' then the Result should be -88"
+        "error_message": "If the Qualifier is 'less than or equal to' or 'below method detection limit' then the Result should be -88"
     })
     errs.append(checkData(**results_args))
 
-    # Check - if the qualifier is "estimated" or "below reporting level" then the result must be between the mdl and rl (inclusive) (Error)
-    print('# Check - if the qualifier is "estimated" or "below reporting level" then the result must be between the mdl and rl (inclusive) (Error)')
+    # Check - if the qualifier is "estimated" or "below reporting limit" then the result must be between the mdl and rl (inclusive) EXCEPT Lab blank sampletypes (Error)
+    print('# Check - if the qualifier is "estimated" or "below reporting limit" then the result must be between the mdl and rl (inclusive) EXCEPT Lab blank sampletypes (Error)')
     results_args.update({
         "badrows": results[
-                ((results.qualifier.isin(["estimated", "below reporting level"])) & (results.sampletype != 'Lab blank'))
+                ((results.qualifier.isin(["estimated", "below reporting limit"])) & (results.sampletype != 'Lab blank'))
                 & (
                     (results.result < results.mdl) | (results.result > results.rl)
                 )
             ].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
-        "error_message": "If the Qualifier is 'estimated' or 'below reporting level' then the Result should be between the MDL and RL (Inclusive)"
+        "error_message": "If the Qualifier is 'estimated' or 'below reporting limit' then the Result should be between the MDL and RL (Inclusive). (This does not apply to Lab blanks.)"
     })
     errs.append(checkData(**results_args))
     
-    # Check - if the qualifier is less than, below mdl, below reporting level, or estimated, but the result > rl, then the wrong qualifier was used
-    print('# Check - if the qualifier is less than, below mdl, below reporting level, or estimated, but the result > rl, then the wrong qualifier was used')
+    # Check - if the qualifier is less than or equal to, below mdl, below reporting limit, or estimated, but the result > rl, then the wrong qualifier was used
+    print('# Check - if the qualifier is less than or equal to, below mdl, below reporting limit, or estimated, but the result > rl, then the wrong qualifier was used')
     results_args.update({
         "badrows": results[
-                (results.qualifier.isin(["estimated", "below reporting level", "below method detection limit", "estimated"])) 
+                (results.qualifier.isin(["less than or equal to", "below reporting limit", "below method detection limit", "estimated"])) 
                 & (results.result > results.rl)
             ].tmp_row.tolist(),
         "badcolumn": "Qualifier",
         "error_type": "Value Error",
-        "error_message": "if qualifier is 'less than', 'below method detection limit', 'below reporting level' or 'estimated', but the Result > RL, then the incorrect qualifier was used"
+        "error_message": "if Qualifier is 'less than or equal to', 'below method detection limit', 'below reporting limit' or 'estimated', but the Result > RL, then the incorrect qualifier was used"
     })
     errs.append(checkData(**results_args))
 
@@ -251,13 +316,13 @@ def chemistry_tissue(all_dfs):
     results_args.update({
         "badrows": results[
             (
-                (results.qualifier.isin(['none', 'equal to'])) & (results.qualifier != 'Lab blank')
+                (results.qualifier.isin(['none', 'equal to'])) & (results.sampletype != 'Lab blank')
             ) & 
             (results.result <= results.rl)
         ].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
-        "error_message": "if the qualifier is 'none' then the result must be greater than the RL"
+        "error_message": "if the qualifier is 'none' or 'equal to' then the result must be greater than the RL. (This does not apply to Lab blanks.)"
     })
     errs.append(checkData(**results_args))
 
@@ -285,14 +350,15 @@ def chemistry_tissue(all_dfs):
     # ----------------------------------------------------------------------------------------------------------------------------------#
     # Check that each analysis batch has all the required sampletypes (All of them should have "Result" for obvious reasons) (Error)
     print('# Check that each analysis batch has all the required sampletypes (All of them should have "Result" for obvious reasons) (Error)')
-    # Analyte classes: Inorganics, PAH, PCB, Chlorinated Hydrocarbons, Pyrethroid, PBDE, FIPRONIL, Lipids, TN, TOC
+    # Analyte classes: Inorganics, PAH, PCB, Chlorinated Hydrocarbons, Pyrethroid, PBDE
+    # EDIT: From lu_analytes it seems like the Analyte Classes to check are the following: Inorganics, PCB, PCB, Chlorinated Hydrocarbons
     # Required sampletypes by analyteclass:
     # Inorganics: Method blank, Reference Material, Matrix Spike, Blank Spike
-    # PAH: Method blank, Reference Material, Matrix Spike
-    # PCB, Chlorinated Hydrocarbons, PBDE: Method blank, Reference Material, Matrix Spike
-    # Pyrethroid, FIPRONIL: Method blank, Matrix Spike
-    # TN: Method blank
-    # TOC: Method blank, Reference Material
+    # PCB: Lab blank, Blank spiked, Result, Reference Material
+    # Chlorinated Hydrocarbons: Lab blank, Blank spiked, Matrix spike, Result, Reference - SRM 1974c Mussel Tissue
+    # PBDE: Method blank, Reference Material, Matrix Spike
+    # PFAS: Lab blank, Blank spiked, Matrix spike, Result
+    # Lipids: does NOT need to be checked for required sampletypes
     error_args = []
     
     required_sampletypes = {
@@ -428,11 +494,12 @@ def chemistry_tissue(all_dfs):
     print('# ---------------------------------------------------------------------------------------------------------------------------------#')
     # Check - Holding times for AnalyteClasses: 
     print('# Check - Holding times for AnalyteClasses: ')
-    #  Inorganics, PAH, PCB, Chlorinated Hydrocarbons, PBDE, Pyrethroid, FIPRONIL, TOC/TN is 1 year (see notes)
-    print('#  Inorganics, PAH, PCB, Chlorinated Hydrocarbons, PBDE, Pyrethroid, FIPRONIL, TOC/TN is 1 year (see notes)')
+    # FIPRONIL has been removed from thsi check (and should be from all checks)
+    #  Inorganics, PAH, PCB, Chlorinated Hydrocarbons, PBDE, Pyrethroid, TOC/TN is 1 year (see notes)
+    print('#  Inorganics, PAH, PCB, Chlorinated Hydrocarbons, PBDE, Pyrethroid, TOC/TN is 1 year (see notes)')
 
     holding_time_mask = (results.analysisdate - results.sampledate >= timedelta(days=365))
-    holding_time_classes = ['Inorganics', 'PAH', 'PCB', 'Chlorinated Hydrocarbons', 'PBDE', 'Pyrethroid', 'FIPRONIL', 'TOC', 'TN']
+    holding_time_classes = ['Inorganics', 'PAH', 'PCB', 'Chlorinated Hydrocarbons', 'PBDE', 'Pyrethroid', 'TOC', 'TN']
     results_args.update({
         "badrows": results[
                 results.analyteclass.isin(holding_time_classes) 
@@ -503,46 +570,76 @@ def chemistry_tissue(all_dfs):
     # -----------------------------------------------------------------------------------------------------------------------------------#
     # Units checks
     print("# units checks for Mussel tissue")
-    organic_tissue_mask = ((results.matrix == 'tissue') & (results.analyteclass != 'Inorganics'))
-    metals_tissue_mask = ((results.matrix == 'tissue') & (results.analyteclass == 'Inorganics'))
+    organic_tissue_mask = (results.analyteclass != 'Inorganics')
+    metals_tissue_mask = (results.analyteclass == 'Inorganics')
     
     # Non reference materials units must be ug/g ww for the tissue matrix (metals)
+    print('# Non reference materials units must be ug/g ww for the tissue matrix (metals)')
     results_args.update({
-        "badrows": results[ (metals_tissue_mask & (~results.sampletype.str.contains('Reference', case = False))) & (~results.units.isin('ug/g ww')) ].tmp_row.tolist(),
+        "badrows": results[ (metals_tissue_mask & (~results.sampletype.str.contains('Reference', case = False))) & (~results.units.isin(['ug/g ww'])) ].tmp_row.tolist(),
         "badcolumn": "Units",
         "error_type": "Value Error",
-        "error_message": f"For metals in Mussel Tissue, units must be ug/g ww unless it is a Reference material"
-    })
-    errs.append(checkData(**results_args))
-    
-    # If it is a CRM, then units must be mg/kg dw or ug/g dw (metals)
-    results_args.update({
-        "badrows": results[ (metals_tissue_mask & (results.sampletype.str.contains('Reference', case = False))) & (~results.units.isin(['ug/g dw', 'mg/kg dw'])) ].tmp_row.tolist(),
-        "badcolumn": "Units",
-        "error_type": "Value Error",
-        "error_message": f"For Reference materials (for metals) in Mussel Tissue, units must be mg/kg dw or ug/g dw"
+        "error_message": f"For metals in Mussel Tissue, units must be ug/g ww for non Reference material sampletypes"
     })
     errs.append(checkData(**results_args))
     
 
     # Non reference materials units must be ng/g ww for the tissue matrix (organics)
+    print('# Non reference materials units must be ng/g ww for the tissue matrix (organics)')
     results_args.update({
-        "badrows": results[ (organic_tissue_mask & (~results.sampletype.str.contains('Reference', case = False))) & (~results.units.isin('ng/g ww')) ].tmp_row.tolist(),
+        "badrows": results[ (organic_tissue_mask & (~results.sampletype.str.contains('Reference', case = False))) & (~results.units.isin(['ng/g ww'])) ].tmp_row.tolist(),
         "badcolumn": "Units",
         "error_type": "Value Error",
-        "error_message": f"For organics in Mussel Tissue, units must be ng/g ww unless it is a Reference material"
+        "error_message": f"For organics in Mussel Tissue, units must be ng/g ww for non Reference material sampletypes"
     })
     errs.append(checkData(**results_args))
     
-    # If it is a CRM, then units must be ug/kg ww (organics)
+
+    # May 28, 2023 - Robert
+    # Copy pasting this code from the sediment chemistry custom checks file
+    # Check - For SampleType/CRM Reference Material and Matrix Sediment, Analyte must have units that match lu_chemcrm. (Error)"
+    print("# Check - For SampleType/CRM Reference Material and Matrix Sediment, Analyte must have units that match lu_chemcrm. (Error)")
+    crm_analyteclasses = pd.read_sql("SELECT DISTINCT analyteclass FROM lu_chemcrm WHERE matrix = 'tissue'", eng).analyteclass.tolist()
+    crmvals = pd.read_sql(
+        f"""
+        SELECT
+            matrix,
+            crm as sampletype, 
+            units as units_crm, 
+            analytename
+        FROM lu_chemcrm
+        """,
+        eng
+    )
+    checkdf = results.merge(crmvals, on = ['sampletype','analytename','matrix'], how = 'inner')
+    badrows = checkdf[checkdf.units != checkdf.units_crm].tmp_row.tolist()
     results_args.update({
-        "badrows": results[ (organic_tissue_mask & (results.sampletype.str.contains('Reference', case = False))) & (~results.units.isin(['ug/kg ww'])) ].tmp_row.tolist(),
+        "badrows": badrows,
         "badcolumn": "Units",
         "error_type": "Value Error",
-        "error_message": f"For Reference materials (for organics) in Mussel Tissue, units must be ug/kg ww"
+        # @Zaib - changed your lookup list link to not have the full hard coded URL, but rather the one that uses the app script root variable
+        "error_message": f"For SRM 1974c and SRM 2976, units must match those in the reference material document. <a href=/{current_app.script_root}/scraper?action=help&layer=lu_chemcrm target=_blank>See the CRM Lookup list values</a>)"
     })
     errs.append(checkData(**results_args))
     
+
+    # May 28, 2023 - Robert
+    # Check - sampletype cannot be a sediment reference material
+    # Get the sediment CRMs from the lookup list (this way if we ever decide to change their names we dont need to change any code)
+    forbidden_crms = pd.read_sql("""SELECT DISTINCT crm FROM lu_chemcrm WHERE matrix = 'sediment';""", eng)
+    assert not forbidden_crms.empty, "CRM lookup list lu_chemcrm has no reference materials for the sediment matrix. Check the table in the database, it is likely not configured correctly"
+    
+    forbidden_crms = forbidden_crms.crm.tolist()
+    
+    results_args.update({
+        "badrows": results[results.sampletype.isin(forbidden_crms)],
+        "badcolumn": "SampleType",
+        "error_type": "Value Error",
+        "error_message": f"You are making a sediment chemistry submission but this Reference Material is for sediment"
+    })
+    errs.append(checkData(**results_args))
+
+
 
     # -----------------------------------------------------------------------------------------------------------------------------------
 
@@ -552,8 +649,9 @@ def chemistry_tissue(all_dfs):
     # If there are errors, dont waste time with the QA plan checks
 
     # For testing, let us not enforce this, or we will waste a lot of time cleaning data
-    # if errs != []:
-    #     return {'errors': errs, 'warnings': warnings}
+    # uncommented to test basic chemistry tissue checks - zaib 2june2023
+    if errs != []:
+        return {'errors': errs, 'warnings': warnings}
 
 
 
@@ -587,8 +685,10 @@ def chemistry_tissue(all_dfs):
 
 
     # Table 6-2 Check #3 and #6 within an analysisbatch, Matrix spikes should have 75-125% recovery of spiked mass for 100% of analytes
-    print('# Check - within an analysisbatch, Matrix spikes/Blank spikes should have 75-125% recovery of spiked mass for all analytes')
-    checkdf = results[(results.analyteclass == 'Inorganics') & results.sampletype.isin(['Matrix spike', 'Blank spiked'])] \
+    # 2023-06-01 - Chem technical committee lifted requirement for blank spikes - blank spikes no longer required as of 2023-06-01 - subject to change in the future (today is 2023-06-02)
+    print('# Check #3 - within an analysisbatch, Matrix spikes should have 75-125% recovery of spiked mass for all analytes')
+    print('# Check #6 disabled for now as of 2023-06-01')
+    checkdf = results[(results.analyteclass == 'Inorganics') & results.sampletype.isin(['Matrix spike'])] \
         .groupby(['analysisbatchid', 'sampletype', 'sampleid', 'labreplicate']) \
         .apply(
             lambda df: 
@@ -597,14 +697,14 @@ def chemistry_tissue(all_dfs):
     if not checkdf.empty:
         checkdf = checkdf.reset_index(name = 'passed_check')
         checkdf = results.merge(checkdf, on = ['analysisbatchid', 'sampletype', 'sampleid', 'labreplicate'], how = 'inner')
-        checkdf = checkdf[checkdf.sampletype.isin(['Matrix spike', 'Blank spiked'])]
+        checkdf = checkdf[checkdf.sampletype.isin(['Matrix spike'])]
         checkdf = checkdf[(~checkdf.passed_check) & ((checkdf.percentrecovery < 75) | (checkdf.percentrecovery > 125))]
 
         results_args.update({
             "badrows": checkdf.tmp_row.tolist(),
             "badcolumn": "AnalysisBatchID, SampleType, SampleID, LabReplicate, Result",
             "error_type": "Value Error",
-            "error_message": f"For Matrix spikes/Blank spikes, all analytes should have 75-125% recovery"
+            "error_message": f"For Matrix spikes, all analytes should have 75-125% recovery"
         })
         warnings.append(checkData(**results_args))
     # --- END Table 6-2 Check #3 and #6 --- #
@@ -612,8 +712,9 @@ def chemistry_tissue(all_dfs):
 
 
     # --- Table 6-2 Check #4 and #7 --- #
-    # Blank spike and Matrix spike dupes are required
+    # Matrix spike dupes are required
     # Check #4 - Matrix spike duplicate required (1 per batch)
+    # check #7 disabled (blank spike dupes will not be required any longer as of 2023-06-01)
     print('# Check - Matrix spike duplicate required (1 per batch)')
     tmp = results62.groupby(['analysisbatchid', 'analytename']).apply(
         lambda df:
@@ -636,33 +737,35 @@ def chemistry_tissue(all_dfs):
                 warnings.append(checkData(**results_args))
     
     #(Check #7, sample as check #4 except with Blank spikes)
-    print('# Check - Blank spike duplicate required (1 per batch)')
-    tmp = results62.groupby(['analysisbatchid', 'analytename']).apply(
-        lambda df:
-        not df[(df.sampletype == 'Blank spiked') & (df.labreplicate == 2)].empty # signifies whether or not a Matrix spike duplicate is present
-    )
-    if not tmp.empty:
-        tmp = tmp.reset_index( name = 'has_blankspike_dup') 
-        tmp = tmp[~tmp.has_blankspike_dup] # get batches without the matrix spike dupes
-        tmp = results62.merge(tmp, on = ['analysisbatchid', 'analytename'], how = 'inner')
-        tmp = tmp.groupby(['analysisbatchid', 'analytename']).agg({'tmp_row': list})
-        if not tmp.empty:
-            tmp = tmp.reset_index()
-            for _, row in tmp.iterrows():
-                results_args.update({
-                    "badrows": row.tmp_row, # list of rows associated with the batch that doesnt have a matrix spike dup
-                    "badcolumn": "SampleType",
-                    "error_type": "Incomplete data",
-                    "error_message": f"The batch {row.analysisbatchid} is missing a blank spike duplicate for {row.analytename}"
-                })
-                warnings.append(checkData(**results_args))
+    print('# Check #7 - Blank spike duplicate required (1 per batch)')
+    print('# Check #7 disabled as of 2023-06-01')
+    # tmp = results62.groupby(['analysisbatchid', 'analytename']).apply(
+    #     lambda df:
+    #     not df[(df.sampletype == 'Blank spiked') & (df.labreplicate == 2)].empty # signifies whether or not a Matrix spike duplicate is present
+    # )
+    # if not tmp.empty:
+    #     tmp = tmp.reset_index( name = 'has_blankspike_dup') 
+    #     tmp = tmp[~tmp.has_blankspike_dup] # get batches without the matrix spike dupes
+    #     tmp = results62.merge(tmp, on = ['analysisbatchid', 'analytename'], how = 'inner')
+    #     tmp = tmp.groupby(['analysisbatchid', 'analytename']).agg({'tmp_row': list})
+    #     if not tmp.empty:
+    #         tmp = tmp.reset_index()
+    #         for _, row in tmp.iterrows():
+    #             results_args.update({
+    #                 "badrows": row.tmp_row, # list of rows associated with the batch that doesnt have a matrix spike dup
+    #                 "badcolumn": "SampleType",
+    #                 "error_type": "Incomplete data",
+    #                 "error_message": f"The batch {row.analysisbatchid} is missing a blank spike duplicate for {row.analytename}"
+    #             })
+    #             warnings.append(checkData(**results_args))
     # --- END TABLE 6-2 Check #7 --- #
     # --- END Table 6-2 Check #4 and #7 --- #
 
     # --- Table 6-2 Check #5 and #8 --- #
     # Matrix/Blank spike duplicates need RPD under 25%
     print('# Check - Duplicate Matrix spikes must have RPD < 25% for all analytes')
-    checkdf = results[(results.analyteclass == 'Inorganics') & results.sampletype.isin(['Matrix spike', 'Blank spiked'])]
+    print('# This check disabled for blank spikes as of 2023-06-01')
+    checkdf = results[(results.analyteclass == 'Inorganics') & results.sampletype.isin(['Matrix spike'])]
     checkdf = checkdf.groupby(['analysisbatchid', 'analyteclass', 'sampletype', 'analytename','sampleid']).apply(
         lambda subdf:
         abs((subdf.result.max() - subdf.result.min()) / ((subdf.result.max() + subdf.result.min()) / 2)) <= 0.25
@@ -675,10 +778,10 @@ def chemistry_tissue(all_dfs):
             checkdf = checkdf.reset_index(name = 'passed')
             checkdf['errmsg'] = checkdf.apply(
                 lambda row:
-                f"Duplicate Matrix spikes/Blank spikes should have an RPD under 25% for all analytes in the batch ({row.analysisbatchid}) (for the analyteclass {row.analyteclass})"
+                f"Duplicate Matrix spikes should have an RPD under 25% for all analytes in the batch ({row.analysisbatchid}) (for the analyteclass {row.analyteclass})"
                 , axis = 1
             )
-            checkdf = results[(results.analyteclass == 'Inorganics') & results.sampletype.isin(['Matrix spike', 'Blank spiked'])] \
+            checkdf = results[(results.analyteclass == 'Inorganics') & results.sampletype.isin(['Matrix spike'])] \
                 .merge(checkdf[~checkdf.passed], on = ['analysisbatchid', 'analyteclass'], how = 'inner')
             
             if not checkdf.empty:
@@ -771,7 +874,7 @@ def chemistry_tissue(all_dfs):
 
     # Table 6-3 Check #3 - % recovery must be 50 to 150% for at least 70% of analytes
     print('# Check - within an analysisbatch, Matrix spikes/Blank spikes should have 50-150% recovery of spiked mass for all analytes')
-    checkdf = results[(results.analyteclass == 'Inorganics') & results.sampletype.isin(['Matrix spike'])] \
+    checkdf = results[(results.analyteclass != 'Inorganics') & results.sampletype.isin(['Matrix spike'])] \
         .groupby(['analysisbatchid', 'sampletype', 'sampleid', 'labreplicate']) \
         .apply(
             lambda df: 
@@ -792,7 +895,7 @@ def chemistry_tissue(all_dfs):
         warnings.append(checkData(**results_args))
     # END Table 6-3 Check #3 - % recovery must be 50 to 150% for at least 70% of analytes
 
-    # Table 6-4 Check #4 Matrix spike duplicate required
+    # Table 6-3 Check #4 Matrix spike duplicate required
     print('# Check - Matrix spike duplicate required (1 per batch)')
 
     tmp = results63pfas.groupby(['analysisbatchid', 'analytename']).apply(
@@ -814,9 +917,9 @@ def chemistry_tissue(all_dfs):
                     "error_message": f"The batch {row.analysisbatchid} is missing a matrix spike duplicate for {row.analytename}"
                 })
                 warnings.append(checkData(**results_args))
-    # END Table 6-4 Check #4 Matrix spike duplicate required
+    # END Table 6-3 Check #4 Matrix spike duplicate required
 
-    # Table 6-4 Check #5 Matrix spike duplicate RPD < 50% for at least 70% of analytes
+    # Table 6-3 Check #5 Matrix spike duplicate RPD < 50% for at least 70% of analytes
     print('# Check - Duplicate Matrix spikes must have RPD < 50% for all analytes')
     checkdf = results63[results63.sampletype.isin(['Matrix spike'])]
     checkdf = checkdf.groupby(['analysisbatchid', 'analyteclass', 'sampletype', 'analytename','sampleid']).apply(
@@ -856,34 +959,34 @@ def chemistry_tissue(all_dfs):
                     results_args.update(args)
                     warnings.append(checkData(**results_args))
 
-    # END Table 6-4 Check #5 Matrix spike duplicate RPD < 50% for at least 70% of analytes
+    # END Table 6-3 Check #5 Matrix spike duplicate RPD < 50% for at least 70% of analytes
 
 
 
     # ----- PFAS Only ----- #
     results63pfas = results63[results63.analyteclass == 'PFAS']
-    # Table 6-3 Check #6 - Blank spiked % recovery must be 60 to 140% (PFAS ONLY)
-    print('# Check - within an analysisbatch, Matrix spikes/Blank spikes should have 60-140% recovery of spiked mass for all PFAS analytes')
+    # Table 6-3 Check #6 - Blank spiked % recovery must be 50 to 150% (PFAS ONLY)
+    print('# Check - within an analysisbatch, Blank spikes should have 50-150% recovery of spiked mass for all PFAS analytes')
     checkdf = results63pfas[results63pfas.sampletype.isin(['Blank spiked'])] \
         .groupby(['analysisbatchid', 'sampletype', 'sampleid', 'labreplicate']) \
         .apply(
             lambda df: 
-            (sum( (df.percentrecovery > 60) & (df.percentrecovery < 140)) / len(df)) == 1
+            (sum( (df.percentrecovery > 50) & (df.percentrecovery < 150)) / len(df)) == 1
         )
     if not checkdf.empty:
         checkdf = checkdf.reset_index(name = 'passed_check')
         checkdf = results.merge(checkdf, on = ['analysisbatchid', 'sampletype', 'sampleid', 'labreplicate'], how = 'inner')
         checkdf = checkdf[checkdf.sampletype.isin(['Blank spiked'])]
-        checkdf = checkdf[(~checkdf.passed_check) & ((checkdf.percentrecovery < 60) | (checkdf.percentrecovery > 140))]
+        checkdf = checkdf[(~checkdf.passed_check) & ((checkdf.percentrecovery < 50) | (checkdf.percentrecovery > 150))]
 
         results_args.update({
             "badrows": checkdf.tmp_row.tolist(),
             "badcolumn": "AnalysisBatchID, SampleType, SampleID, LabReplicate, Result",
             "error_type": "Value Error",
-            "error_message": f"For Blank spikes, all analytes should have 60-140% recovery (for PFAS)"
+            "error_message": f"For Blank spikes, all analytes should have 50-150% recovery (for PFAS)"
         })
         warnings.append(checkData(**results_args))
-    # END Table 6-3 Check #6 - Blank spiked % recovery must be 60 to 140% (PFAS ONLY)
+    # END Table 6-3 Check #6 - Blank spiked % recovery must be 50 to 150% (PFAS ONLY)
 
 
     # Table 6-3 Check #7 Blank spike duplicate required (PFAS ONLY)

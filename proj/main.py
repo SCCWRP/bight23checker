@@ -191,11 +191,13 @@ def main():
     all_dfs = hardcoded_fixes(all_dfs)
     #print("DONE preprocessing and cleaning data")
 
-    # this is the same as results['sampleid'] in chemistry custom checks. 
+    # this is the same as results['sampleid'] in chemistry (sediment) custom checks. 
     # checker_labsampleid is created for record purposes so we know how the labsampleid is used after stripping everything with and after the last hyphen.
     # Based on the assumption of labsampleid always having a format with the characters at the last hyphen and on being removed after meetings Bight Chemistry data.
-    if match_dataset in ['chemistry', 'chemistry_tissue']:
+    if match_dataset in ['chemistry']:
         all_dfs['tbl_chemresults']['checker_labsampleid'] = all_dfs['tbl_chemresults'].labsampleid.apply(lambda x: str(x).rpartition('-')[0 if '-' in str(x) else -1]  )
+    if match_dataset in ['chemistry_tissue']:
+        all_dfs['tbl_chemresults_tissue']['checker_labsampleid'] = all_dfs['tbl_chemresults_tissue'].labsampleid.apply(lambda x: str(x).rpartition('-')[0 if '-' in str(x) else -1]  )
     
     # write all_dfs again to the same excel path
     # Later, if the data is clean, the loading routine will use the tab names to load the data to the appropriate tables
