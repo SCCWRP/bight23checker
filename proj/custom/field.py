@@ -274,7 +274,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         
         for organization in sampling_organizations:
             trawlstations = pd.read_sql(f"""SELECT DISTINCT stationid FROM field_assignment_table WHERE "parameter" = 'trawl' AND assigned_agency = '{organization}' ; """, eng).stationid.tolist()
-            badrows = occupation[(occupation.collectiontype != 'Grab') & (~occupation.stationid.isin(trawlstations))].tmp_row.tolist()
+            badrows = occupation[(occupation.collectiontype != 'Grab') & (~occupation.stationid.isin(trawlstations)) & (occupation.samplingorganization == organization)].tmp_row.tolist()
             occupation_args.update({
                 "badrows": badrows,
                 "badcolumn": 'StationID,SamplingOrganization',
@@ -284,7 +284,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             warnings = [*warnings, checkData(**occupation_args)]
             
             grabstations = pd.read_sql(f"""SELECT DISTINCT stationid FROM field_assignment_table WHERE "parameter" = 'sediment' AND assigned_agency = '{organization}' """, eng).stationid.tolist()
-            badrows = occupation[(occupation.collectiontype == 'Grab') & (~occupation.stationid.isin(grabstations))].tmp_row.tolist()
+            badrows = occupation[(occupation.collectiontype == 'Grab') & (~occupation.stationid.isin(grabstations)) & (occupation.samplingorganization == organization)].tmp_row.tolist()
             occupation_args.update({
                 "badrows": badrows,
                 "badcolumn": 'StationID,SamplingOrganization',
