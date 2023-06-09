@@ -205,7 +205,7 @@ def chemistry(all_dfs):
     # Check for All required analytes per station (All or nothing)
     current_matrix = 'sediment' #sediment or tissue - affects query for required analytes
     # Check for all required analytes per station - if a station has a certain analyteclass
-    req_anlts = pd.read_sql(f"SELECT analyte AS analytename, analyteclass FROM lu_analytes WHERE b23{current_matrix}='yes'", eng) \
+    req_anlts = pd.read_sql(f"SELECT analyte AS analytename, analyteclass FROM lu_analytes WHERE b23{current_matrix} = 'yes' AND analyteclass != 'Pyrethroid'; ", eng) \
         .groupby('analyteclass')['analytename'] \
         .apply(set) \
         .to_dict()
