@@ -273,7 +273,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         
         for organization in sampling_organizations:
             trawlstations = pd.read_sql(f"""SELECT DISTINCT stationid FROM field_assignment_table WHERE "parameter" = 'trawl' AND assigned_agency = '{organization}' ; """, eng).stationid.tolist()
-            badrows = occupation[(occupation.collectiontype != 'Grab') & (~occupation.stationid.isin(trawlstations))].tmp_row.tolist()
+            badrows = occupation[(occupation.collectiontype != 'Grab') & (~occupation.stationid.isin(trawlstations)) & (occupation.samplingorganization == organization)].tmp_row.tolist()
             occupation_args.update({
                 "badrows": badrows,
                 "badcolumn": 'StationID,SamplingOrganization',
@@ -283,7 +283,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             warnings = [*warnings, checkData(**occupation_args)]
             
             grabstations = pd.read_sql(f"""SELECT DISTINCT stationid FROM field_assignment_table WHERE "parameter" = 'sediment' AND assigned_agency = '{organization}' """, eng).stationid.tolist()
-            badrows = occupation[(occupation.collectiontype == 'Grab') & (~occupation.stationid.isin(grabstations))].tmp_row.tolist()
+            badrows = occupation[(occupation.collectiontype == 'Grab') & (~occupation.stationid.isin(grabstations)) & (occupation.samplingorganization == organization)].tmp_row.tolist()
             occupation_args.update({
                 "badrows": badrows,
                 "badcolumn": 'StationID,SamplingOrganization',
@@ -359,7 +359,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     
 
     # Matthew M- If StationOccupation/Station Fail != "None or No Fail/Temporary" then Abandoned should be set to "Yes"
-    #- Message should read "Abandoned should be set to 'Yes' when Station Fail != 'None or No Fail' or 'Temporary'" # Adjusted 9/27/18 - Dario made this a warning not an error
+    #- Message should read "Abandoned should be set to 'Yes' when Station Fail != 'None or No Fail' or 'Temporary'" 
     print("If StationOccupation/Station Fail != None or No Fail/Temporary then Abandoned should be set to Yes")
     results= eng.execute("select lu_stationfails.stationfail from lu_stationfails")
     lu_sf1 = pd.DataFrame(results.fetchall())
@@ -388,6 +388,28 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         "error_message": 'If StationOccupation/StationFail is set to None or Temporary then Abandoned should be set to No.'
     })
     errs = [*errs, checkData(**occupation_args)]
+
+    # StationOccupation check SalinityUnits must be either 'ppt' or 'psu'
+    print("# StationOccupation check SalinityUnits must be either 'ppt' or 'psu'")
+    print(occupation[~occupation.salinityunits.isin(['ppt', 'psu'])])
+    occupation_args.update({
+        "badrows": occupation[~occupation.salinityunits.isin(['ppt', 'psu'])].tmp_row.tolist(),
+        "badcolumn": 'SalinityUnits',
+        "error_type": 'Undefined Error',
+        "error_message": 'SalinityUnits must be either ppt or psu.'
+    })
+    errs = [*errs, checkData(**occupation_args)]
+
+    # Check - If Datum is Other, then a comment is required.
+    print("# Check - If Datum is Other, then a comment is required.")
+    occupation_args.update({
+        "badrows": occupation[(occupation['occupationdatum'] == 'Other (comment required)') & (pd.isnull(occupation['comments']))].tmp_row.tolist(),
+        "badcolumn": 'Comments',
+        "error_type": 'Undefined Error',
+        "error_message": 'If Datum is Other, then a comment is required.'
+    })
+    errs = [*errs, checkData(**occupation_args)]
+
     ### END OCCUPATION CHECKS ###
     
     
