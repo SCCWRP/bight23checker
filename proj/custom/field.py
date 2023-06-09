@@ -603,21 +603,8 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         warnings = [*warnings, checkData(**trawl_args)]
 
 
-
-        ## 4 - Kristin - bug fixed on 26jun18
-        ## Check - A comment is required if TrawlFail is equal to Other
-        print("## A COMMENT IS REQUIRED IF TRAWLAILCODE IS EQUAL TO OTHER ##")
-        trawlcode = trawl[['trawlfail', 'comments','tmp_row']].where(trawl['trawlfail'].isin(['Other trawl failure'])).dropna(axis = 0, how = 'all')
-        trawl_args.update({
-            "badrows": trawlcode.loc[pd.isnull(trawlcode['comments'])].tmp_row.tolist(),
-            "badcolumn": 'TrawlFail',
-            "error_type": "Undefined Error",
-            "error_message" : 'A comment is required if trawlfail is equal to other'
-        })
-        errs = [*errs, checkData(**trawl_args)]
-
         ## Kristin - bug fixed on 26jun18
-        ## Check - If PTSensor = Yes then PTSensorManufacturer required (but not SerialNumber/OnBottomTemp/OnBottomRules for table on OnBottomTemp/OnBottomTime incorrect need to be adjusted to not required)
+        ## Check - If PTSensor = Yes then PTSensorManufacturer required
         print('## PTSENSOR MANUFACTURER REQUIRED IF PT SENSOR IS YES##')
         print(trawl[(trawl.ptsensor == 'Yes')&(trawl.ptsensormanufacturer.isnull())].tmp_row.tolist())
         trawl_args.update({
@@ -652,7 +639,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             "badrows": trawl[(trawl['trawlfail'].isin(lu_tf.trawlfailure.tolist())) & (trawl['comments'].isnull())].tmp_row.tolist(),
             "badcolumn": 'Comments',
             "error_type": "Undefined Error",
-            "error_message" : f'A comment is required for that stationfail option. Please see: <a href=/{current_app.script_root}/scraper?action=help&layer=lu_trawlfails target=_blank>TrawlFail lookup</a>.'
+            "error_message" : f'A comment is required for that trawlfail option. Please see: <a href=/{current_app.script_root}/scraper?action=help&layer=lu_trawlfails target=_blank>TrawlFail lookup</a>.'
         })
         errs = [*errs, checkData(**trawl_args)]
 
