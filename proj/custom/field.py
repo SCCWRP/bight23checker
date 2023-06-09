@@ -360,7 +360,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     
 
     # Matthew M- If StationOccupation/Station Fail != "None or No Fail/Temporary" then Abandoned should be set to "Yes"
-    #- Message should read "Abandoned should be set to 'Yes' when Station Fail != 'None or No Fail' or 'Temporary'" # Adjusted 9/27/18 - Dario made this a warning not an error
+    #- Message should read "Abandoned should be set to 'Yes' when Station Fail != 'None or No Fail' or 'Temporary'" 
     print("If StationOccupation/Station Fail != None or No Fail/Temporary then Abandoned should be set to Yes")
     results= eng.execute("select lu_stationfails.stationfail from lu_stationfails")
     lu_sf1 = pd.DataFrame(results.fetchall())
@@ -389,6 +389,18 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         "error_message": 'If StationOccupation/StationFail is set to None or Temporary then Abandoned should be set to No.'
     })
     errs = [*errs, checkData(**occupation_args)]
+
+    # StationOccupation check SalinityUnits must be either 'ppt' or 'psu'
+    print("# StationOccupation check SalinityUnits must be either 'ppt' or 'psu'")
+    print(occupation[~occupation.salinityunits.isin(['ppt', 'psu'])])
+    occupation_args.update({
+        "badrows": occupation[~occupation.salinityunits.isin(['ppt', 'psu'])].tmp_row.tolist(),
+        "badcolumn": 'SalinityUnits',
+        "error_type": 'Undefined Error',
+        "error_message": 'SalinityUnits must be either ppt or psu.'
+    })
+    errs = [*errs, checkData(**occupation_args)]
+
     ### END OCCUPATION CHECKS ###
     
     
