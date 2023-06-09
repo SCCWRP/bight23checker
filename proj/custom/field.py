@@ -401,6 +401,16 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     })
     errs = [*errs, checkData(**occupation_args)]
 
+    # Check - If Datum is Other, then a comment is required.
+    print("# Check - If Datum is Other, then a comment is required.")
+    occupation_args.update({
+        "badrows": occupation[(occupation['occupationdatum'] == 'Other (comment required)') & (pd.isnull(occupation['comments']))].tmp_row.tolist(),
+        "badcolumn": 'Comments',
+        "error_type": 'Undefined Error',
+        "error_message": 'If Datum is Other, then a comment is required.'
+    })
+    errs = [*errs, checkData(**occupation_args)]
+
     ### END OCCUPATION CHECKS ###
     
     
