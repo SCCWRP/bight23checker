@@ -560,6 +560,10 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         station.columns = field_sql.keys()
         # creates new dataframes containing pertinent fields
         td = trawl[['stationid','startlatitude','startlongitude','endlatitude','endlongitude','tmp_row']]
+        print("trawl")
+        print(trawl.to_string(index=True))
+        print("trawl.dtypes")
+        print(trawl.dtypes)
         sd = pd.DataFrame({'stationid':station['stationid'],'stlat':station['targetlatitude'],'stlon':station['targetlongitude']})
         dt = pd.merge(td, sd, how = 'left', on ='stationid')
         # Adds error for unmatched trawls
@@ -592,8 +596,21 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         })
         warnings = [*warnings, checkData(**trawl_args)]
         
+        missing_entries = [dt.loc[dt[c].replace(-88, pd.NA).isnull()] for c in td.columns]
+        print("-----------------------------------------")
+        print("-----------------------------------------")
+        print("dt")
+        print(dt.to_string(index=True))
+        print("dt.dtypes")
+        print(dt.dtypes)
+        for c in td.columns: 
+            print("c")
+            print(c)
+        print("missing_entries")
+        print(missing_entries)
+        print("-----------------------------------------")
+        print("-----------------------------------------")
         
-        missing_entries = [dt.loc[dt[c].isnull()] for c in td.columns]
         trawl_args.update({
             "badrows": missing_entries[len(missing_entries) > 0].tmp_row.tolist(),
             "badcolumn": 'TrawlDistanceToNominalTarget',
