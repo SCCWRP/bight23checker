@@ -291,7 +291,7 @@ def export_sdf_to_json(path, sdf):
                 "type" : "Feature",
                 "geometry" : {
                     "type":"polyline",
-                    "paths" : row.SHAPE.get('paths')[0]
+                    "paths" : row.SHAPE.get('paths')
                 },
                 "properties" : {
                     k:str(v) for k,v in row.items() if k not in ('strata_polygon', 'SHAPE')
@@ -314,7 +314,7 @@ def export_sdf_to_json(path, sdf):
                 "type" : "Feature",
                 "geometry" : {
                     "type":"polygon",
-                    "rings" : row.SHAPE.get('rings')[0]
+                    "rings" : row.SHAPE.get('rings')
                 },
                 "properties" : {
                     k:str(v) for k,v in row.items() if k not in ('strata_polygon', 'SHAPE')
