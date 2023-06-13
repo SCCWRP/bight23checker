@@ -348,12 +348,12 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     print(sofat['dists'])
     # Raises Warning for Distances calculated above > 100M
     print("Raises warning for distances calculated above > 100m:")
-    print(sofat.loc[sofat['dists']>100])
+    print(sofat[sofat['dists'] > 100])
 
     occupation_args.update({
         "badrows": sofat[
             sofat.apply(
-                lambda row: row['dists'] > 200 if 'channel islands' in str(row['region']).strip().lower() else 100
+                lambda row: row['dists'] > (200 if 'channel islands' in str(row['region']).strip().lower() else 100)
                 ,
                 axis = 1
             )
@@ -758,7 +758,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             "badrows": grab[
                     grab.merge(db, how = 'left', on = 'stationid').apply(
                         lambda row:
-                        row['grabdistancetonominaltarget'] > 200 if 'channel islands' in str(row['region']).strip().lower() else 100,
+                        (row['grabdistancetonominaltarget'] > 200) if 'channel islands' in str(row['region']).strip().lower() else (row['grabdistancetonominaltarget'] > 100),
                         axis = 1
                     ) 
                 ] \
@@ -844,21 +844,68 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
 
 
         # Check for the parameters grabbed based on the sample assignment table
-        # grabstations = tuple(grab.stationid.unique())
-        # assignments = pd.rad_sql(f"SELECT * FROM sample_assignment_table WHERE stationid IN {grabstations}", eng)
-        # def check_yes(grp):
-        #     return (grp == 'Yes').any()
+        all_param_names_dict = {
+            'toxicity' : 'Toxicity', 
+            'pfas': 'PFAS', 
+            'pfasfieldblank': 'PFAS field blank', 
+            'microplastics' : 'Microplastics', 
+            'microplasticsfieldblank': 'Microplastics Field blank', 
+            'grainsize' : 'Sediment Grain Size', 
+            'sedimentchemistry': 'Sediment Chemistry', 
+            'benthicinfauna' : 'Benthic Infauna'
+        }
 
-        # summary = grab.groupby('stationid').agg({
-        #     'toxicity': check_yes,
-        #     'pfas': check_yes,
-        #     'pfasfieldblank': check_yes,
-        #     'microplastics': check_yes,
-        #     'microplasticsfieldblank': check_yes,
-        #     'grainsize': check_yes,
-        #     'sedimentchemistry': check_yes,
-        #     'infauna': check_yes,
-        # }).reset_index()
+        # get a list of param names just based on the keys
+        all_param_names = all_param_names_dict.keys()
+        
+        # Query sample assignment table along with xwalk to get the grab tables column names as parameter names
+        assignments = pd.read_sql(f"SELECT s.stationid, x.grabtable_param_name AS parameter FROM sample_assignment_table s JOIN xwalk_sedgrab_parameter_names x on s.datatype = x.datatype", eng)
+
+        # Mark just presence or absence of a parameter for a stationid
+        assigned_params = assignments.pivot_table(index='stationid', columns='parameter', aggfunc=lambda x: 1, fill_value=0)
+
+        # Reset the index
+        assigned_params.reset_index(inplace=True)
+
+        # Remove the column index name
+        assigned_params.columns.name = None
+
+        # add on the missing columns (if they are missing)
+        for c in list( set(all_param_names) - set(assigned_params.columns) ):
+            assigned_params[c] = 0
+
+        def check_yes(grp):
+            return 1 if (grp == 'Yes').any() else 0
+        
+        print('here')
+        agg_dict = {
+            param: check_yes
+            for param in all_param_names
+        }
+        agg_dict.update({'tmp_row': list})
+        has_params = grab.groupby('stationid').agg(agg_dict) 
+        print("has params")
+        print(has_params)
+        has_params = has_params.reset_index()
+        print("has params")
+        print(has_params)
+        print('yes')
+        
+        # merge them together for checking of presence and absence
+        checkdf = has_params.merge(assigned_params, how = 'inner', on = 'stationid', suffixes = ('','_assigned'))
+
+        if not checkdf.empty:
+            for param, human_readable_param in all_param_names_dict.items():
+                badrows = checkdf[checkdf.apply(lambda row: (row[param] == 0) & (row[f"""{param}_assigned"""] == 1), axis = 1)].tmp_row.tolist()
+                badrows = [element for sublist in badrows for element in sublist]
+                
+                grab_args.update({
+                    "badrows": badrows,
+                    "badcolumn": 'stationid',
+                    "error_type": "Assignment Error",
+                    "error_message" : f'This station was assigned to have {human_readable_param} grabbed but it is recorded as missing from your grab table'
+                })
+                warnings = [*warnings, checkData(**grab_args)]
 
 
         if strata_check:
