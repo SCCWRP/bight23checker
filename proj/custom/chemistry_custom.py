@@ -138,7 +138,7 @@ def chemistry(all_dfs):
     errs.append(checkData(**results_args))
 
     # PFAS completeness checks - checking for blanks
-    pfas_field_blank_stations = pd.read_sql(f"""SELECT DISTINCT stationid FROM vw_sample_assignment WHERE "parameter" = 'PFAS Field Blank' ORDER BY 1""").stationid.tolist()
+    pfas_field_blank_stations = pd.read_sql(f"""SELECT DISTINCT stationid FROM vw_sample_assignment WHERE "parameter" = 'PFAS Field Blank' ORDER BY 1""", g.eng).stationid.tolist()
     pfasresults = results[results.analyteclass == 'PFAS']
     if not pfasresults.empty:
         # Check - if a lab is submitting PFAS then they need to also submit the field blanks
@@ -168,7 +168,7 @@ def chemistry(all_dfs):
         # One PFAS equipment blank per lab
 
         # Get labs that have given us equipment blanks
-        equipblanks = pd.read_sql("SELECT DISTINCT lab FROM tbl_chemresults WHERE sampletype = 'Equipment blank'; ")
+        equipblanks = pd.read_sql("SELECT DISTINCT lab FROM tbl_chemresults WHERE sampletype = 'Equipment blank'; ", g.eng)
         
         # Filter down to the records where the lab is NOT in the list of labs that have already given equipment blanks
         checkdf = checkdf[~pfasresults.lab.isin(equipblanks.lab.tolist())]
@@ -260,11 +260,10 @@ def chemistry(all_dfs):
 
     # Reference materials will not always have all the analytes
     # labs may enter -88 for those analytes which dont have reference material values
-    if not chkdf.empty:
-        chkdf = results.groupby(['stationid','sampletype','analyteclass'])['analytename'].apply(set).reset_index()
-        chkdf['missing_analytes'] = chkdf.apply(
-            lambda row: ', '.join(list((req_anlts.get(row.analyteclass) if req_anlts.get(row.analyteclass) is not None else set()) - row.analytename)), axis = 1 
-        )
+    chkdf = results.groupby(['stationid','sampletype','analyteclass'])['analytename'].apply(set).reset_index()
+    chkdf['missing_analytes'] = chkdf.apply(
+        lambda row: ', '.join(list((req_anlts.get(row.analyteclass) if req_anlts.get(row.analyteclass) is not None else set()) - row.analytename)), axis = 1 
+    )
 
         chkdf = chkdf[chkdf.missing_analytes != set()]
         if not chkdf.empty:
