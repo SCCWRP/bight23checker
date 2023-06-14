@@ -265,30 +265,30 @@ def chemistry(all_dfs):
         lambda row: ', '.join(list((req_anlts.get(row.analyteclass) if req_anlts.get(row.analyteclass) is not None else set()) - row.analytename)), axis = 1 
     )
 
-        chkdf = chkdf[chkdf.missing_analytes != set()]
-        if not chkdf.empty:
-            chkdf = results.merge(chkdf[chkdf.missing_analytes != ''], how = 'inner', on = ['stationid','sampletype','analyteclass'])
-            chkdf = chkdf.groupby(['stationid','sampletype','analyteclass','missing_analytes']).agg({'tmp_row': list}).reset_index()
-            errs_args = chkdf.apply(
-                lambda row:
-                {
-                    "error_or_warning": "warning" if ('Reference' in str(row.sampletype)) else "error",
-                    "badrows": row.tmp_row,
-                    "badcolumn" : "stationid",
-                    "error_type": "Missing Data",
-                    "error_message" : f"For the station {row.stationid}, and sampletype {row.sampletype} you attempted to submit {row.analyteclass} but are missing some required analytes ({row.missing_analytes})"
-                },
-                axis = 1
-            ).tolist()
+    chkdf = chkdf[chkdf.missing_analytes != set()]
+    if not chkdf.empty:
+        chkdf = results.merge(chkdf[chkdf.missing_analytes != ''], how = 'inner', on = ['stationid','sampletype','analyteclass'])
+        chkdf = chkdf.groupby(['stationid','sampletype','analyteclass','missing_analytes']).agg({'tmp_row': list}).reset_index()
+        errs_args = chkdf.apply(
+            lambda row:
+            {
+                "error_or_warning": "warning" if ('Reference' in str(row.sampletype)) else "error",
+                "badrows": row.tmp_row,
+                "badcolumn" : "stationid",
+                "error_type": "Missing Data",
+                "error_message" : f"For the station {row.stationid}, and sampletype {row.sampletype} you attempted to submit {row.analyteclass} but are missing some required analytes ({row.missing_analytes})"
+            },
+            axis = 1
+        ).tolist()
 
-            for argset in errs_args:
-                error_or_warning = argset.pop("error_or_warning")
-                results_args.update(argset)
-                if error_or_warning == "error":
-                    errs.append(checkData(**results_args))
-                else:
-                    warnings.append(checkData(**results_args))
-    
+        for argset in errs_args:
+            error_or_warning = argset.pop("error_or_warning")
+            results_args.update(argset)
+            if error_or_warning == "error":
+                errs.append(checkData(**results_args))
+            else:
+                warnings.append(checkData(**results_args))
+
     # End of checking all required analytes per station, if they attempted submission of an analyteclass
 
     # Separate check for the Pyrethroid analyteclass
