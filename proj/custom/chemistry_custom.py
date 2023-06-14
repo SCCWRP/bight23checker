@@ -39,17 +39,9 @@ def chemistry(all_dfs):
         on = 'analytename',
         how = 'inner'
     )
-
-    # # Calculate percent recovery - moving this before Chemistry QA checks
-    # # if truevalue is 0 - critical error: float division by zero BUG
-    # results['percentrecovery'] = \
-    #     results.apply(
-    #         lambda x: 
-    #         float(x.result)/float(x.truevalue)*100 if ('spike' in x.sampletype.lower())|('reference' in x.sampletype.lower()) else -88, 
-    #         axis = 1
-    #     )
-
     
+    # Calculation of percentrecovery was moved to the QA plan checks section
+
     # sampleid should just be everything before the last occurrence of a hyphen character in the labsampleid
     # if no hyphen, the sampleid is just the labsampleid
     # checker_labsampleid is created in main.py for storing purposes in case it may be needed on how data is grouped for later use
@@ -144,6 +136,9 @@ def chemistry(all_dfs):
         "error_message": f"This is a sediment chemistry submission but this record has a matrix value of 'tissue'"
     })
     errs.append(checkData(**results_args))
+
+    # Check - if a lab is submitting PFAS then they need to also submit the field blanks
+    # Check - if a lab is submitting PFAS then they need to also submit the equipment blanks
 
 
     # ----- END LOGIC CHECKS ----- # 
@@ -290,11 +285,40 @@ def chemistry(all_dfs):
         errs.append(checkData(**results_args))
 
 
+    # Check - in a sediment submission, they should be reporting % by weight of Moisture for all samples
+    if not results.empty:
+        # I cannot think of a single case where results here would be empty, but i always put that
+        
+        checkdf = results[(results.matrix == 'sediment') & (results.stationid != '0000')]
+        if not checkdf.empty:
+            checkdf = checkdf.groupby(['stationid','sampledate']).agg({
+                    # True if Moisture is in there, False otherwise
+                    'analytename' : (lambda grp: 'Moisture' in grp.unique()), 
+                    'tmp_row': list
+                }) \
+                .reset_index() \
+                .rename(columns = {'analytename': 'has_moisture'}) # rename to has_moisture since really that is what the column is representing after the groupby operation
+            
+            bad = checkdf[~checkdf.has_moisture]
+            if not bad.empty:
+                for _, row in bad.iterrows():
+                    results_args.update({
+                        "badrows": row.tmp_row,
+                        "badcolumn": "StationID,SampleDate,AnalyteName",
+                        "error_type": "Missing Data",
+                        "error_message": f"""For the station {row.stationid} and sampledate {row.sampledate} it appears the sediment moisture was not reported"""
+                    })
+                    errs.append(checkData(**results_args))
+
+
+
+
     # End of the checks for No partial submissions of analyteclasses
 
 
 
     # ------------------------- Begin chemistry base checks ----------------------------- #
+
 
     # Check for duplicates on stationid, sampledate, analysisbatchid, sampletype, matrix, analytename, fieldduplicate, labreplicate, SAMPLEID
     # Cant be done in Core since there is no sampleid column that we are having them submit, but rather it is a field we create internally based off the labsampleid column
@@ -310,6 +334,52 @@ def chemistry(all_dfs):
         "error_message" : "These appear to be duplicated records that need to be distinguished with the labreplicate field (labrep 1, and labrep 2)"
     })
     errs.append(checkData(**results_args))
+
+
+    # Check - if the sampletype is "Result" or "Field blank" then the stationid cannot be '0000' 
+    results_args.update({
+        "badrows": results[results.sampletype.isin(['Result','Field blank']) & results.stationid.isin(['0000']) ].tmp_row.tolist(),
+        "badcolumn" : 'SampleType,StationID',
+        "error_type": "Value Error",
+        "error_message" : "If the sampletype is 'Result' or 'Field blank' then the stationid must not be '0000'"
+    })
+    errs.append(checkData(**results_args))
+    
+    # Check - if stationid is not 0000, then the sampletype cannot be "Result" or "Field blank"
+    # Not applying this check to Matrix spike sampletype - that one will get its own check
+    results_args.update({
+        "badrows": results[ (results.sampletype != 'Matrix spike') & ((~results.stationid.isin(['0000'])) & ~results.sampletype.isin(['Result','Field blank'])) ].tmp_row.tolist(),
+        "badcolumn" : 'SampleType,StationID',
+        "error_type": "Value Error",
+        "error_message" : "if stationid != '0000' then sampletype should be 'Result' or 'Field blank'"
+    })
+    errs.append(checkData(**results_args))
+    
+    # Check - if the stationid is not 0000 and the sampletype is Matrix spike, then it is an error
+    # They should use the QA stationID with a correct QA code if they used the actual station sediment as the matrix for spiking
+    results_args.update({
+        "badrows": results[ (~results.stationid.isin(['0000'])) & (results.sampletype == 'Matrix spike') ].tmp_row.tolist(),
+        "badcolumn" : 'SampleType,StationID',
+        "error_type": "Value Error",
+        "error_message" : f"All QA sampletypes must have a stationid of 0000 (Including Matrix spikes). If this is a Matrix spike done with the actual sediment sample, you should use the appropriate <a href={current_app.script_root}/scraper?action=help&layer=lu_chemqacodes>QA Code</a> ('Matrix spike done with the actual sediment sample as the matrix for spiking')"
+    })
+    errs.append(checkData(**results_args))
+    
+
+    # Check - if the qacode is 'Matrix spike done with the actual sediment sample as the matrix for spiking' then a comment containing the station it came from is required
+    results_args.update({
+        "badrows": results[ 
+            (results.qacode == 'Matrix spike done with the actual sediment sample as the matrix for spiking') 
+            & 
+            (~results.comments.str.contains(r'B23-\d{5}', regex = True) )
+        ].tmp_row.tolist(),
+        "badcolumn" : 'Comments',
+        "error_type": "Value Error",
+        "error_message" : "If the qacode is 'Matrix spike done with the actual sediment sample as the matrix for spiking' then we ask that a comment is provided telling which station it came from"
+    })
+    errs.append(checkData(**results_args))
+
+
 
 
     # Check - If the sampletype is "Lab blank" or "Blank spiked" then the matrix must be labwater    
@@ -687,6 +757,16 @@ def chemistry(all_dfs):
     
 
     # -----------------------------------------------------------------------------------------------------------------------------------#
+
+    # Check - if the analytename is 'Moisture','TOC','TN then the unit must be % by weight
+    results_args.update({
+        "badrows": results[ results.analytename.isin(['Moisture','TOC','TN']) & (results.units != r'% by weight') ].tmp_row.tolist(),
+        "badcolumn": "Units",
+        "error_type": "Value Error",
+        "error_message": r"if the analytename is 'Moisture','TOC' or 'TN' then the unit must be % by weight"
+    })
+    errs.append(checkData(**results_args))
+
 
     # Rewriting the Non CRM units checks (Organics and Tirewear)
     # Check - for Chlorinated Hydrocarbons, PAH, PBDE, PCB, Pyrethroid, TIREWEAR in the sediment matrix, the units must be ng/g dw For non reference material sampletypes
@@ -1401,13 +1481,13 @@ def chemistry(all_dfs):
         # Check - Within an analysisbatch, Matrix spikes/Blank spikes should have 60-140% recovery of spiked mass for 70% of analytes (WARNING)
         print('# Check # 4 and 7 - Within an analysisbatch, Matrix spikes/Blank spikes should have 60-140% recovery of spiked mass for 70% of analytes (WARNING)')
         print("Check # 7 temporarily disabled due to modification to QA plan on 2023-06-01 by chem technical committee")
-        checkdf = results[mask55 & results.sampletype.isin(['Matrix spike'])] \
-            .groupby(['analysisbatchid', 'sampletype', 'analyteclass','sampleid','labreplicate']) \
-            .apply(
-                lambda df: 
-                (sum((df.percentrecovery > 60) & (df.percentrecovery < 140)) / len(df)) >= 0.7
-            )
+        checkdf = results[mask55 & results.sampletype.isin(['Matrix spike'])]
         if not checkdf.empty:
+            checkdf = checkdf.groupby(['analysisbatchid', 'sampletype', 'analyteclass','sampleid','labreplicate']) \
+                .apply(
+                    lambda df: 
+                    (sum((df.percentrecovery > 60) & (df.percentrecovery < 140)) / len(df)) >= 0.7
+                )
             checkdf = checkdf.reset_index(name = 'passed_check')
             checkdf = results.merge(checkdf, on = ['analysisbatchid', 'sampletype', 'analyteclass','sampleid','labreplicate'], how = 'inner')
             checkdf = checkdf[checkdf.sampletype.isin(['Matrix spike'])]
