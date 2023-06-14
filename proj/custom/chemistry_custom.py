@@ -269,6 +269,10 @@ def chemistry(all_dfs):
     if not chkdf.empty:
         chkdf = results.merge(chkdf[chkdf.missing_analytes != ''], how = 'inner', on = ['stationid','sampletype','analyteclass'])
         chkdf = chkdf.groupby(['stationid','sampletype','analyteclass','missing_analytes']).agg({'tmp_row': list}).reset_index()
+
+        # add error or warning as a key value pair to the args dictionary
+        # it will be "popped" off later to determine whether we will issue a warning or error
+        # this check is a warnings for the Reference Material sampletypes but an error for everything else
         errs_args = chkdf.apply(
             lambda row:
             {
