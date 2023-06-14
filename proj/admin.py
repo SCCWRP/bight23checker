@@ -1,6 +1,8 @@
 import os
 import pandas as pd
-from flask import Blueprint, g, current_app, render_template, redirect, url_for, session, request, jsonify
+from bs4 import BeautifulSoup
+from io import BytesIO
+from flask import Blueprint, g, current_app, render_template, redirect, url_for, session, request, jsonify, send_file
 
 from .utils.db import metadata_summary
 
@@ -32,12 +34,22 @@ def tracking():
 
 @admin.route('/schema')
 def schema():
+    print("entering schema")
+
+    # This is kind of obsolete - orgiinally i was going to have this only available to scientists
+    # We will keep this because later we will have different levels of access and privileges
     authorized = session.get("AUTHORIZED_FOR_ADMIN_FUNCTIONS")
 
     print("start schema information lookup routine")
     eng = g.eng
+
+    # Query string arg to get the specific datatype
     datatype = request.args.get("datatype")
+
+    # Query string arg option to download
+    download = str(request.args.get("download")).strip().lower() == 'true'
     
+    # If a specific datatype is selected then display the schema for it
     if datatype is not None:
         if datatype not in current_app.datasets.keys():
             return f"Datatype {datatype} not found"
@@ -50,7 +62,7 @@ def schema():
             df = metadata_summary(tbl, eng)
             
             df['lookuplist_table_name'] = df['lookuplist_table_name'].apply(
-                lambda x: f"""<a target=_blank href=/{current_app.config.get('APP_SCRIPT_ROOT')}/scraper?action=help&layer={x}>{x}</a>""" if pd.notnull(x) else ''
+                lambda x: f"""<a target=_blank href=/{current_app.script_root}/scraper?action=help&layer={x}>{x}</a>""" if pd.notnull(x) else ''
             )
 
             # drop "table_name" column
@@ -63,11 +75,38 @@ def schema():
 
             return_object[tbl] = df.to_dict('records')
         
+        if download:
+            excel_blob = BytesIO()
+
+            with pd.ExcelWriter(excel_blob) as writer:
+                for key in return_object.keys():
+                    df_to_download = pd.DataFrame.from_dict(return_object[key])
+                    df_to_download['lookuplist_table_name'] = df_to_download['lookuplist_table_name'].apply(
+                        lambda x: "https://{}/{}/scraper?action=help&layer={}".format(
+                            request.host,
+                            current_app.config.get('APP_SCRIPT_ROOT'),
+                            BeautifulSoup(x, 'html.parser').text.strip()
+                        ) if BeautifulSoup(x, 'html.parser').text.strip() != '' else ''
+                    )
+                    df_to_download.to_excel(writer, sheet_name=key, index=False)
+
+            excel_blob.seek(0)
+
+            # if the query string said "download=true"
+            return send_file(
+                excel_blob, 
+                download_name = f'{datatype}_schema.xlsx', 
+                as_attachment = True, 
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+
+        # Return the datatype query string arg - the template will need access to that
         return render_template('schema.html', metadata=return_object, datatype=datatype, authorized=authorized)
         
     # only executes if "datatypes" not given
     datatypes_list = current_app.datasets.keys()
     return render_template('schema.html', datatypes_list=datatypes_list, authorized=authorized)
+
 
 
 

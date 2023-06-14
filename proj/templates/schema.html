@@ -13,8 +13,9 @@
     </style>
 </head>
 <body>
-    
-    {% if datatypes_list %}
+    <div>
+        {% if datatypes_list %}
+        <p>Choose a datatype:</p>
         {% for dtyp in datatypes_list %}
         <ul>
             <li>
@@ -23,9 +24,14 @@
         </ul>
         {% endfor %}
     {% else %}
+    </div>
     <div class="container d-flex flex-column align-items-center justify-content-center">
     <h1>Schema Information for {{datatype}}</h1>
-    <br><br>
+    <br>
+    <a href="{{request.script_root}}/schema"><button id="return-main-app"> Return to main page </button></a>
+    <br>
+    <a href="{{request.script_root}}/schema?datatype={{datatype}}&download=true" target=_blank><button id="download-schema"> Download as an Excel file </button></a>
+    <br>
     {# metadata is essentially the schema information about all tables in the datatype #}
     
     {% for tablename, table in metadata.items() %}
@@ -59,5 +65,6 @@
 
     {% endif %}
 </body>
+
 </html>
 
