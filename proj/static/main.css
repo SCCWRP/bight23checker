@@ -206,3 +206,13 @@ span.table-not-matched {
 .form-check-item .form-check-input {
     margin-right: 10px; /* adjust this to change the space between the radio button and its label */
 }
+
+
+div.errors-report-cell {
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+}
+div.warnings-report-cell {
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+}
