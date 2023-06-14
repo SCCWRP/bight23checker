@@ -140,7 +140,7 @@ def chemistry_tissue(all_dfs):
         .to_dict()
 
     
-    chkdf = results.groupby(['bioaccumulationsampleid','analyteclass'])['analytename'].apply(set).reset_index()
+    chkdf = results.groupby(['bioaccumulationsampleid','sampletype','analyteclass'])['analytename'].apply(set).reset_index()
     print("chkdf")
     print(chkdf)
     chkdf['missing_analytes'] = chkdf.apply(
@@ -151,19 +151,21 @@ def chemistry_tissue(all_dfs):
     print("chkdf")
     print(chkdf)
 
+    # Reference materials will not always have all the analytes
+    # labs may enter -88 for those analytes which dont have reference material values
     if not chkdf.empty:
         print("inside if chkdf not empty")
-        chkdf = results.merge(chkdf[chkdf.missing_analytes != ''], how = 'inner', on = ['bioaccumulationsampleid','analyteclass'])
+        chkdf = results.merge(chkdf[chkdf.missing_analytes != ''], how = 'inner', on = ['bioaccumulationsampleid','sampletype','analyteclass'])
         print("chkdf")
         print(chkdf)
-        chkdf = chkdf.groupby(['bioaccumulationsampleid','analyteclass','missing_analytes']).agg({'tmp_row': list}).reset_index()
+        chkdf = chkdf.groupby(['bioaccumulationsampleid','sampletype','analyteclass','missing_analytes']).agg({'tmp_row': list}).reset_index()
         errs_args = chkdf.apply(
             lambda row:
             {
                 "badrows": row.tmp_row,
-                "badcolumn" : "BioAccumulationSampleID",
+                "badcolumn" : "BioAccumulationSampleID,SampleType",
                 "error_type": "missing_data",
-                "error_message" : f"For the BioAccumulationSampleID {row.bioaccumulationsampleid}, you attempted to submit {row.analyteclass} but are missing some required analytes ({row.missing_analytes})"
+                "error_message" : f"For the BioAccumulationSampleID {row.bioaccumulationsampleid} and sampletype {row.sampletype}, you attempted to submit {row.analyteclass} but are missing some required analytes ({row.missing_analytes})"
             },
             axis = 1
         ).tolist()
