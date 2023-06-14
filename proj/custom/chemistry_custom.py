@@ -124,7 +124,7 @@ def chemistry(all_dfs):
         "badrows": badrows,
         "badcolumn": "StationID,Lab,AnalyteName",
         "error_type": "Logic Error",
-        "error_message": f"Your lab was not assigned to submit data for this analyteclass from this station (<a href=/{current_app.config.get('APP_SCRIPT_ROOT')}/scraper?action=help&layer=vw_sample_assignment&datatype=chemistry target=_blank>see sample assignments</a>)"
+        "error_message": f"Your lab was not assigned to submit data for this analyteclass from this station (<a href=/{current_app.config.get('APP_SCRIPT_ROOT')}/scraper?action=help&layer=vw_sample_assignment target=_blank>see sample assignments</a>)"
     })
     warnings.append(checkData(**results_args))
 
@@ -137,8 +137,61 @@ def chemistry(all_dfs):
     })
     errs.append(checkData(**results_args))
 
-    # Check - if a lab is submitting PFAS then they need to also submit the field blanks
-    # Check - if a lab is submitting PFAS then they need to also submit the equipment blanks
+    # PFAS completeness checks - checking for blanks
+    pfas_field_blank_stations = pd.read_sql(f"""SELECT DISTINCT stationid FROM vw_sample_assignment WHERE "parameter" = 'PFAS Field Blank' ORDER BY 1""").stationid.tolist()
+    pfasresults = results[results.analyteclass == 'PFAS']
+    if not pfasresults.empty:
+        # Check - if a lab is submitting PFAS then they need to also submit the field blanks
+        pfas_field_blank_results = pfasresults[pfasresults.stationid.isin(pfas_field_blank_stations)]
+        if not pfas_field_blank_results.empty:
+            # Among stations for which they are giving us PFAS, and which are asssigned field blanks - they need to be giving us that data
+            checkdf = pfas_field_blank_results.groupby(['stationid']).agg(
+                {
+                    'sampletype': (lambda col: 'Field blank' in col.unique()),
+                    'tmp_row' : list
+                }
+            ).reset_index().rename(columns = {'sampletype': 'has_field_blank'})
+            
+            bad = checkdf[~checkdf.has_field_blank]
+            if not bad.empty:
+                for _, row in bad.iterrows():
+                    results_args.update({
+                        "badrows": row.tmp_row,
+                        "badcolumn": "StationID,SampleType",
+                        "error_type": "Missing Data",
+                        "error_message": f"""The station {row.stationid} was assigned as PFAS field blank but it appears to be missing from your submission"""
+                    })
+                    errs.append(checkData(**results_args))
+
+
+        # Check - if a lab is submitting PFAS then they need to also submit the equipment blanks
+        # One PFAS equipment blank per lab
+
+        # Get labs that have given us equipment blanks
+        equipblanks = pd.read_sql("SELECT DISTINCT lab FROM tbl_chemresults WHERE sampletype = 'Equipment blank'; ")
+        
+        # Filter down to the records where the lab is NOT in the list of labs that have already given equipment blanks
+        checkdf = checkdf[~pfasresults.lab.isin(equipblanks.lab.tolist())]
+        
+        if not checkdf.empty:
+            checkdf = checkdf.groupby(['lab','analytename']).agg(
+                    {
+                        'sampletype': (lambda col: 'Equipment blank' in col.unique()),
+                        'tmp_row' : list
+                    }
+                ).reset_index().rename(columns = {'sampletype': 'has_equipment_blank'})
+            
+            bad = checkdf[~checkdf.has_equipment_blank]
+            if not bad.empty:
+                for _, row in bad.iterrows():
+                    results_args.update({
+                        "badrows": bad.tmp_row,
+                        "badcolumn": "Lab,SampleType",
+                        "error_type": "Missing Data",
+                        "error_message": f"""You are submitting PFAS data but there is no Equipment blank provided for the analyte {row.analytename} """
+                    })
+                    errs.append(checkData(**results_args))
+                    
 
 
     # ----- END LOGIC CHECKS ----- # 
@@ -204,30 +257,35 @@ def chemistry(all_dfs):
         .groupby('analyteclass')['analytename'] \
         .apply(set) \
         .to_dict()
-    
-    chkdf = results.groupby(['stationid','analyteclass'])['analytename'].apply(set).reset_index()
-    chkdf['missing_analytes'] = chkdf.apply(
-        lambda row: ', '.join(list((req_anlts.get(row.analyteclass) if req_anlts.get(row.analyteclass) is not None else set()) - row.analytename)), axis = 1 
-    )
 
-    chkdf = chkdf[chkdf.missing_analytes != set()]
+    # Reference materials will not always have all the analytes
+    # labs may enter -88 for those analytes which dont have reference material values
     if not chkdf.empty:
-        chkdf = results.merge(chkdf[chkdf.missing_analytes != ''], how = 'inner', on = ['stationid','analyteclass'])
-        chkdf = chkdf.groupby(['stationid','analyteclass','missing_analytes']).agg({'tmp_row': list}).reset_index()
-        errs_args = chkdf.apply(
-            lambda row:
-            {
-                "badrows": row.tmp_row,
-                "badcolumn" : "stationid",
-                "error_type": "missing_data",
-                "error_message" : f"For the station {row.stationid}, you attempted to submit {row.analyteclass} but are missing some required analytes ({row.missing_analytes})"
-            },
-            axis = 1
-        ).tolist()
+        chkdf = results.groupby(['stationid','sampletype','analyteclass'])['analytename'].apply(set).reset_index()
+        chkdf['missing_analytes'] = chkdf.apply(
+            lambda row: ', '.join(list((req_anlts.get(row.analyteclass) if req_anlts.get(row.analyteclass) is not None else set()) - row.analytename)), axis = 1 
+        )
 
-        for argset in errs_args:
-            results_args.update(argset)
-            errs.append(checkData(**results_args))
+        chkdf = chkdf[chkdf.missing_analytes != set()]
+        if not chkdf.empty:
+            chkdf = results.merge(chkdf[chkdf.missing_analytes != ''], how = 'inner', on = ['stationid','sampletype','analyteclass'])
+            chkdf = chkdf.groupby(['stationid','sampletype','analyteclass','missing_analytes']).agg({'tmp_row': list}).reset_index()
+            errs_args = chkdf.apply(
+                lambda row:
+                {
+                    "badrows": row.tmp_row,
+                    "badcolumn" : "stationid",
+                    "error_type": "Missing Data",
+                    "error_message" : f"For the station {row.stationid}, and sampletype {row.sampletype} you attempted to submit {row.analyteclass} but are missing some required analytes ({row.missing_analytes})"
+                },
+                axis = 1
+            ).tolist()
+
+            for argset in errs_args:
+                results_args.update(argset)
+                errs.append(checkData(**results_args))
+
+    
     # End of checking all required analytes per station, if they attempted submission of an analyteclass
 
     # Separate check for the Pyrethroid analyteclass
