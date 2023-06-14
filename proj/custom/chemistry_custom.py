@@ -205,7 +205,7 @@ def chemistry(all_dfs):
     # Check for All required analytes per station (All or nothing)
     current_matrix = 'sediment' #sediment or tissue - affects query for required analytes
     # Check for all required analytes per station - if a station has a certain analyteclass
-    req_anlts = pd.read_sql(f"SELECT analyte AS analytename, analyteclass FROM lu_analytes WHERE b23{current_matrix}='yes'", eng) \
+    req_anlts = pd.read_sql(f"SELECT analyte AS analytename, analyteclass FROM lu_analytes WHERE b23{current_matrix} = 'yes' AND analyteclass != 'Pyrethroid'; ", eng) \
         .groupby('analyteclass')['analytename'] \
         .apply(set) \
         .to_dict()
@@ -234,7 +234,65 @@ def chemistry(all_dfs):
             results_args.update(argset)
             errs.append(checkData(**results_args))
     # End of checking all required analytes per station, if they attempted submission of an analyteclass
-    # No partial submissions of analyteclasses
+
+    # Separate check for the Pyrethroid analyteclass
+    pyre = pd.read_sql(f"SELECT analyte AS analytename FROM lu_analytes WHERE b23{current_matrix} = 'yes' AND analyteclass = 'Pyrethroid' AND NOT (analyte ~ 'Permethrin'); ", eng).analytename.tolist()
+
+    # filter to Pyrethroid analyteclass, groupby stationid and get stations where the set of Pyrethroids is not a subset of the Pyrethroids being submitted for that station
+    # We are excluding the Permethrin analytes for this check
+    pyrethresults = results[ results.analyteclass == 'Pyrethroid' ]
+    if not pyrethresults.empty:
+        # in order to be considered a complete set of pyrethroids:
+        #  the set of analytenames must contain all from the query AND at least one of the analytes must have "Permethrin" in it
+        badstations = pyrethresults.groupby('stationid')['analytename'].apply( lambda x: not ((set(pyre).issubset(set(x))) and (any([ 'Permethrin' in str(anlt) for anlt in x ])) ) )
+        badstations = badstations[badstations == True].index.tolist()
+
+        badrows = results[(results.stationid.isin(badstations)) & (results.analyteclass == 'Pyrethroid')].tmp_row.tolist()
+        results_args.update({
+            "badrows": badrows,
+            "badcolumn": "StationID,AnalyteName",
+            "error_type": "Incomplete Data",
+            "error_message": f"""You are submitting Pyrethroid data for the stations {','.join(badstations)} but they appear to be missing some of the Pyrethroid analytes (see the <a href=/{current_app.config.get('APP_SCRIPT_ROOT')}/scraper?action=help&layer=lu_analytes>lookup list</a>)"""
+        })
+        errs.append(checkData(**results_args))
+
+    # Special check for Pyrethroids courtesy of chatGPT:
+    # Within a batch (analysisbatchid) if you have "Permethrin, cis" you must also have "Permethrin, trans"
+    # if you have "Permethrin, trans" you must also have "Permethrin, cis"
+    # If you have "Permethrin (cis + trans)" you must not have "Permethrin, cis" nor "Permethrin, trans"
+    def check_permethrin(group):
+        perm_cis = group[group['analytename'] == 'Permethrin, cis']['tmp_row'].tolist()
+        perm_trans = group[group['analytename'] == 'Permethrin, trans']['tmp_row'].tolist()
+        perm_cis_trans = group[group['analytename'] == 'Permethrin (cis + trans)']['tmp_row'].tolist()
+
+        # If 'Permethrin, cis' exists but 'Permethrin, trans' doesn't or vice versa
+        rule1_violation = perm_cis + perm_trans if (perm_cis and not perm_trans) or (perm_trans and not perm_cis) else []
+        
+        # If 'Permethrin (cis + trans)' exists and either 'Permethrin, cis' or 'Permethrin, trans' exists
+        rule2_violation = perm_cis_trans if perm_cis_trans and (perm_cis or perm_trans) else []
+
+        return rule1_violation + rule2_violation
+
+    if not pyrethresults.empty:
+
+        # Apply function to each batch
+        badrows = pyrethresults.groupby('analysisbatchid').apply(check_permethrin)
+
+        # Flatten the list of lists
+        badrows = [row for sublist in badrows for row in sublist]
+        
+        results_args.update({
+            "badrows": badrows,
+            "badcolumn": "AnalysisBatchID,AnalyteName",
+            "error_type": "Logic Error",
+            "error_message": f"""Within a batch (AnalysisBatchID) you may have the results for 'Permethrin, cis' and 'Permethrin, trans' recorded separately OR the sum represented by the analytename 'Permethrin (cis + trans)' """
+        })
+        errs.append(checkData(**results_args))
+
+
+    # End of the checks for No partial submissions of analyteclasses
+
+
 
     # ------------------------- Begin chemistry base checks ----------------------------- #
 

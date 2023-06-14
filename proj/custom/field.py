@@ -295,18 +295,19 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         raise Exception("No sampling organization detected")
 
     print("# Check StationOccupation/Salinity - if the station is an Estuary or Brackish Estuary then the salinity is required")
-    estuaries = pd.read_sql("SELECT DISTINCT stationid, stratum FROM field_assignment_table WHERE stratum IN ('Estuaries', 'Brackish Estuaries');", eng)
+    estuaries = pd.read_sql("SELECT DISTINCT stationid, stratum FROM field_assignment_table WHERE stratum IN ('Estuaries');", eng)
 
     print("# Only run if they submitted data for estuaries")
+    # Per Dario June 12 2023 - We are not sampling Brackish Estuaries so only check for Estuaries
     if len((occupation[(occupation.stationid.isin(estuaries.stationid))]))!=0 :
-        print("# for matching stationids, make sure Estuary and Brackish Estuary salinity has a value")
-        print('## Make sure Estuary and Brackish Estuary salinity value is non-empty ##')
+        print("# for matching stationids, make sure Estuary salinity has a value")
+        print('## Make sure Estuary salinity value is non-empty ##')
         strats = pd.merge(occupation[['stationid','salinity','tmp_row']],estuaries, how = 'left', on='stationid')
         occupation_args.update({
             "badrows": strats[pd.isnull(strats.salinity)].tmp_row.tolist(),
             "badcolumn": 'Salinity',
             "error_type": 'Undefined Error',
-            "error_message": 'Station in Estuary or Brackish Estuary. Salinity is required and user must enter -88 if measurement is missing.'
+            "error_message": 'Salinity is required for stations that are Estuaries and user must enter -88 if measurement is actually missing.'
         })
         errs = [*errs, checkData(**occupation_args)]
 
@@ -315,7 +316,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     print("# Jordan - Station Occupation Latitude/Longitude should be no more than 100M from Field Assignment Table Target Latitude/Longitude otherwise warning")
     print("# Merges SO dataframe and FAT dataframe according to StationIDs")
     so = occupation[['stationid','occupationlatitude','occupationlongitude','tmp_row']]
-    fat = pd.read_sql("SELECT DISTINCT stationid, latitude AS targetlatitude, longitude AS targetlongitude FROM field_assignment_table", eng)
+    fat = pd.read_sql("SELECT DISTINCT stationid, latitude AS targetlatitude, longitude AS targetlongitude, region FROM field_assignment_table", eng)
     sofat = pd.merge(so, fat, how = 'left', on ='stationid')
 
     # Raises Error for Unmatched StationIDs & Distances More than 100M from FAT Target
@@ -347,13 +348,21 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     print(sofat['dists'])
     # Raises Warning for Distances calculated above > 100M
     print("Raises warning for distances calculated above > 100m:")
-    print(sofat.loc[sofat['dists']>100])
+    print(sofat[sofat['dists'] > 100])
 
     occupation_args.update({
-        "badrows": sofat.loc[sofat['dists']>100].tmp_row.tolist(),
+        "badrows": sofat[
+            sofat.apply(
+                lambda row: row['dists'] > (200 if 'channel islands' in str(row['region']).strip().lower() else 100)
+                ,
+                axis = 1
+            )
+        ] \
+        .tmp_row \
+        .tolist(),
         "badcolumn": 'StationID',
         "error_type": 'Undefined Warning',
-        "error_message": 'Distance from Occupation Latitude/Longitude in submission to Target Latitude/Longitude in field assignment table is greater than 100 meters.'
+        "error_message": 'Distance from Occupation Latitude/Longitude in submission to Target Latitude/Longitude in field assignment table is greater than 100 meters. (up tp 200m is ok for channel islands stations)'
     })
     warnings = [*warnings, checkData(**occupation_args)]
     
@@ -555,12 +564,16 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         ##  This check is only to be done for submissions where the trawl track table hasn't been provided (most of the time).
         print("New calculated field (TrawlDistanceToNominalTarget) - Draw a line from StartLat/StartLon to EndLat/Lon calculate nearest point to tblStations Lat/Lon")
         # creates dataframe from field assignment table
-        field_sql = eng.execute("select DISTINCT stationid,latitude AS targetlatitude,longitude AS targetlongitude from field_assignment_table;")
+        field_sql = eng.execute("select DISTINCT stationid,latitude AS targetlatitude,longitude AS targetlongitude, region from field_assignment_table;")
         station = pd.DataFrame(field_sql.fetchall())
         station.columns = field_sql.keys()
         # creates new dataframes containing pertinent fields
         td = trawl[['stationid','startlatitude','startlongitude','endlatitude','endlongitude','tmp_row']]
-        sd = pd.DataFrame({'stationid':station['stationid'],'stlat':station['targetlatitude'],'stlon':station['targetlongitude']})
+        print("trawl")
+        print(trawl.to_string(index=True))
+        print("trawl.dtypes")
+        print(trawl.dtypes)
+        sd = pd.DataFrame({'stationid':station['stationid'],'stlat':station['targetlatitude'],'stlon':station['targetlongitude'],'region':station['region']})
         dt = pd.merge(td, sd, how = 'left', on ='stationid')
         # Adds error for unmatched trawls
         print("Adds error for unmatched trawls")
@@ -585,15 +598,41 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         print("Adds error for trawls over 100m away from Station Location and Missiong Lat/Lon Entries.")
         trawl['trawldistancetonominaltarget'].dropna(inplace=True)
         trawl_args.update({
-            "badrows": trawl.loc[trawl['trawldistancetonominaltarget']>100].tmp_row.tolist(),
+            # is is the station data with the target latlongs and the region
+            # trying to get the code to do what Dario wants without re writing the whole thing
+            "badrows": trawl[
+                    trawl.merge(
+                        sd, how = 'left', on = 'stationid'
+                    ) \
+                    .apply(
+                        lambda row: 
+                        row['trawldistancetonominaltarget'] > (200 if 'channel islands' in str(row['region']).strip().lower() else 100),
+                        axis = 1
+                    ) 
+                ] \
+                .tmp_row \
+                .tolist(),
             "badcolumn": 'startlatitude,startlongitude,endlatitude,endlongitude',
             "error_type": "Undefined Warning",
-            "error_message" : 'Trawl path over 100m away from Station Location'
+            "error_message" : 'Trawl path over 100m away from Station Location (Warning is issued if over 200m for channel islands)'
         })
         warnings = [*warnings, checkData(**trawl_args)]
         
+        missing_entries = [dt.loc[dt[c].replace(-88, pd.NA).isnull()] for c in td.columns]
+        print("-----------------------------------------")
+        print("-----------------------------------------")
+        print("dt")
+        print(dt.to_string(index=True))
+        print("dt.dtypes")
+        print(dt.dtypes)
+        for c in td.columns: 
+            print("c")
+            print(c)
+        print("missing_entries")
+        print(missing_entries)
+        print("-----------------------------------------")
+        print("-----------------------------------------")
         
-        missing_entries = [dt.loc[dt[c].isnull()] for c in td.columns]
         trawl_args.update({
             "badrows": missing_entries[len(missing_entries) > 0].tmp_row.tolist(),
             "badcolumn": 'TrawlDistanceToNominalTarget',
@@ -603,21 +642,8 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         warnings = [*warnings, checkData(**trawl_args)]
 
 
-
-        ## 4 - Kristin - bug fixed on 26jun18
-        ## Check - A comment is required if TrawlFail is equal to Other
-        print("## A COMMENT IS REQUIRED IF TRAWLAILCODE IS EQUAL TO OTHER ##")
-        trawlcode = trawl[['trawlfail', 'comments','tmp_row']].where(trawl['trawlfail'].isin(['Other trawl failure'])).dropna(axis = 0, how = 'all')
-        trawl_args.update({
-            "badrows": trawlcode.loc[pd.isnull(trawlcode['comments'])].tmp_row.tolist(),
-            "badcolumn": 'TrawlFail',
-            "error_type": "Undefined Error",
-            "error_message" : 'A comment is required if trawlfail is equal to other'
-        })
-        errs = [*errs, checkData(**trawl_args)]
-
         ## Kristin - bug fixed on 26jun18
-        ## Check - If PTSensor = Yes then PTSensorManufacturer required (but not SerialNumber/OnBottomTemp/OnBottomRules for table on OnBottomTemp/OnBottomTime incorrect need to be adjusted to not required)
+        ## Check - If PTSensor = Yes then PTSensorManufacturer required
         print('## PTSENSOR MANUFACTURER REQUIRED IF PT SENSOR IS YES##')
         print(trawl[(trawl.ptsensor == 'Yes')&(trawl.ptsensormanufacturer.isnull())].tmp_row.tolist())
         trawl_args.update({
@@ -652,7 +678,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             "badrows": trawl[(trawl['trawlfail'].isin(lu_tf.trawlfailure.tolist())) & (trawl['comments'].isnull())].tmp_row.tolist(),
             "badcolumn": 'Comments',
             "error_type": "Undefined Error",
-            "error_message" : f'A comment is required for that stationfail option. Please see: <a href=/{current_app.script_root}/scraper?action=help&layer=lu_trawlfails target=_blank>TrawlFail lookup</a>.'
+            "error_message" : f'A comment is required for that trawlfail option. Please see: <a href=/{current_app.script_root}/scraper?action=help&layer=lu_trawlfails target=_blank>TrawlFail lookup</a>.'
         })
         errs = [*errs, checkData(**trawl_args)]
 
@@ -681,7 +707,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             "error_type": "Location Error",
             "error_message" : f'This station has lat/longs outside of the region/stratum where the target lat/longs are (See Map tab for more details)'
         })
-        errs = [*errs, checkData(**trawl_args)]
+        warnings = [*warnings, checkData(**trawl_args)]
     else:
         # catch the case where the submission is only grab - trawl file should NOT be there...
         trawlpath = os.path.join(session['submission_dir'], "bad_trawl.json")
@@ -697,7 +723,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         print("##  New calculated field (GrabDistanceToNominalTarget) . Look at Field Assignment Table target latitude/longitude. How are far off is Grab/Lat/Lon to target ##")
         # create dataframe from Database field_assignment_table
         
-        latlons = eng.execute('select distinct stationid, latitude AS targetlatitude, longitude AS targetlongitude from field_assignment_table;')
+        latlons = eng.execute('select distinct stationid, latitude AS targetlatitude, longitude AS targetlongitude, region from field_assignment_table;')
         db = pd.DataFrame(latlons.fetchall())
         db.columns = latlons.keys()
         
@@ -729,10 +755,18 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         grab['grabdistancetonominaltarget'] = grab['grabdistancetonominaltarget'].replace(np.nan,-88)
         print(grab.loc[grab.grabdistancetonominaltarget > 100])
         grab_args.update({
-            "badrows": grab.loc[grab.grabdistancetonominaltarget > 100].tmp_row.tolist(),
+            "badrows": grab[
+                    grab.merge(db, how = 'left', on = 'stationid').apply(
+                        lambda row:
+                        (row['grabdistancetonominaltarget'] > 200) if 'channel islands' in str(row['region']).strip().lower() else (row['grabdistancetonominaltarget'] > 100),
+                        axis = 1
+                    ) 
+                ] \
+                .tmp_row \
+                .tolist(),
             "badcolumn": 'Latitude,Longitude',
             "error_type": "Undefined Warning",
-            "error_message" : 'Grab Distance to Nominal Target > 100m'
+            "error_message" : 'Grab Distance to Nominal Target > 100m (200m for channel islands)'
         })
         warnings = [*warnings, checkData(**grab_args)]
 
@@ -808,6 +842,72 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         else:
             strata_check = True
 
+
+        # Check for the parameters grabbed based on the sample assignment table
+        all_param_names_dict = {
+            'toxicity' : 'Toxicity', 
+            'pfas': 'PFAS', 
+            'pfasfieldblank': 'PFAS field blank', 
+            'microplastics' : 'Microplastics', 
+            'microplasticsfieldblank': 'Microplastics Field blank', 
+            'grainsize' : 'Sediment Grain Size', 
+            'sedimentchemistry': 'Sediment Chemistry', 
+            'benthicinfauna' : 'Benthic Infauna'
+        }
+
+        # get a list of param names just based on the keys
+        all_param_names = all_param_names_dict.keys()
+        
+        # Query sample assignment table along with xwalk to get the grab tables column names as parameter names
+        assignments = pd.read_sql(f"SELECT s.stationid, x.grabtable_param_name AS parameter FROM sample_assignment_table s JOIN xwalk_sedgrab_parameter_names x on s.datatype = x.datatype", eng)
+
+        # Mark just presence or absence of a parameter for a stationid
+        assigned_params = assignments.pivot_table(index='stationid', columns='parameter', aggfunc=lambda x: 1, fill_value=0)
+
+        # Reset the index
+        assigned_params.reset_index(inplace=True)
+
+        # Remove the column index name
+        assigned_params.columns.name = None
+
+        # add on the missing columns (if they are missing)
+        for c in list( set(all_param_names) - set(assigned_params.columns) ):
+            assigned_params[c] = 0
+
+        def check_yes(grp):
+            return 1 if (grp == 'Yes').any() else 0
+        
+        print('here')
+        agg_dict = {
+            param: check_yes
+            for param in all_param_names
+        }
+        agg_dict.update({'tmp_row': list})
+        has_params = grab.groupby('stationid').agg(agg_dict) 
+        print("has params")
+        print(has_params)
+        has_params = has_params.reset_index()
+        print("has params")
+        print(has_params)
+        print('yes')
+        
+        # merge them together for checking of presence and absence
+        checkdf = has_params.merge(assigned_params, how = 'inner', on = 'stationid', suffixes = ('','_assigned'))
+
+        if not checkdf.empty:
+            for param, human_readable_param in all_param_names_dict.items():
+                badrows = checkdf[checkdf.apply(lambda row: (row[param] == 0) & (row[f"""{param}_assigned"""] == 1), axis = 1)].tmp_row.tolist()
+                badrows = [element for sublist in badrows for element in sublist]
+                
+                grab_args.update({
+                    "badrows": badrows,
+                    "badcolumn": 'stationid',
+                    "error_type": "Assignment Error",
+                    "error_message" : f'This station was assigned to have {human_readable_param} grabbed but it is recorded as missing from your grab table'
+                })
+                warnings = [*warnings, checkData(**grab_args)]
+
+
         if strata_check:
             # Check if grab stations are in strata
             print("# Check if grab stations are in strata")
@@ -827,7 +927,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
                 "error_type": "Location Error",
                 "error_message" : f'This station has lat/longs outside of the region/stratum where the target lat/longs are (See Map tab for more details)'
             })
-            errs = [*errs, checkData(**grab_args)]
+            warnings = [*warnings, checkData(**grab_args)]
         print("end grab CHECKS")
 
         ## end grab CHECKS ##

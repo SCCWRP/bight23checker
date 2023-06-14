@@ -193,7 +193,16 @@ require([
             map: map,
             center: [-118.193741, 33.770050], //California
             zoom: 10,
-            container: "viewDiv"
+            container: "viewDiv",
+            extent: { // Set the initial extent of the view to the Southern California Bight region
+                xmin: -120.6,
+                ymin: 32.5,
+                xmax: -117.1,
+                ymax: 34.4,
+                spatialReference: {
+                    wkid: 4326
+                }
+            }
         });
 
         
@@ -280,7 +289,7 @@ require([
             let popUp = {
                 title: "{stationid}",
                 content: `
-                    <p><strong>The Lat/Longs given for station {stationid} were not found inside the region where the station lives ({region})</strong></p>
+                    <p><strong>Warning: The Lat/Longs given for station {stationid} were not found inside the region where the station lives ({region})</strong></p>
                     <p>This point corresponds to grab event number: {grabeventnumber}</p>
                 `
             }
@@ -306,7 +315,7 @@ require([
             let popUp = {
                 title: "{stationid}",
                 content: `
-                    <p><strong>This trawl for {stationid} was not found inside the region where the station lives ({region})</strong></p>
+                    <p><strong>Warning: This trawl for {stationid} was not found completely inside the region where the station lives ({region})</strong></p>
                     <p>This line corresponds to trawl number: {trawlnumber}</p>
                     <p>Start LatLongs: {startlatitude}, {startlongitude}</p>
                     <p>Over LatLongs: {overlatitude}, {overlongitude}</p>
