@@ -162,6 +162,7 @@ def chemistry_tissue(all_dfs):
         errs_args = chkdf.apply(
             lambda row:
             {
+                "error_or_warning": "warning" if ('Reference' in str(row.sampletype)) else "error",
                 "badrows": row.tmp_row,
                 "badcolumn" : "BioAccumulationSampleID,SampleType",
                 "error_type": "missing_data",
@@ -171,8 +172,12 @@ def chemistry_tissue(all_dfs):
         ).tolist()
 
         for argset in errs_args:
+            error_or_warning = argset.pop("error_or_warning")
             results_args.update(argset)
-            errs.append(checkData(**results_args))
+            if error_or_warning == "error":
+                errs.append(checkData(**results_args))
+            else:
+                warnings.append(checkData(**results_args))
     print("# End of checking all required analytes per station, if they attempted submission of an analyteclass")
     # End of checking all required analytes per station, if they attempted submission of an analyteclass
     # No partial submissions of analyteclasses
