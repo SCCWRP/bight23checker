@@ -128,7 +128,7 @@ def chemistry_tissue(all_dfs):
     print('# ----- END LOGIC CHECKS ----- # ')
 
     # ----- CUSTOM CHECKS - TISSUE RESULTS ----- #
-    print('# ----- CUSTOM CHECKS - SEDIMENT RESULTS ----- #')
+    print('# ----- CUSTOM CHECKS - TISSUE RESULTS ----- #')
 
     # Check for All required analytes per bioaccumulationsampleid (All or nothing)
     current_matrix = 'tissue' #sediment or tissue - affects query for required analytes
