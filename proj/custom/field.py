@@ -19,6 +19,7 @@ from arcgis.geometry import lengths, areas_and_lengths, project
 from arcgis.geometry import Point as arcgisPoint
 import os
 
+
 def fieldchecks(occupation, eng, trawl = None, grab = None):
     #return {'errors': [], 'warnings': []}
     current_function_name = str(currentframe().f_code.co_name)
@@ -53,25 +54,14 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     # Initiates the parts needed for strata check
     gis = GIS(os.environ.get("ARCGIS_API_URL"),os.environ.get("ARCGIS_API_USERNAME"),os.environ.get("ARCGIS_API_PASSWORD"))
     # Query Strata Bight 2018
-    strata = gis.content.get(os.environ.get("BIGHT18_STRATA_LAYER_ID")).layers[0].query().sdf
+    strata = gis.content.get(os.environ.get("BIGHT_STRATA_LAYER_ID")).layers[0].query().sdf
 
     # Convert from spatial reference from 3857 to 4326
     strata['SHAPE'] = pd.Series(project(geometries=strata['SHAPE'].tolist(), in_sr=3857, out_sr=4326))
     
-    # Turn the dataframe strata into a dictionary so we can look it up later when we check if points are in polygon
-    # strata_lookup = {}
-    # for tup, subdf in strata.groupby(['region','stratum']):
-    #     # For some reasons, the stratum in stations_grab_final is Bay, but it's Bays in the strata layer
-    #     if tup[1] == 'Bay':
-    #         tup = (tup[0], 'Bays')
-    #     strata_lookup[(tup[0],tup[1])] = subdf['SHAPE'].iloc[0]
-    
     # I am going to be forcing Karen to match the field assignment table with the strata layer, so we might not need to do that
     # and in fact, doing so may possibly break it in bight 2023
-    strata_lookup = {
-        # (tup[0],tup[1] if tup[1] != 'Bay' else 'Bays') : subdf['SHAPE'].iloc[0] for tup, subdf in strata.groupby(['region','stratum'])
-        (tup[0],tup[1]) : subdf['SHAPE'].iloc[0] for tup, subdf in strata.groupby(['region','stratum'])
-    }
+    # it is now June 15, 2023 and i can confirm that it did break it in bight2023 - Robert
     
     eng = g.eng
     
@@ -589,7 +579,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         )
 
         # see if they passed or not
-        checkdf['passed'] = checkdf.apply(lambda row: row.dist > row.max_allowable_distance, axis = 1 )
+        checkdf['passed'] = checkdf.apply(lambda row: row.dist <= row.max_allowable_distance, axis = 1 )
         
         # get the bad records that didnt pass
         checkdf = checkdf[~checkdf.passed]
@@ -608,12 +598,9 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
                     "badrows": row.tmp_row,
                     "badcolumn": 'StartLatitude,StartLongitude,EndLatitude,EndLongitude',
                     "error_type": "Undefined Error",
-                    "error_message" : f'Your trawl was in the region {row.region} and the distance was over {row.max_allowable_distance} meters'
+                    "error_message" : f'Your trawl was in the region {row.region} and the distance from the trawl line to the target station was over {row.max_allowable_distance} meters'
                 })
                 warnings = [*warnings, checkData(**trawl_args)]
-
-
-
 
 
         ## Kristin - bug fixed on 26jun18
@@ -660,13 +647,12 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         print("Check if trawl stations are in strata")
         # checker thing is breaking 
         print("-------------------- it broke between this --------------------")
-        trawl_map_errors_df = check_strata_trawl(trawl, strata_lookup, field_assignment_table)
+        trawl_map_errors_df = check_strata_trawl(trawl, strata, field_assignment_table)
         print("-------------------- and this --------------------") # yes it is breaking here :/
 
         trawlpath = os.path.join(session['submission_dir'], "bad_trawl.json")
         if len(trawl_map_errors_df) > 0:
             export_sdf_to_json(trawlpath, trawl_map_errors_df)
-            # export_sdf_to_json(os.path.join(session['submission_dir'], "bight_region.json"), strata[strata['region'].isin(trawl_map_errors_df['region'])])
             export_sdf_to_json(
                 os.path.join(session['submission_dir'], "bight_region.json"), 
                 strata.merge( trawl_map_errors_df[['stationid','region']], on = 'region', how = 'inner' )
@@ -889,7 +875,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             print(grab)
             print("field_assignment_table")
             print(field_assignment_table)
-            bad_df = check_strata_grab(grab, strata_lookup, field_assignment_table)
+            bad_df = check_strata_grab(grab, strata, field_assignment_table)
             print(bad_df)
             grabpath = os.path.join(session['submission_dir'], "bad_grab.json")
             if len(bad_df) > 0:
