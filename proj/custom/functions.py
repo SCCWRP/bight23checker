@@ -10,6 +10,10 @@ import pandas as pd
 from flask import current_app
 import json
 
+# for trawl distance function
+from shapely.geometry import Point as shapelyPoint
+from shapely.geometry import LineString
+from pyproj import CRS, Transformer
 
 def checkData(tablename, badrows, badcolumn, error_type, error_message = "Error", is_core_error = False, errors_list = [], q = None, **kwargs):
     
@@ -120,6 +124,19 @@ def check_distance(df,start_lat,end_lat,start_lon,end_lon):
         distance.append(dis)
     return distance
 
+# courtesy of chatgpt - for the trawl line distance check (100m distance allowed, 200m fior channel islands region)
+def calculate_distance(row):
+    transformer = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)  # Transformer object from WGS84 to pseudo-Mercator EPSG:3857
+
+    # Define point and line
+    point = shapelyPoint(transformer.transform(row['targetlongitude'], row['targetlatitude']))
+    line = LineString([(transformer.transform(row['startlongitude'], row['startlatitude'])), (transformer.transform(row['endlongitude'], row['endlatitude']))])
+    
+    # Calculate distance in meters
+    distance = point.distance(line)
+    
+    return distance  # Distance in meters
+
 def multivalue_lookup_check(df, field, listname, listfield, dbconnection, displayfieldname = None, sep=','):
     """
     Checks a column of a dataframe against a column in a lookup list. Specifically if the column may have multiple values.
@@ -169,6 +186,8 @@ def check_strata_grab(grab, strata_lookup, field_assignment_table):
         how='left', 
         on=['stationid']
     )
+    print("grab after merge")
+    print(grab)
     # Make the points based on long, lat columns of grab
     grab['SHAPE'] = grab.apply(
         lambda row: Point({                

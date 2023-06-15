@@ -7,7 +7,7 @@
 
 from inspect import currentframe
 from flask import current_app, g, session
-from .functions import checkData, haversine_np, check_distance, check_time, check_strata_grab, check_strata_trawl, export_sdf_to_json
+from .functions import checkData, haversine_np, check_distance, check_time, check_strata_grab, check_strata_trawl, export_sdf_to_json, calculate_distance
 import pandas as pd
 import re
 from shapely.geometry import Point, LineString
@@ -559,87 +559,61 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         })
         warnings = [*warnings, checkData(**trawl_args)]
 
-        ## 3 - Jordan Golemo -
         ##  New calculated field (TrawlDistanceToNominalTarget) - Draw a line from StartLat/StartLon to EndLat/Lon calculate nearest point to tblStations Lat/Lon.
-        ##  This check is only to be done for submissions where the trawl track table hasn't been provided (most of the time).
-        print("New calculated field (TrawlDistanceToNominalTarget) - Draw a line from StartLat/StartLon to EndLat/Lon calculate nearest point to tblStations Lat/Lon")
-        # creates dataframe from field assignment table
-        field_sql = eng.execute("select DISTINCT stationid,latitude AS targetlatitude,longitude AS targetlongitude, region from field_assignment_table;")
-        station = pd.DataFrame(field_sql.fetchall())
-        station.columns = field_sql.keys()
-        # creates new dataframes containing pertinent fields
-        td = trawl[['stationid','startlatitude','startlongitude','endlatitude','endlongitude','tmp_row']]
-        print("trawl")
-        print(trawl.to_string(index=True))
-        print("trawl.dtypes")
-        print(trawl.dtypes)
-        sd = pd.DataFrame({'stationid':station['stationid'],'stlat':station['targetlatitude'],'stlon':station['targetlongitude'],'region':station['region']})
-        dt = pd.merge(td, sd, how = 'left', on ='stationid')
-        # Adds error for unmatched trawls
-        print("Adds error for unmatched trawls")
+        trawlstations = ",".join( [f""" '{s}' """ for s in trawl.stationid.unique()] )
+        fat = pd.read_sql(
+            f"SELECT stationid, latitude AS targetlatitude, longitude AS targetlongitude, stratum, region FROM field_assignment_table WHERE stationid IN ({trawlstations})", 
+            g.eng
+        )
+        checkdf = trawl.merge(fat, on = ['stationid'], how = 'left')
         trawl_args.update({
-            "badrows": trawl.loc[dt['stlat'].isnull()].tmp_row.tolist(),
+            "badrows": checkdf[checkdf.targetlatitude.isnull() | checkdf.targetlongitude.isnull() ].tmp_row.tolist(),
             "badcolumn": 'StationID',
-            "error_type": "Undefined Warning",
-            "error_message" : 'Could not match submitted StationID to field assignment table'
+            "error_type": "Undefined Error",
+            "error_message" : f'StationID not found in the <a href={current_app.script_root}/scraper?action=help&layer=vw_field_assignment>field assignment table</a>'
         })
-        warnings = [*warnings, checkData(**trawl_args)]
+        errs = [*errs, checkData(**trawl_args)]
+
+        # remove rows with missing lat longs
+        checkdf = checkdf.dropna(subset = ['targetlatitude','targetlongitude'])
+
+        # Now time to check the distance of the trawl line to the target station
+        # the calculate_distance function returns the value in meters
+        checkdf['dist'] = checkdf.apply(calculate_distance, axis=1)
+        print("trawl check df")
+        print(checkdf[['stationid','dist','region','tmp_row']])
+
+        checkdf['max_allowable_distance'] = checkdf.region.apply(
+            lambda x: 
+            200 if ('channel islands' in str(x).lower()) else 100
+        )
+
+        # see if they passed or not
+        checkdf['passed'] = checkdf.apply(lambda row: row.dist > row.max_allowable_distance, axis = 1 )
         
-        dt = dt.dropna()
-        # initializes new field "TrawlDistanceToNominalTarget"
-        trawl['trawldistancetonominaltarget'] = pd.Series([-88]*(len(trawl)))
-        # determines closest point on trawl to station and determines min distance
-        for i in dt.index:
-            stloc = Point(dt['stlat'][i],dt['stlon'][i])
-            line = LineString([(dt['startlatitude'][i],dt['startlongitude'][i]),(dt['endlatitude'][i],dt['endlongitude'][i])])
-            closest_point = line.interpolate(line.project(stloc))
-            trawl.loc[i,'trawldistancetonominaltarget'] = haversine_np(closest_point.y,closest_point.x,stloc.y,stloc.x)
-        # Adds error for trawls over 100m away from Station Location, and missing lat/lon entries
-        print("Adds error for trawls over 100m away from Station Location and Missiong Lat/Lon Entries.")
-        trawl['trawldistancetonominaltarget'].dropna(inplace=True)
-        trawl_args.update({
-            # is is the station data with the target latlongs and the region
-            # trying to get the code to do what Dario wants without re writing the whole thing
-            "badrows": trawl[
-                    trawl.merge(
-                        sd, how = 'left', on = 'stationid'
-                    ) \
-                    .apply(
-                        lambda row: 
-                        row['trawldistancetonominaltarget'] > (200 if 'channel islands' in str(row['region']).strip().lower() else 100),
-                        axis = 1
-                    ) 
-                ] \
-                .tmp_row \
-                .tolist(),
-            "badcolumn": 'startlatitude,startlongitude,endlatitude,endlongitude',
-            "error_type": "Undefined Warning",
-            "error_message" : 'Trawl path over 100m away from Station Location (Warning is issued if over 200m for channel islands)'
-        })
-        warnings = [*warnings, checkData(**trawl_args)]
+        # get the bad records that didnt pass
+        checkdf = checkdf[~checkdf.passed]
+
+        # get the bad rows
+        checkdf = checkdf.groupby(['region','max_allowable_distance']).agg({
+            'tmp_row':list
+        }).reset_index()
         
-        missing_entries = [dt.loc[dt[c].replace(-88, pd.NA).isnull()] for c in td.columns]
-        print("-----------------------------------------")
-        print("-----------------------------------------")
-        print("dt")
-        print(dt.to_string(index=True))
-        print("dt.dtypes")
-        print(dt.dtypes)
-        for c in td.columns: 
-            print("c")
-            print(c)
-        print("missing_entries")
-        print(missing_entries)
-        print("-----------------------------------------")
-        print("-----------------------------------------")
-        
-        trawl_args.update({
-            "badrows": missing_entries[len(missing_entries) > 0].tmp_row.tolist(),
-            "badcolumn": 'TrawlDistanceToNominalTarget',
-            "error_type": "Undefined Warning",
-            "error_message" :'Missing Lat/Lon entries'
-        })
-        warnings = [*warnings, checkData(**trawl_args)]
+        print("trawl check df, again")
+        print(checkdf)
+
+        if not checkdf.empty:
+            for _, row in checkdf.iterrows():
+                trawl_args.update({
+                    "badrows": row.tmp_row,
+                    "badcolumn": 'StartLatitude,StartLongitude,EndLatitude,EndLongitude',
+                    "error_type": "Undefined Error",
+                    "error_message" : f'Your trawl was in the region {row.region} and the distance was over {row.max_allowable_distance} meters'
+                })
+                warnings = [*warnings, checkData(**trawl_args)]
+
+
+
 
 
         ## Kristin - bug fixed on 26jun18
@@ -911,6 +885,10 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         if strata_check:
             # Check if grab stations are in strata
             print("# Check if grab stations are in strata")
+            print("grab")
+            print(grab)
+            print("field_assignment_table")
+            print(field_assignment_table)
             bad_df = check_strata_grab(grab, strata_lookup, field_assignment_table)
             print(bad_df)
             grabpath = os.path.join(session['submission_dir'], "bad_grab.json")
