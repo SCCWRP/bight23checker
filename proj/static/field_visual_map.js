@@ -164,13 +164,15 @@ require([
         
         const points = data['points']
         const polylines = data['polylines']
-        const polygons = data['polygons']
+        const grab_polygons = data['grab_polygons']
+        const trawl_polygons = data['trawl_polygons']
         const strataLayerId = data['strata_layer_id']
         const targets = data['targets']
         
         console.log(points)
         console.log(polylines)
-        console.log(polygons)
+        console.log(grab_polygons)
+        console.log(trawl_polygons)
 
         arcGISAPIKey = data['arcgis_api_key']
         esriConfig.apiKey = arcGISAPIKey
@@ -255,24 +257,54 @@ require([
         
 
 
-        if (polygons !== "None" ) {
+        if (grab_polygons !== "None" ) {
             let popupTemplate = {
                 title: "{region}",
                 content: `
-                    <p>The Region specified in your data submission was: {region}</p>
-                    <p>The Stratum specified in your submission was: {stratum}</p>
-                    <p><strong>The Lat/Longs for your station {stationid} were not found in this region ({region})</strong></p>
+                    <p>The Region specified in your sediment grab submission was: {region}</p>
+                    <p>The Stratum specified in your sediment grab submission was: {stratum}</p>
+                    <p><strong>The Lat/Longs for your sediment grab station {stationid} were not found in this region ({region})</strong></p>
                 `
             }
             // let attributes = {
             //     Name: "Bight Strata Layer"
             // }
 
-            console.log('polygons')
-            console.log(polygons)
-            for (let i = 0; i < polygons.length; i++){
-                let polygon = polygons[i].geometry
-                let attributes = polygons[i].properties
+            console.log('grab_polygons')
+            console.log(grab_polygons)
+            for (let i = 0; i < grab_polygons.length; i++){
+                let polygon = grab_polygons[i].geometry
+                let attributes = grab_polygons[i].properties
+                console.log('polygon')
+                console.log(polygon)
+                
+                let polygonGraphic  = new Graphic({
+                    geometry: polygon,
+                    symbol: simpleFillSymbol,
+                    attributes: attributes,
+                    popupTemplate: popupTemplate
+                });
+                graphicsLayer.add(polygonGraphic);
+            }
+        } 
+        if (trawl_polygons !== "None" ) {
+            let popupTemplate = {
+                title: "{region}",
+                content: `
+                    <p>The Region specified for your trawl: {region}</p>
+                    <p>The Stratum: {stratum}</p>
+                    <p><strong>The trawl line for your station {stationid} did not intersect this region ({region})</strong></p>
+                `
+            }
+            // let attributes = {
+            //     Name: "Bight Strata Layer"
+            // }
+
+            console.log('trawl_polygons')
+            console.log(trawl_polygons)
+            for (let i = 0; i < trawl_polygons.length; i++){
+                let polygon = trawl_polygons[i].geometry
+                let attributes = trawl_polygons[i].properties
                 console.log('polygon')
                 console.log(polygon)
                 
@@ -315,7 +347,7 @@ require([
             let popUp = {
                 title: "{stationid}",
                 content: `
-                    <p><strong>Warning: This trawl for {stationid} was not found completely inside the region where the station lives ({region})</strong></p>
+                    <p><strong>Warning: This trawl for {stationid} was not found to intersect the region where the station lives ({region})</strong></p>
                     <p>This line corresponds to trawl number: {trawlnumber}</p>
                     <p>Start LatLongs: {startlatitude}, {startlongitude}</p>
                     <p>Over LatLongs: {overlatitude}, {overlongitude}</p>

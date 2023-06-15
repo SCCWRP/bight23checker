@@ -651,15 +651,18 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         print("-------------------- and this --------------------") # yes it is breaking here :/
 
         trawlpath = os.path.join(session['submission_dir'], "bad_trawl.json")
+        bad_trawl_bight_region_path = os.path.join(session['submission_dir'], "bad_trawl_bight_regions.json")
         if len(trawl_map_errors_df) > 0:
             export_sdf_to_json(trawlpath, trawl_map_errors_df)
             export_sdf_to_json(
-                os.path.join(session['submission_dir'], "bight_region.json"), 
+                bad_trawl_bight_region_path , 
                 strata.merge( trawl_map_errors_df[['stationid','region']], on = 'region', how = 'inner' )
             )
         else:
             if os.path.exists(trawlpath):
                 os.remove(trawlpath)
+            if os.path.exists(bad_trawl_bight_region_path):
+                os.remove(bad_trawl_bight_region_path)
         
         trawl_args.update({
             "badrows": trawl_map_errors_df.tmp_row.tolist(),
@@ -671,8 +674,11 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     else:
         # catch the case where the submission is only grab - trawl file should NOT be there...
         trawlpath = os.path.join(session['submission_dir'], "bad_trawl.json")
+        bad_trawl_bight_region_path = os.path.join(session['submission_dir'], "bad_trawl_bight_regions.json")
         if os.path.exists(trawlpath):
             os.remove(trawlpath)
+        if os.path.exists(bad_trawl_bight_region_path):
+            os.remove(bad_trawl_bight_region_path)
 
     # ------- END Trawl Checks ------- #
 
@@ -878,12 +884,15 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             bad_df = check_strata_grab(grab, strata, field_assignment_table)
             print(bad_df)
             grabpath = os.path.join(session['submission_dir'], "bad_grab.json")
+            bad_grab_region_path = os.path.join(session['submission_dir'], "bad_grab_bight_regions.json")
             if len(bad_df) > 0:
                 export_sdf_to_json(grabpath, bad_df)
-                export_sdf_to_json(os.path.join(session['submission_dir'], "bight_region.json"), strata[strata['region'].isin(bad_df['region'])])
+                export_sdf_to_json(bad_grab_region_path, strata[strata['region'].isin(bad_df['region'])])
             else:
                 if os.path.exists(grabpath):
                     os.remove(grabpath)
+                if os.path.exists(bad_grab_region_path):
+                    os.remove(bad_grab_region_path)
 
             grab_args.update({
                 "badrows": bad_df.tmp_row.tolist(),
@@ -898,8 +907,11 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     else:
         # catch the case where the submission is only trawl - grab file should NOT be there...
         grabpath = os.path.join(session['submission_dir'], "bad_grab.json")
+        bad_grab_region_path = os.path.join(session['submission_dir'], "bad_grab_bight_regions.json")
         if os.path.exists(grabpath):
             os.remove(grabpath)
+        if os.path.exists(bad_grab_region_path):
+            os.remove(bad_grab_region_path)
 
     # export geojson with target latlongs
     print('field_assignment_table')
