@@ -255,7 +255,36 @@ require([
         // };
 
         
+        if (trawl_polygons !== "None" ) {
+            let popupTemplate = {
+                title: "{region}",
+                content: `
+                    <p>The Region specified for your trawl: {region}</p>
+                    <p>The Stratum: {stratum}</p>
+                    <p><strong>The trawl line for your station {stationid} did not intersect this region ({region})</strong></p>
+                `
+            }
+            // let attributes = {
+            //     Name: "Bight Strata Layer"
+            // }
 
+            console.log('trawl_polygons')
+            console.log(trawl_polygons)
+            for (let i = 0; i < trawl_polygons.length; i++){
+                let polygon = trawl_polygons[i].geometry
+                let attributes = trawl_polygons[i].properties
+                console.log('polygon')
+                console.log(polygon)
+                
+                let polygonGraphic  = new Graphic({
+                    geometry: polygon,
+                    symbol: simpleFillSymbol,
+                    attributes: attributes,
+                    popupTemplate: popupTemplate
+                });
+                graphicsLayer.add(polygonGraphic);
+            }
+        } 
 
         if (grab_polygons !== "None" ) {
             let popupTemplate = {
@@ -287,36 +316,7 @@ require([
                 graphicsLayer.add(polygonGraphic);
             }
         } 
-        if (trawl_polygons !== "None" ) {
-            let popupTemplate = {
-                title: "{region}",
-                content: `
-                    <p>The Region specified for your trawl: {region}</p>
-                    <p>The Stratum: {stratum}</p>
-                    <p><strong>The trawl line for your station {stationid} did not intersect this region ({region})</strong></p>
-                `
-            }
-            // let attributes = {
-            //     Name: "Bight Strata Layer"
-            // }
-
-            console.log('trawl_polygons')
-            console.log(trawl_polygons)
-            for (let i = 0; i < trawl_polygons.length; i++){
-                let polygon = trawl_polygons[i].geometry
-                let attributes = trawl_polygons[i].properties
-                console.log('polygon')
-                console.log(polygon)
-                
-                let polygonGraphic  = new Graphic({
-                    geometry: polygon,
-                    symbol: simpleFillSymbol,
-                    attributes: attributes,
-                    popupTemplate: popupTemplate
-                });
-                graphicsLayer.add(polygonGraphic);
-            }
-        } 
+        
         if (points !== "None" ) {
             let popUp = {
                 title: "{stationid}",

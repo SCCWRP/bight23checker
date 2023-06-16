@@ -67,6 +67,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     
     field_assignment_table = pd.read_sql("SELECT * FROM field_assignment_table", eng)
 
+
     # ------- LOGIC CHECKS ------- #
     print("# ------- LOGIC CHECKS ------- #")
     

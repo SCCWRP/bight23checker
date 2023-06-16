@@ -187,11 +187,28 @@ def check_strata_grab(grab, strata_lookup, field_assignment_table):
         field_assignment_table.filter(items=['stationid','stratum','region']).drop_duplicates(), 
         how='left', 
         on=['stationid']
+    ).merge(
+        # tack on that region exists column because it will show up as True if it exists, NULL otherwise
+        strata_lookup.assign(region_exists_in_featurelayer = True),
+        on = ['region','stratum'],
+        how = 'left'
     )
+
+    # We essentially make it a critical error when the field assignment doesnt match the feature layer
+    # The reason for this is that it essentially is a server side error rather than a user error
+    # If they are submitting data, and we havent worked that out, that is a big problem that needs to be addressed, so we will raise a critical
+    # If we are on top of it, this should never happen during the entire bight 2023 cycle
+    print("Before assertion")
+    assert \
+        pd.notnull(grab.region_exists_in_featurelayer).all(), \
+        "There are region/stratum combinations in the field assignment table that do not match the bight region feature layer"
+    print("After assertion")
+
+
     print("grab after merge")
     print(grab)
     # Make the points based on long, lat columns of grab
-    grab['SHAPE'] = grab.apply(
+    grab['grabpoint'] = grab.apply(
         lambda row: Point({                
             "x" :  row['longitude'], 
             "y" :  row['latitude'], 
@@ -203,12 +220,15 @@ def check_strata_grab(grab, strata_lookup, field_assignment_table):
     # Now we check if the points are in associated polygon or not. Assign True if they are in
     print("Now we check if the points are in associated polygon or not. Assign True if they are in")
     grab['is_station_in_strata'] = grab.apply(
-        lambda row: strata_lookup.get((row['region'], row['stratum'])).contains(row['SHAPE'])
-        if strata_lookup.get((row['region'], row['stratum']), None) is not None
-        else
-        'cannot_find_lookup_strata',
+        lambda row: row.SHAPE.contains(row['grabpoint']),
         axis=1
     )
+
+    # the geojson we give to the browser at the end will expect the point to be in the SHAPE column
+    grab['SHAPE'] = grab.grabpoint
+
+    # geojson will not like this column in there so we will drop it now
+    grab.drop(['grabpoint'], axis = 'columns', inplace = True)
 
     # Now we get the bad rows
     bad_df = grab.assign(tmp_row=grab.index).query("is_station_in_strata == False")
@@ -273,18 +293,12 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
     # these objects are also not json serializable so it makes it difficult, so its better we just drop the columns
     trawl.drop(['region_polygon','trawl_line'], axis = 'columns', inplace = True)
 
-
     print('in the trawl strata check - trawl dataframe')
 
     print(trawl)
 
     # Now we get the bad rows
-    bad_df = trawl.assign(tmp_row=trawl.index).query("is_station_in_strata == False")
-
-    if not bad_df.empty:
-        print("bad df was populated:")
-        print(bad_df)
-    
+    bad_df = trawl.assign(tmp_row=trawl.index).query("is_station_in_strata == False")    
     return bad_df
 
 def export_sdf_to_json(path, sdf):
