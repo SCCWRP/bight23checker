@@ -310,7 +310,7 @@ def ocean_acidification(all_dfs):
     print(ctd[(ctd.depth < 0)|(ctd.depth > 75)][['season','agency','sampledate','sampletime','station','depth']])
     warnings.append(checkData('tbl_oactd', ctd[(ctd.depth < 0)|(ctd.depth > 75)].tmp_row.tolist(),'Depth','Range Warning', 'Depth value is outside of what would be considered a normal range of values, (0 to 75)'))
     # temperature check
-    print(ctd[(ctd.temperature < 0)|(ctd.temperature > 20)][['season','agency','sampledate','sampletime','station','temperature']])
+    print(ctd[(ctd.temperature.astype(float) < 0)|(ctd.temperature.astype(float) > 20)][['season','agency','sampledate','sampletime','station','temperature']])
     warnings.append(checkData('tbl_oactd', ctd[(ctd.temperature < 0)|(ctd.temperature > 20)].tmp_row.tolist(),'Temperature','Range Warning', 'Temperature value outside of what would be considered a normal range (e.g. 0-15).'))
     # salinity check
     print(ctd[(ctd.salinity < 33.0)|(ctd.salinity > 33.7)][['season','agency','sampledate','sampletime','station','salinity']])
@@ -347,7 +347,8 @@ def ocean_acidification(all_dfs):
 
     errs = [er for er in errs if len(er) > 0]
     warnings = [w for w in warnings if len(w) > 0]
-
+    
+    print("-------------------------------------------R Script -------------------------------------------------------")
     # OA Analysis routine - pH correction and omega aragonite
     if len(errs) == 0:
         print("No errors - run analysis routine")
