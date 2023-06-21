@@ -6,12 +6,14 @@ from inspect import currentframe
 from arcgis.geometry.filters import within, contains
 from arcgis.geometry import Point, Polyline, Polygon, Geometry
 from arcgis.geometry import lengths, areas_and_lengths, project
+from arcgis.geometry.functions import intersect as arc_geometry_intersect
 import pandas as pd
 from flask import current_app
 import json
 
 # for trawl distance function
 from shapely.geometry import Point as shapelyPoint
+from shapely.geometry import Polygon as shapelyPolygon
 from shapely.geometry import LineString
 from pyproj import CRS, Transformer
 
@@ -185,11 +187,28 @@ def check_strata_grab(grab, strata_lookup, field_assignment_table):
         field_assignment_table.filter(items=['stationid','stratum','region']).drop_duplicates(), 
         how='left', 
         on=['stationid']
+    ).merge(
+        # tack on that region exists column because it will show up as True if it exists, NULL otherwise
+        strata_lookup.assign(region_exists_in_featurelayer = True),
+        on = ['region','stratum'],
+        how = 'left'
     )
+
+    # We essentially make it a critical error when the field assignment doesnt match the feature layer
+    # The reason for this is that it essentially is a server side error rather than a user error
+    # If they are submitting data, and we havent worked that out, that is a big problem that needs to be addressed, so we will raise a critical
+    # If we are on top of it, this should never happen during the entire bight 2023 cycle
+    print("Before assertion")
+    assert \
+        pd.notnull(grab.region_exists_in_featurelayer).all(), \
+        "There are region/stratum combinations in the field assignment table that do not match the bight region feature layer"
+    print("After assertion")
+
+
     print("grab after merge")
     print(grab)
     # Make the points based on long, lat columns of grab
-    grab['SHAPE'] = grab.apply(
+    grab['grabpoint'] = grab.apply(
         lambda row: Point({                
             "x" :  row['longitude'], 
             "y" :  row['latitude'], 
@@ -201,12 +220,15 @@ def check_strata_grab(grab, strata_lookup, field_assignment_table):
     # Now we check if the points are in associated polygon or not. Assign True if they are in
     print("Now we check if the points are in associated polygon or not. Assign True if they are in")
     grab['is_station_in_strata'] = grab.apply(
-        lambda row: strata_lookup.get((row['region'], row['stratum'])).contains(row['SHAPE'])
-        if strata_lookup.get((row['region'], row['stratum']), None) is not None
-        else
-        'cannot_find_lookup_strata',
+        lambda row: row.SHAPE.contains(row['grabpoint']),
         axis=1
     )
+
+    # the geojson we give to the browser at the end will expect the point to be in the SHAPE column
+    grab['SHAPE'] = grab.grabpoint
+
+    # geojson will not like this column in there so we will drop it now
+    grab.drop(['grabpoint'], axis = 'columns', inplace = True)
 
     # Now we get the bad rows
     bad_df = grab.assign(tmp_row=grab.index).query("is_station_in_strata == False")
@@ -220,76 +242,63 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
         field_assignment_table.filter(items=['stationid','stratum','region']).drop_duplicates(), 
         how='left', 
         on=['stationid']
+    ).merge(
+        # tack on that region exists column because it will show up as True if it exists, NULL otherwise
+        strata_lookup.assign(region_exists_in_featurelayer = True),
+        on = ['region','stratum'],
+        how = 'left'
     )
-    print("trawl merged df: ")
-    print(trawl)
+
+    # We essentially make it a critical error when the field assignment doesnt match the feature layer
+    # The reason for this is that it essentially is a server side error rather than a user error
+    # If they are submitting data, and we havent worked that out, that is a big problem that needs to be addressed, so we will raise a critical
+    # If we are on top of it, this should never happen during the entire bight 2023 cycle
+    print("Before assertion")
+    assert \
+        pd.notnull(trawl.region_exists_in_featurelayer).all(), \
+        "There are region/stratum combinations in the field assignment table that do not match the bight region feature layer"
+    print("After assertion")
+
 
     # Make the points based on long, lat columns of grab
-    trawl['SHAPE'] = trawl.apply(
-        lambda row: Polyline({                
-            "paths" : [
-                [
-                    [row['startlongitude'], row['startlatitude']], [row['endlongitude'], row['endlatitude']]
-                ]
-            ],
-            "spatialReference" : {"wkid" : 4326}
-        }),
+    trawl['trawl_line'] = trawl.apply(
+        lambda row: LineString([
+            (row['startlongitude'], row['startlatitude']), (row['endlongitude'], row['endlatitude'])
+        ]),
         axis=1
     )
-    print("------- shape was populated -------")
+
+    # make a column of shapely polygons - this will be the bight region polygon to check for intersection with trawl line
+    # We already asserted that there will be no missing values in the SHAPE column
+    trawl['region_polygon'] = trawl.apply(
+        lambda row: 
+        [shapelyPolygon(ring) for ring in row.SHAPE.get('rings')],
+        axis=1
+    )
     
-    # Assert if we are not able to find the lookup strata
-    # Strata lookup dictionary has (region, stratum) as keys, so if the region + stratum combination is not in the lookup list, we cannot match
-    print("it probably crashes at the zip function")
-    not_in_field_assignment_table = [(x,y) for x,y in zip(trawl['region'], trawl['stratum']) if (x,y) not in strata_lookup.keys()]
-    print("--- not_in_field_assignment_table ---")
-    print(not_in_field_assignment_table) # this passed
-    print("                             ")
-    print("                             ")
-    print("                             ")
-    print("checking the length")
-
-
-    # Please forgive me, but i am not sure why the below (commented out) code was put in - Robert
-    # ------------------------------------------------------------------------------------
-    # print("REPLACING THE NUMERIC nan WITH TEXT null")
-    # if np.nan in not_in_field_assignment_table[0]:
-    #     #replace numeric nan with text null
-    #     not_in_field_assignment_table = [
-    #         #tuple(None if isinstance(i, float) and math.isnan(i) else i for i in t) 
-    #         # try with empty string instead because None will be nonetype object and .join does not like that
-    #         tuple('' if isinstance(i, float) and math.isnan(i) else i for i in t) 
-    #         for t in not_in_field_assignment_table
-    #     ]
-    # print(not_in_field_assignment_table)
-
-    # print('\n'.join(','.join(elems) for elems in not_in_field_assignment_table))
-    # print("this following does not work...")
-    # ------------------------------------------------------------------------------------
-
-
-    #print(f"{','.join(not_in_field_assignment_table)} these combos are not in the field_assignment_table")
-    # error when not_in_field_assignment_table = [(nan, nan)] is a tuple values, ERROR: sequence item 0: expected str instance, tuple found
-    #assert len(not_in_field_assignment_table) == 0, f"{','.join(not_in_field_assignment_table)} these combos are not in the field_assignment_table" 
-    #assert len(not_in_field_assignment_table) == 0, f"{','.join(','.join(elems) for elems in not_in_field_assignment_table)} these combos are not in the field_assignment_table" 
-    print("the assertion did not fail")
-
+    
+    # We are assuming that the region and stratum combination is in the strata lookup list
     # Now we check if the points are in associated polygon or not. Assign True if they are in
-    print(" -------------------------BEFORE IS STATION IN STRATA")
     trawl['is_station_in_strata'] = trawl.apply(
-        lambda row: strata_lookup.get((row['region'], row['stratum'])).contains(row['SHAPE'])
-        if strata_lookup.get((row['region'], row['stratum']), None) is not None
-        else
-        'cannot_find_lookup_strata',
+        lambda row: 
+        any([polygon.intersects(row.trawl_line) for polygon in row.region_polygon]),
         axis=1
     )
-    print(" --------------------------------AFTER IS STATION IN STRATA")
 
+    # Need to ensure the SHAPE column is the trawl line as an arcgis geometry Polyline object
+    # This is because there is a function that exports a spatial dataframe to a json which expects this column, as an "ArcGIS API for Python type of object"
+    trawl['SHAPE'] = trawl.trawl_line.apply(lambda line: Polyline({"paths": [list(line.coords)], "spatialReference": {"wkid": 4326}}) )
+
+    # We also should drop the temp columns created in this function, since we dont want them included in the geojson that will be put on the map
+    # these objects are also not json serializable so it makes it difficult, so its better we just drop the columns
+    trawl.drop(['region_polygon','trawl_line'], axis = 'columns', inplace = True)
+
+    print('in the trawl strata check - trawl dataframe')
+
+    print(trawl)
 
     # Now we get the bad rows
-    bad_df = trawl.assign(tmp_row=trawl.index).query("is_station_in_strata == False")
-    print("bad df was populated:")
-    print(bad_df)
+    bad_df = trawl.assign(tmp_row=trawl.index).query("is_station_in_strata == False")    
     return bad_df
 
 def export_sdf_to_json(path, sdf):

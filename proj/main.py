@@ -3,6 +3,7 @@ from werkzeug.utils import secure_filename
 from gc import collect
 import os
 import pandas as pd
+from json import loads
 
 # custom imports, from local files
 from .preprocess import clean_data, hardcoded_fixes
@@ -14,6 +15,17 @@ from .utils.excel import mark_workbook
 from .utils.exceptions import default_exception_handler
 from .custom import *
 
+# So i can see more of the columns when i print the dataframes
+# if it doesnt exist, it will return None, and all columns will be printed in dataframes
+CUSTOM_CONFIG_PATH = os.path.join(os.getcwd(), 'proj', 'config')
+CONFIG_FILEPATH = os.path.join(CUSTOM_CONFIG_PATH, 'config.json')
+
+assert os.path.exists(CONFIG_FILEPATH), "config.json not found"
+CONFIG = loads(open(CONFIG_FILEPATH, 'r').read())
+
+max_print_cols = CONFIG.get("DF_PRINT_MAX_COLUMNS")
+max_print_cols = int(max_print_cols) if max_print_cols is not None else max_print_cols
+pd.set_option('display.max_columns', max_print_cols)
 
 upload = Blueprint('upload', __name__)
 @upload.route('/upload',methods = ['GET','POST'])
