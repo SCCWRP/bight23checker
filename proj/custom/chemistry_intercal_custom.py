@@ -128,10 +128,10 @@ def chemistry_intercal(all_dfs):
     # Check - The MDL should never be a negative number (Error)
     print('# Check - The MDL should never be a negative number (Error)')
     results_args.update({
-        "badrows": results[results.mdl < 0].tmp_row.tolist(),
+        "badrows": results[(results.mdl < 0) & (results.mdl != -88)].tmp_row.tolist(),
         "badcolumn": "MDL",
         "error_type": "Value Error",
-        "error_message": "The MDL should not be negative"
+        "error_message": "The MDL should not be negative (except for -88 to denote a missing value)"
     })
     errs.append(checkData(**results_args))
 
