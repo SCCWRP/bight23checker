@@ -1,4 +1,3 @@
-{% if authorized %}
 <html>
 <head>
 
@@ -30,51 +29,5 @@
 </table>
 </body>
 </html>
-{% else %}
-<html>
-	<head>
-		<link rel="stylesheet" type="text/css" href="{{url_for('static', filename = 'button.css')}}">
-		<link rel="stylesheet" type="text/css" href="{{url_for('static', filename = 'trackform.css')}}">
-	</head>
-	<body>
 
-		<form id="admin-auth-form">
-			<label for="adminpw">Please sign in to view submission tracking (The password is exactly what you think it is)</label>
-			<input type="password" name="adminpw">
-			<button id="admin-auth-submit-btn" class="btn btn-primary" type="submit">Submit</button>
-		</form>
-	</body>
-	<script type="text/javascript">
-		document.getElementById('admin-auth-form')?.addEventListener('submit', (event) => {
-			event.preventDefault();
-			const formData = new FormData(event.target);
-			console.log(JSON.stringify(Object.fromEntries(formData.entries())))
-			fetch(
-				`{{request.script_root}}/adminauth`, 
-				{
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					body: JSON.stringify(Object.fromEntries(formData.entries()))
-			}
-			)
-			.then(response => {
-				if (!response.ok) {
-					throw new Error('Network response was not ok');
-				}
-				return response.json();
-			})
-			.then(data => {
-				console.log(data);
-				if (data.message === 'true') {
-					window.location = `{{request.script_root}}/track`
-				}
-			})
-			.catch(error => {
-				console.error('There was a problem submitting the form', error);
-			});
-		})
-	</script>
-</html>
-{% endif %}
+

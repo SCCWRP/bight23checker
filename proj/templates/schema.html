@@ -32,6 +32,8 @@
     <br>
     <a href="{{request.script_root}}/schema?datatype={{datatype}}&download=true" target=_blank><button id="download-schema"> Download as an Excel file </button></a>
     <br>
+    <a href="{{request.script_root}}/adminauth?redirect_to=schema"><button id="edit-schema"> Log in to edit </button></a>
+    <br>
     {# metadata is essentially the schema information about all tables in the datatype #}
     
     {% for tablename, table in metadata.items() %}
@@ -50,10 +52,16 @@
                             {% endfor %}
                         </thead>
                         {% endif %}
-                        <tr {% if row.primary_key == 'YES' %} class="primary-key-row" {% endif %}>
-                            {% for k, v in row.items() %}
-                            <td>{{v | safe}}</td>
-                            {% endfor %}    
+                        {% for k, v in row.items() %}
+                            {% if loop.index0 == 0 %}
+                                <tr data-parent-table="{{tablename}}" data-column-name="{{v}}" {% if row.primary_key == 'YES' %} class="primary-key-row" {% endif %}>
+                            {% endif %}
+                                {% if ((authorized) and (k == 'description')) %}
+                                    <td class="editable-description-cell" contenteditable="true">{{v | safe}}</td>
+                                {% else %}
+                                    <td>{{v | safe}}</td>
+                                {%endif%}
+                        {% endfor %}    
                         </tr>
                     {% endfor %}
                 </table>
@@ -65,6 +73,41 @@
 
     {% endif %}
 </body>
+
+{% if authorized %}
+<script>
+    Array.from(document.getElementsByClassName('editable-description-cell')).forEach(cell => {
+        cell.addEventListener('blur', function() {
+            const colDescription = this.innerText;
+            const parentTable = this.parentNode.dataset.parentTable;
+            const colName = this.parentNode.dataset.columnName;
+            saveChanges(parentTable, colName, colDescription);
+        });
+
+        cell.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();  // Prevents adding a new line (if the cell is a multiline input like textarea)
+                this.blur();  // Remove focus from the cell
+            }
+        });
+    });
+    const saveChanges = function(tableName, colName, txt) {
+        fetch("{{request.script_root}}/save-changes", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                "tablename": tableName,
+                "column_name" : colName,
+                "column_description" : txt 
+            })
+        })
+        .then(response => response.json())
+        .then(data => console.log(data))
+    }
+</script>
+{% endif %}
 
 </html>
 
