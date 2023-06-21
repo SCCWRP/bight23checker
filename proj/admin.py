@@ -3,6 +3,8 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from io import BytesIO
 from flask import Blueprint, g, current_app, render_template, redirect, url_for, session, request, jsonify, send_file
+import psycopg2
+from psycopg2 import sql
 
 from .utils.db import metadata_summary
 
@@ -27,6 +29,9 @@ def tracking():
     session_results = g.eng.execute(sql_session)
     session_json = [dict(r) for r in session_results]
     authorized = session.get("AUTHORIZED_FOR_ADMIN_FUNCTIONS")
+    if not authorized:
+        return render_template('admin_password.html', redirect_route='track')
+
     
     # session is a reserved word in flask - renaming to something different
     return render_template('track.html', session_json=session_json, authorized=authorized)
@@ -110,11 +115,57 @@ def schema():
 
 
 
-@admin.route('/adminauth', methods = ['POST'])
+@admin.route('/save-changes', methods = ['GET','POST'])
+def savechanges():
+
+    data = request.get_json()
+
+    tablename = str(data.get("tablename")).strip()
+    column_name = str(data.get("column_name")).strip()
+    column_description = str(data.get("column_description")).strip()
+
+
+
+    # connect with psycopg2
+    connection = psycopg2.connect(
+        host=os.environ.get("DB_HOST"),
+        database=os.environ.get("DB_NAME"),
+        user=os.environ.get("DB_USER"),
+        password=os.environ.get("PGPASSWORD"),
+    )
+
+    connection.set_session(autocommit=True)
+
+    with connection.cursor() as cursor:
+        command = sql.SQL(
+            """
+            COMMENT ON COLUMN {tablename}.{column_name} IS {description};
+            """
+        ).format(
+            tablename = sql.Identifier(tablename),
+            column_name = sql.Identifier(column_name),
+            description = sql.Literal(column_description)
+        )
+        
+        cursor.execute(command)
+
+    connection.close()
+
+    
+    return jsonify(message=f"successfully updated comment on the column {column_name} in the table {tablename}")
+
+
+@admin.route('/adminauth', methods = ['GET','POST'])
 def adminauth():
+
+    # I put a link in the schema page for some who want to edit the schema to sign in
+    # I put schema as as query string arg to show i want them to be redirected there after they sign in
+    if request.args.get("redirect_to"):
+        return render_template('admin_password.html', redirect_route=request.args.get("redirect_to"))
 
     adminpw = request.get_json().get('adminpw')
     if adminpw == os.environ.get("ADMIN_FUNCTION_PASSWORD"):
         session['AUTHORIZED_FOR_ADMIN_FUNCTIONS'] = True
-    
+
+
     return jsonify(message=str(session.get("AUTHORIZED_FOR_ADMIN_FUNCTIONS")).lower())
