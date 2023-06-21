@@ -206,7 +206,7 @@ def metadata_summary(table, eng):
         isc.COLUMN_NAME,
         isc.udt_name AS datatype,
         CASE WHEN isc.is_nullable = 'NO' THEN 'YES' ELSE' NO' END AS required,
-        isc.character_maximum_length,
+        isc.character_maximum_length AS character_limit,
         pkey.primary_key,
         fkeys.foreign_table_name AS lookuplist_table_name,
         cmt.description 

@@ -106,54 +106,57 @@ def schema():
             )
 
         # Return the datatype query string arg - the template will need access to that
-        return render_template('schema.html', metadata=return_object, datatype=datatype, authorized=authorized)
+        return render_template('schema.jinja2', metadata=return_object, datatype=datatype, authorized=authorized)
         
     # only executes if "datatypes" not given
     datatypes_list = current_app.datasets.keys()
-    return render_template('schema.html', datatypes_list=datatypes_list, authorized=authorized)
+    return render_template('schema.jinja2', datatypes_list=datatypes_list, authorized=authorized)
 
 
 
 
-@admin.route('/save-changes', methods = ['GET','POST'])
+@admin.route('/save-changes', methods = ['POST'])
 def savechanges():
-
-    data = request.get_json()
-
-    tablename = str(data.get("tablename")).strip()
-    column_name = str(data.get("column_name")).strip()
-    column_description = str(data.get("column_description")).strip()
-
-
-
-    # connect with psycopg2
-    connection = psycopg2.connect(
-        host=os.environ.get("DB_HOST"),
-        database=os.environ.get("DB_NAME"),
-        user=os.environ.get("DB_USER"),
-        password=os.environ.get("PGPASSWORD"),
-    )
-
-    connection.set_session(autocommit=True)
-
-    with connection.cursor() as cursor:
-        command = sql.SQL(
-            """
-            COMMENT ON COLUMN {tablename}.{column_name} IS {description};
-            """
-        ).format(
-            tablename = sql.Identifier(tablename),
-            column_name = sql.Identifier(column_name),
-            description = sql.Literal(column_description)
-        )
-        
-        cursor.execute(command)
-
-    connection.close()
-
+    authorized = session.get("AUTHORIZED_FOR_ADMIN_FUNCTIONS")
     
-    return jsonify(message=f"successfully updated comment on the column {column_name} in the table {tablename}")
+    if authorized:
+        data = request.get_json()
 
+        tablename = str(data.get("tablename")).strip()
+        column_name = str(data.get("column_name")).strip()
+        column_description = str(data.get("column_description")).strip()
+
+
+
+        # connect with psycopg2
+        connection = psycopg2.connect(
+            host=os.environ.get("DB_HOST"),
+            database=os.environ.get("DB_NAME"),
+            user=os.environ.get("DB_USER"),
+            password=os.environ.get("PGPASSWORD"),
+        )
+
+        connection.set_session(autocommit=True)
+
+        with connection.cursor() as cursor:
+            command = sql.SQL(
+                """
+                COMMENT ON COLUMN {tablename}.{column_name} IS {description};
+                """
+            ).format(
+                tablename = sql.Identifier(tablename),
+                column_name = sql.Identifier(column_name),
+                description = sql.Literal(column_description)
+            )
+            
+            cursor.execute(command)
+
+        connection.close()
+
+        
+        return jsonify(message=f"successfully updated comment on the column {column_name} in the table {tablename}")
+
+    return ''
 
 @admin.route('/adminauth', methods = ['GET','POST'])
 def adminauth():

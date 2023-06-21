@@ -42,7 +42,7 @@
                 <h3><strong>{{tablename}}</strong></h3>
             </div>
             <div class="table-content-container">
-                <table class="table table-striped table-hover">                    
+                <table id="{{tablename}}-schema-table" class="table table-striped table-hover">                    
                     {% for row in table %}
                         {# for the first loop, add the table header #}
                         {% if loop.index0 == 0 %}
@@ -52,17 +52,22 @@
                             {% endfor %}
                         </thead>
                         {% endif %}
+
+                        {# I moved the part that builds the <tr> inside the loop so i could capture the column name and store it in the dataset of the row #}
+                        <tr data-parent-table="{{tablename}}" data-row-number="{{loop.index0}}" {% if row.primary_key == 'YES' %} class="primary-key-row" {% endif %}>
                         {% for k, v in row.items() %}
-                            {% if loop.index0 == 0 %}
-                                <tr data-parent-table="{{tablename}}" data-column-name="{{v}}" {% if row.primary_key == 'YES' %} class="primary-key-row" {% endif %}>
-                            {% endif %}
+                            <td 
                                 {% if ((authorized) and (k == 'description')) %}
-                                    <td class="editable-description-cell" contenteditable="true">{{v | safe}}</td>
+                                    class="description-cell editable-description-cell" 
+                                    contenteditable="true"
                                 {% else %}
-                                    <td>{{v | safe}}</td>
-                                {%endif%}
+                                    class="{{k}}-cell"
+                                {% endif %}
+                            >
+                                {{v | safe}}
+                            </td>
                         {% endfor %}    
-                        </tr>
+                                </tr>
                     {% endfor %}
                 </table>
             </div>
@@ -80,7 +85,15 @@
         cell.addEventListener('blur', function() {
             const colDescription = this.innerText;
             const parentTable = this.parentNode.dataset.parentTable;
-            const colName = this.parentNode.dataset.columnName;
+            const colName = this.parentNode.querySelector('.column_name-cell').innerText;
+
+            console.log("colDescription")
+            console.log(colDescription)
+            console.log("parentTable")
+            console.log(parentTable)
+            console.log("colName")
+            console.log(colName)
+
             saveChanges(parentTable, colName, colDescription);
         });
 
@@ -88,6 +101,17 @@
             if (event.key === 'Enter') {
                 event.preventDefault();  // Prevents adding a new line (if the cell is a multiline input like textarea)
                 this.blur();  // Remove focus from the cell
+                
+                // get the next row number, which was stored in the dataset of each <tr> element
+                let nextRow = Number(this.parentNode.dataset.rowNumber) + 1;
+
+                // this = td, parent is the tr, and the parent of that is tbody, and the parent of that is the table
+                // we want to do the queryselection for the next row from the parent table, rather than from the entire document
+                let parentTable = this.parentNode.parentNode.parentNode;
+
+                // focus on the "next cell" if it exists
+                parentTable.querySelector(`tr[data-row-number="${nextRow}"]`)?.querySelector("td.editable-description-cell").focus()
+
             }
         });
     });

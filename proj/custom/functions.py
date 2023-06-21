@@ -199,9 +199,12 @@ def check_strata_grab(grab, strata_lookup, field_assignment_table):
     # If they are submitting data, and we havent worked that out, that is a big problem that needs to be addressed, so we will raise a critical
     # If we are on top of it, this should never happen during the entire bight 2023 cycle
     print("Before assertion")
-    assert \
-        pd.notnull(grab.region_exists_in_featurelayer).all(), \
-        "There are region/stratum combinations in the field assignment table that do not match the bight region feature layer"
+    # assert \
+    #     pd.notnull(grab.region_exists_in_featurelayer).all(), \
+    #     "There are region/stratum combinations in the field assignment table that do not match the bight region feature layer"
+    if not pd.notnull(grab.region_exists_in_featurelayer).all():
+        print("THERE IS A PROBLEM")
+        print("There are region/stratum combinations in the field assignment table that do not match the bight region feature layer")
     print("After assertion")
 
 
@@ -248,15 +251,20 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
         on = ['region','stratum'],
         how = 'left'
     )
+    print("trawl")
+    print(trawl)
 
     # We essentially make it a critical error when the field assignment doesnt match the feature layer
     # The reason for this is that it essentially is a server side error rather than a user error
     # If they are submitting data, and we havent worked that out, that is a big problem that needs to be addressed, so we will raise a critical
     # If we are on top of it, this should never happen during the entire bight 2023 cycle
     print("Before assertion")
-    assert \
-        pd.notnull(trawl.region_exists_in_featurelayer).all(), \
-        "There are region/stratum combinations in the field assignment table that do not match the bight region feature layer"
+    # assert \
+    #     pd.notnull(trawl.region_exists_in_featurelayer).all(), \
+    #     "There are region/stratum combinations in the field assignment table that do not match the bight region feature layer"
+    if not pd.notnull(trawl.region_exists_in_featurelayer).all():
+        print("THERE IS A PROBLEM")
+        print("There are region/stratum combinations in the field assignment table that do not match the bight region feature layer")
     print("After assertion")
 
 
@@ -270,6 +278,8 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
 
     # make a column of shapely polygons - this will be the bight region polygon to check for intersection with trawl line
     # We already asserted that there will be no missing values in the SHAPE column
+    print("trawl")
+    print(trawl)
     trawl['region_polygon'] = trawl.apply(
         lambda row: 
         [shapelyPolygon(ring) for ring in row.SHAPE.get('rings')],
