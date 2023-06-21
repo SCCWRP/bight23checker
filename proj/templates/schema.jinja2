@@ -32,8 +32,10 @@
     <br>
     <a href="{{request.script_root}}/schema?datatype={{datatype}}&download=true" target=_blank><button id="download-schema"> Download as an Excel file </button></a>
     <br>
+    {% if not authorized %}
     <a href="{{request.script_root}}/adminauth?redirect_to=schema"><button id="edit-schema"> Log in to edit </button></a>
     <br>
+    {% endif %}
     {# metadata is essentially the schema information about all tables in the datatype #}
     
     {% for tablename, table in metadata.items() %}
@@ -97,13 +99,22 @@
             saveChanges(parentTable, colName, colDescription);
         });
 
+        cell.addEventListener('focus', function(event) {
+            let range = document.createRange(); // create a new range
+            range.selectNodeContents(this); // set range to cell contents
+            let sel = window.getSelection(); // get the current selection
+            sel.removeAllRanges(); // remove all ranges from the selection
+            sel.addRange(range); // add the range to the selection
+        });
+
         cell.addEventListener('keydown', function(event) {
-            if (event.key === 'Enter') {
+            const keyPressType = event.key;
+            if (['Enter','ArrowUp','ArrowDown'].includes(keyPressType)) {
                 event.preventDefault();  // Prevents adding a new line (if the cell is a multiline input like textarea)
                 this.blur();  // Remove focus from the cell
                 
                 // get the next row number, which was stored in the dataset of each <tr> element
-                let nextRow = Number(this.parentNode.dataset.rowNumber) + 1;
+                let nextRow = Number(this.parentNode.dataset.rowNumber) + (keyPressType === 'ArrowUp' ? -1 : 1);
 
                 // this = td, parent is the tr, and the parent of that is tbody, and the parent of that is the table
                 // we want to do the queryselection for the next row from the parent table, rather than from the entire document
