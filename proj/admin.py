@@ -1,4 +1,4 @@
-import os
+import os, re
 import pandas as pd
 from bs4 import BeautifulSoup
 from io import BytesIO
@@ -168,7 +168,71 @@ def column_order():
             if request.method == 'GET' \
             else ''
     
+
+    # connect with psycopg2
+    connection = psycopg2.connect(
+        host=os.environ.get("DB_HOST"),
+        database=os.environ.get("DB_NAME"),
+        user=os.environ.get("DB_USER"),
+        password=os.environ.get("PGPASSWORD"),
+    )
+
+    connection.set_session(autocommit=True)
+
     if request.method == 'GET':
+        eng = g.eng
+
+        # update column-order table based on contents of information schema
+        cols_to_add_qry = (
+            """
+            WITH cols_to_add AS (
+                SELECT 
+                    table_name,
+                    column_name,
+                    ordinal_position AS original_db_position,
+                    ordinal_position AS custom_column_position 
+                FROM
+                    information_schema.COLUMNS 
+                WHERE
+                    table_name IN ( SELECT DISTINCT table_name FROM column_order ) 
+                    AND ( table_name, column_name ) NOT IN ( SELECT DISTINCT table_name, column_name FROM column_order )
+            )
+            INSERT INTO 
+                column_order (table_name, column_name, original_db_position, custom_column_position) 
+                (
+                    SELECT table_name, column_name, original_db_position, custom_column_position FROM cols_to_add
+                )
+            ;
+            """
+        )
+
+        # remove records from column order if they are not there anymore
+        cols_to_delete_qry = (
+            """
+            WITH cols_to_delete AS (
+                SELECT TABLE_NAME
+                    ,
+                    COLUMN_NAME,
+                    original_db_position,
+                    custom_column_position 
+                FROM
+                    column_order 
+                WHERE
+                    TABLE_NAME NOT IN ( SELECT DISTINCT TABLE_NAME FROM information_schema.COLUMNS ) 
+                    OR ( TABLE_NAME, COLUMN_NAME ) NOT IN ( SELECT DISTINCT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS ) 
+                ) 
+                DELETE FROM column_order 
+                WHERE
+                    ( TABLE_NAME, COLUMN_NAME ) IN ( SELECT TABLE_NAME, COLUMN_NAME FROM cols_to_delete );
+            ;
+            """
+        )
+        with connection.cursor() as cursor:
+            command = sql.SQL(cols_to_add_qry)
+            cursor.execute(command)
+            command = sql.SQL(cols_to_delete_qry)
+            cursor.execute(command)
+
         basequery = (
             """
             WITH baseqry AS (
@@ -177,8 +241,7 @@ def column_order():
             SELECT * FROM baseqry
             """
         )
-        eng = g.eng
-
+        
         # Query string arg to get the specific datatype
         datatype = request.args.get("datatype")
         
@@ -212,18 +275,6 @@ def column_order():
             tablename = str(data.get("tablename")).strip()
             column_name = str(data.get("column_name")).strip()
             column_position = str(data.get("column_position")).strip()
-
-
-
-            # connect with psycopg2
-            connection = psycopg2.connect(
-                host=os.environ.get("DB_HOST"),
-                database=os.environ.get("DB_NAME"),
-                user=os.environ.get("DB_USER"),
-                password=os.environ.get("PGPASSWORD"),
-            )
-
-            connection.set_session(autocommit=True)
 
             with connection.cursor() as cursor:
                 command = sql.SQL(
