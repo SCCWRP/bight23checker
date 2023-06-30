@@ -8,14 +8,9 @@
 import re, os, binascii
 from inspect import currentframe
 from flask import current_app, g, session
-from .functions import checkData, haversine_np, check_distance, check_time, check_strata_grab, check_strata_trawl, export_sdf_to_json, calculate_distance
+from .functions import checkData, haversine_np, check_distance, check_time, check_strata_grab, check_strata_trawl, export_sdf_to_json, calculate_distance, check_samplenumber_sequence
 import pandas as pd
-from shapely.geometry import Point, LineString
 import numpy as np
-from arcgis.gis import GIS
-from arcgis.features import GeoAccessor, GeoSeriesAccessor
-from arcgis.geometry.filters import within, contains
-from arcgis.geometry import lengths, areas_and_lengths, project
 from arcgis.geometry import Point as arcgisPoint
 from arcgis.geometry import Geometry
 from shapely import wkb
@@ -179,8 +174,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     
     print("# Grab and trawl may possibly be NoneTypes")
     # Grab and trawl may possibly be NoneTypes
-    errs = [
-        *errs, 
+    time_errs = [
         checkTime(occupation, 'OccupationTime', occupation_args),
         checkTime(trawl, 'OverTime', trawl_args) if trawl is not None else {} ,
         checkTime(trawl, 'StartTime', trawl_args) if trawl is not None else {},
@@ -189,6 +183,42 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         checkTime(trawl, 'OnBottomTime', trawl_args) if trawl is not None else {},
         checkTime(grab, 'SampleTime', grab_args) if grab is not None else {}
     ]
+    errs = [
+        *errs, 
+        *time_errs, 
+    ]
+
+    # if no time format errors, then we can check the logic of the grab and trawl numbers
+    if all([(len(t) == 0) for t in time_errs]):
+        
+        if grab is not None:
+            
+            grab_args.update({
+                "badrows": check_samplenumber_sequence(grab, 'sampletime', 'grabeventnumber'),
+                "badcolumn": 'GrabEventNumber',
+                "error_type" : "Logic Error",
+                "error_message" : "GrabEventNumber sequence is incorrect, check GrabEventNumber and SampleTime columns."
+            })
+            errs.append(checkData(**grab_args))
+        
+        if trawl is not None:
+            
+            # Check Logic of Trawl Numbers (Start Time)
+            trawl_args.update({
+                "badrows": check_samplenumber_sequence(trawl, 'starttime', 'trawlnumber'),
+                "badcolumn": 'TrawlNumber',
+                "error_type" : "Logic Error",
+                "error_message" : "TrawlNumber sequence is incorrect, check SampleDate and StartTime."
+            })
+            errs.append(checkData(**trawl_args))
+            
+            # Check Logic of Trawl Numbers (Over Time)
+            trawl_args.update({
+                "badrows": check_samplenumber_sequence(trawl, 'overtime', 'trawlnumber'),
+                "error_message" : "TrawlNumber sequence is incorrect, check SampleDate and OverTime."
+            })
+            errs.append(checkData(**trawl_args))
+
     # ------- END LOGIC CHECKS ------- #
 
 
@@ -456,32 +486,6 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         trawl['trawltime'] = check_time(trawl.starttime.map(str), trawl.endtime.map(str))
 
 
-
-        # Kristin - Check if Trawl/TrawlNumber is out of sequence based upon SampleDate and OverTime. - bug fix 26jun18
-        print("## Check if Trawl/TrawlNumber is out of sequence based upon SampleDate and OverTime. ##")
-        stations = trawl[['stationid','sampledate','overtime','trawlnumber','tmp_row']].copy()
-        print('User must submit more than one station to run this check')
-        if len(stations) > 1:
-            # creates dataframe consisting of trawl submissions with more than one trawl
-            station_duplicates = pd.DataFrame(stations[stations.stationid.isin(stations.stationid[stations.stationid.duplicated()])])
-            # makes sure that both sampledate and overtime are string values
-            station_duplicates['sampledate'] = station_duplicates['sampledate'].map(str)
-            station_duplicates['overtime'] = station_duplicates.overtime.map(str)
-            print('Trawl submissions with more than one trawl:')
-            print(station_duplicates)
-            if len(station_duplicates) > 1 :
-                # creates a datetime value from sampledate and overtime
-                station_duplicates['datetime'] = pd.to_datetime(station_duplicates['sampledate'] + ' ' + station_duplicates['overtime'])
-                station_duplicates['sequence'] = station_duplicates.groupby('stationid')['datetime'].rank(ascending=1)
-                print('Trawl submissions ranked by their date and time')
-                print(station_duplicates)
-                trawl_args.update({
-                    "badrows": station_duplicates.loc[station_duplicates.trawlnumber != station_duplicates.sequence].tmp_row.tolist(),
-                    "badcolumn": "TrawlNumber",
-                    "error_type": "Undefined Error",
-                    "error_message" :'TrawlNumber sequence is incorrect, check SampleDate and OverTime.'
-                })
-                errs = [*errs, checkData(**trawl_args)]
 
         # Eric Hermoso - Check that both Trawl/StartDepth and Trawl/EndDepth are no more than 10% off of StationOccupation (Depth) - warning only 
         # lets just get actual trawls from station occupation - we may to adjust this further to only get successful trawls

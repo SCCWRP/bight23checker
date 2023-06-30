@@ -421,3 +421,25 @@ def sample_assignment_check(eng, df, parameter_column, row_index_col = 'tmp_row'
 
     return badrows
 
+
+# Check Logic of Grab/Trawl Numbers and only return the badrows
+def check_samplenumber_sequence(df_to_check, col, samplenumbercol):
+    assert col in df_to_check.columns, f"{col} not found in columns of the dataframe passed into check_samplenumber_sequence"
+    assert 'stationid' in df_to_check.columns, "'stationid' not found in columns of the dataframe passed into check_samplenumber_sequence"
+    assert 'sampledate' in df_to_check.columns, "'sampledate' not found in columns of the dataframe passed into check_samplenumber_sequence"
+
+    df_to_check[col] = pd.to_datetime(df_to_check[col], format='%H:%M:%S').dt.time
+
+    df_to_check = df_to_check.sort_values(['stationid', 'sampledate', col])
+
+    trawl_grouped = df_to_check.groupby(['stationid', 'sampledate']).apply(lambda grp: grp[samplenumbercol].is_monotonic_increasing).reset_index()
+    trawl_grouped.columns = ['stationid', 'sampledate', 'correct_order']
+
+    badrows = df_to_check.merge(
+            trawl_grouped[trawl_grouped['correct_order'] == False],
+            on = ['stationid', 'sampledate'],
+            how = 'inner'
+        ) \
+        .tmp_row \
+        .tolist()
+    return badrows
