@@ -506,7 +506,7 @@ def chemistry(all_dfs):
         "error_type": "Value Error",
         "error_message": "The MDL should never be greater than the RL"
     })
-    errs.append(checkData(**results_args))
+    warnings.append(checkData(**results_args))
     
     # Check - The MDL should not be equal to the RL (Warning)
     print('# Check - The MDL should not be equal to the RL (Warning)')
