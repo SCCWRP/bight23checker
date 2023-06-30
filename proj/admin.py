@@ -158,6 +158,103 @@ def savechanges():
 
     return ''
 
+
+@admin.route('/column-order', methods = ['GET','POST'])
+def column_order():
+    authorized = session.get("AUTHORIZED_FOR_ADMIN_FUNCTIONS")
+    if not authorized:
+        # return template for GET request, empty string for everything else
+        return render_template('admin_password.html', redirect_route='column-order') \
+            if request.method == 'GET' \
+            else ''
+    
+    if request.method == 'GET':
+        basequery = (
+            """
+            WITH baseqry AS (
+                SELECT table_name, column_name, custom_column_position FROM column_order ORDER BY table_name, custom_column_position
+            )
+            SELECT * FROM baseqry
+            """
+        )
+        eng = g.eng
+
+        # Query string arg to get the specific datatype
+        datatype = request.args.get("datatype")
+        
+        # If a specific datatype is selected then display the schema for it
+        if datatype is not None:
+            if datatype not in current_app.datasets.keys():
+                return f"Datatype {datatype} not found"
+
+            # dictionary to return
+            return_object = {}
+            
+            tables = current_app.datasets.get(datatype).get("tables")
+            for tbl in tables:
+                df = pd.read_sql(f"{basequery} WHERE table_name = '{tbl}';", eng)
+
+                df.fillna('', inplace = True)
+
+                return_object[tbl] = df.to_dict('records')
+            
+            # Return the datatype query string arg - the template will need access to that
+            return render_template('column-order.jinja2', metadata=return_object, datatype=datatype, authorized=authorized)
+        
+        # only executes if "datatypes" not given
+        datatypes_list = current_app.datasets.keys()
+        return render_template('column-order.jinja2', datatypes_list=datatypes_list, authorized=authorized)
+        
+    elif request.method == 'POST':
+        try:
+            data = request.get_json()
+
+            tablename = str(data.get("tablename")).strip()
+            column_name = str(data.get("column_name")).strip()
+            column_position = str(data.get("column_position")).strip()
+
+
+
+            # connect with psycopg2
+            connection = psycopg2.connect(
+                host=os.environ.get("DB_HOST"),
+                database=os.environ.get("DB_NAME"),
+                user=os.environ.get("DB_USER"),
+                password=os.environ.get("PGPASSWORD"),
+            )
+
+            connection.set_session(autocommit=True)
+
+            with connection.cursor() as cursor:
+                command = sql.SQL(
+                    """
+                    UPDATE column_order 
+                        SET custom_column_position = {pos} 
+                    WHERE 
+                        column_order.table_name = {tablename} 
+                        AND column_order.column_name = {column_name};
+                    """
+                ).format(
+                    pos = sql.Literal(column_position),
+                    tablename = sql.Literal(tablename),
+                    column_name = sql.Literal(column_name)
+                )
+                
+                cursor.execute(command)
+
+            connection.close()
+            return jsonify(message=f"In {tablename}: Successfully updated ordinal position of {column_name} to {column_position}")
+        except Exception as e:
+            print(e)
+            return jsonify(message=f"Error: {str(e)}")
+
+    else:
+        return ''
+
+    
+
+
+
 @admin.route('/adminauth', methods = ['GET','POST'])
 def adminauth():
 
