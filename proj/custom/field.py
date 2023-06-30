@@ -5,11 +5,11 @@
 #  Make this file with a function that gets imported to those 3 other custom checks files
 #  This function can take 3 dataframes as arguments, with default on each set to none. But the occupation dataframe must be required.
 
+import re, os, binascii
 from inspect import currentframe
 from flask import current_app, g, session
 from .functions import checkData, haversine_np, check_distance, check_time, check_strata_grab, check_strata_trawl, export_sdf_to_json, calculate_distance
 import pandas as pd
-import re
 from shapely.geometry import Point, LineString
 import numpy as np
 from arcgis.gis import GIS
@@ -17,7 +17,8 @@ from arcgis.features import GeoAccessor, GeoSeriesAccessor
 from arcgis.geometry.filters import within, contains
 from arcgis.geometry import lengths, areas_and_lengths, project
 from arcgis.geometry import Point as arcgisPoint
-import os
+from arcgis.geometry import Geometry
+from shapely import wkb
 
 
 def fieldchecks(occupation, eng, trawl = None, grab = None):
@@ -51,14 +52,6 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     trawl_args      = {**args, **{"dataframe": trawl,      "tablename": 'tbl_trawlevent'        } }
     grab_args       = {**args, **{"dataframe": grab,       "tablename": 'tbl_grabevent'         } }
 
-    # Initiates the parts needed for strata check
-    gis = GIS(os.environ.get("ARCGIS_API_URL"),os.environ.get("ARCGIS_API_USERNAME"),os.environ.get("ARCGIS_API_PASSWORD"))
-    # Query Strata Bight 2018
-    strata = gis.content.get(os.environ.get("BIGHT_STRATA_LAYER_ID")).layers[0].query().sdf
-
-    # Convert from spatial reference from 3857 to 4326
-    strata['SHAPE'] = pd.Series(project(geometries=strata['SHAPE'].tolist(), in_sr=3857, out_sr=4326))
-    
     # I am going to be forcing Karen to match the field assignment table with the strata layer, so we might not need to do that
     # and in fact, doing so may possibly break it in bight 2023
     # it is now June 15, 2023 and i can confirm that it did break it in bight2023 - Robert
@@ -66,6 +59,22 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     eng = g.eng
     
     field_assignment_table = pd.read_sql("SELECT * FROM field_assignment_table", eng)
+    
+    # Initiates the parts needed for strata check
+    strata = pd.read_sql("SELECT * FROM strataregion", eng)
+
+    # Convert geometry from WKB to polygon objects
+    # strata['SHAPE'] = strata['shape'].apply(lambda x: Geometry.from_shapely(wkb.loads(binascii.unhexlify(x))) )
+    strata['SHAPE'] = strata['shape'].apply(
+        lambda x: 
+        Geometry(
+            {
+                "spatialReference": {"wkid": 4326}, 
+                "rings": Geometry.from_shapely( wkb.loads(binascii.unhexlify(x)) ).rings 
+            }
+        )
+    )
+    
 
 
     # ------- LOGIC CHECKS ------- #
@@ -285,6 +294,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     else: 
         raise Exception("No sampling organization detected")
 
+    # Not sampling brackish estuaries this bight cycle
     print("# Check StationOccupation/Salinity - if the station is an Estuary or Brackish Estuary then the salinity is required")
     estuaries = pd.read_sql("SELECT DISTINCT stationid, stratum FROM field_assignment_table WHERE stratum IN ('Estuaries');", eng)
 
@@ -614,7 +624,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             "error_type": "Undefined Error",
             "error_message" : 'PT Sensor Manufacturer required if PT Sensor is Yes'
         })
-        errs = [*errs, checkData(**trawl_args)]
+        warnings = [*warnings, checkData(**trawl_args)]
 
 
         ## Jordan - If PTSensor = Yes then PTSensorSerialNumber required. Added 9/18/18
@@ -627,7 +637,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             "error_type": "Undefined Error",
             "error_message" : 'PT Sensor Serial Number is required if PT Sensor is Yes'
         })
-        errs = [*errs, checkData(**trawl_args)]
+        warnings = [*warnings, checkData(**trawl_args)]
 
         #Matthew M- Check that user has entered a comment if they selected a trawlfail code that requires comment. See lu_trawlfails, commentrequired field
         print("## Check that user has entered a comment if they selected a trawlfail code that requires comment. See lu_trawlfails, commentrequired field. ##")
