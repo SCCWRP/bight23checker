@@ -9,6 +9,12 @@
         .table td, .table th {
             border: 1px solid #ddd; /* Light grey border */
         }
+        .warning-cell {
+            background-color:#ece40c;
+        }
+        .error-cell {
+            background-color:#ff0000;
+        }
     </style>
 </head>
 <body>
@@ -22,12 +28,15 @@
             </li>
         </ul>
         {% endfor %}
-    {% else %}
     </div>
+    {% else %}
     <div class="container d-flex flex-column align-items-center justify-content-center">
     <h1>Column order for tables belonging to the datatype: {{datatype}}</h1>
     <br>
     <a href="{{url_for('admin.column_order')}}"><button id="return-main-app"> Return to main page </button></a>
+    <br>
+    <p>custom column position must be an integer. Try to make sure there are no repeated values within a table</p>
+    <br>
     
     {# metadata is essentially the schema information about all tables in the datatype #}
     
@@ -76,20 +85,23 @@
 
 {% if authorized %}
 <script>
-    Array.from(document.getElementsByClassName('editable-col-order-cell')).forEach(cell => {
+    Array.from(document.getElementsByClassName('editable-col-order-cell')).forEach((cell, ind, arr) => {
         cell.addEventListener('blur', function() {
-            const colDescription = this.innerText;
-            const parentTable = this.parentNode.dataset.parentTable;
-            const colName = this.parentNode.querySelector('.column_name-cell').innerText;
+            const currentCell = this;
+            const colPosition = currentCell.innerText;
+            const parentTable = currentCell.parentNode.dataset.parentTable;
+            const colName = currentCell.parentNode.querySelector('.column_name-cell').innerText;
 
-            console.log("colDescription")
-            console.log(colDescription)
-            console.log("parentTable")
-            console.log(parentTable)
-            console.log("colName")
-            console.log(colName)
-
-            saveChanges(parentTable, colName, colDescription);
+            const parsedVal = parseInt(colPosition);
+            if (isNaN(parsedVal)) {
+                currentCell.classList.add('error-cell');
+                return;
+            }
+            
+  
+            
+            currentCell.innerText = parsedVal;
+            saveChanges(parentTable, colName, parsedVal);
         });
 
         cell.addEventListener('focus', function(event) {
