@@ -297,7 +297,7 @@ def toxicity(all_dfs):
     print("# To check all unique Result/StationID records should have a corresponding record in Field/Grab/StationID (make sure it wasn't abandoned also). This should be an error.")
     
     # first we need to call the field grab event table and get back all the stations that did not fail
-    sql_df = pd.read_sql("SELECT stationid FROM tbl_grabevent WHERE toxicity = 'Yes' AND grabfail = 'None'", eng)
+    sql_df = pd.read_sql("SELECT stationid FROM tbl_grabevent WHERE toxicity = 'Yes' AND grabfail = 'None or No Failure'", eng)
     
     # get only the unique records for database/stationid
     unique_stations = sql_df.stationid.unique()

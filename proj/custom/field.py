@@ -383,7 +383,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         "badrows": occupation[(~occupation.stationfail.isin(lu_sf1.tolist())) & ~occupation['abandoned'].isin(['Yes', 'yes'])].tmp_row.tolist(),
         "badcolumn": 'StationFail',
         "error_type": 'Undefined Error',
-        "error_message": 'If StationOccupation/StationFail is set to anything other than None or Temporary then Abandoned should be set to Yes.'
+        "error_message": 'If StationOccupation/StationFail is set to anything other than "None or No Failure" or Temporary then Abandoned should be set to Yes.'
     })
     errs = [*errs, checkData(**occupation_args)]
 
@@ -395,7 +395,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         "badrows": occupation[(occupation.stationfail.isin(lu_sf1.tolist())) & occupation['abandoned'].isin(['Yes', 'yes'])].tmp_row.tolist(),
         "badcolumn": 'StationFail',
         "error_type": 'Undefined Error',
-        "error_message": 'If StationOccupation/StationFail is set to None or Temporary then Abandoned should be set to No.'
+        "error_message": 'If StationOccupation/StationFail is set to "None or No Failure" or Temporary then Abandoned should be set to No.'
     })
     errs = [*errs, checkData(**occupation_args)]
 

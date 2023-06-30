@@ -100,7 +100,7 @@ def debris(all_dfs):
     print("Starting Debris Custom Checks")
 
     #Jordan - DebrisType/Comment Check- Required if DebrisType starts with the word "Other" or if DebrisType = 'None'
-    print('DebrisType/Comment Check- Required if DebrisType starts with the word Other or if DebrisType = None.')
+    print('DebrisType/Comment Check- Required if DebrisType starts with the word Other or if DebrisType = No Debris Present.')
     print(trawldebris[['debristype','comments']])
     print('trawldebris where DebrisType starts with Other, but has no comment:')
     print(trawldebris[(trawldebris.debristype.str.startswith('Other'))&(trawldebris.debristype != 'Other Foliose Algae')&((trawldebris.comments.isnull())|(trawldebris.comments == ''))])
@@ -122,11 +122,11 @@ def debris(all_dfs):
     }
     errs = [*errs, checkData(**trawldebris_args)]
     
-    print('trawldebris where DebrisType = None, but has no comment:')
-    print(trawldebris[(trawldebris.debristype == 'None')&((trawldebris.comments.isnull())|(trawldebris.comments == ''))])
+    print('trawldebris where DebrisType = No Debris Present, but has no comment:')
+    print(trawldebris[(trawldebris.debristype == 'No Debris Present')&((trawldebris.comments.isnull())|(trawldebris.comments == ''))])
     
     badrows = trawldebris[
-        (trawldebris.debristype == 'None') & 
+        (trawldebris.debristype == 'No Debris Present') & 
         ((trawldebris.comments.isnull()) | 
         (trawldebris.comments == ''))
     ].tmp_row.tolist()
@@ -137,7 +137,7 @@ def debris(all_dfs):
         "badcolumn": "comments",
         "error_type": "Undefined Error",
         "is_core_error": False,
-        "error_message": "You have entered a DebrisType of None. Comment is Required."
+        "error_message": "You have entered a DebrisType of No Debris Present. Comment is Required."
     }
     errs = [*errs, checkData(**trawldebris_args)]
         
@@ -280,11 +280,11 @@ def debris(all_dfs):
     }
     warnings = [*warnings, checkData(**trawldebris_args)]      
     
-    #Jordan - Conditional - If DebrisType = 'None' Then DebrisCount = 0
-    print('Conditional - If DebrisType = None Then DebrisCount = 0')
-    print(trawldebris[(trawldebris.debristype == 'None')&(trawldebris.debriscount != 0)])
+    #Jordan - Conditional - If DebrisType = 'No Debris Present' Then DebrisCount = 0
+    print('Conditional - If DebrisType = No Debris Present Then DebrisCount = 0')
+    print(trawldebris[(trawldebris.debristype == 'No Debris Present')&(trawldebris.debriscount != 0)])
     badrows = trawldebris[
-        (trawldebris.debristype == 'None') & 
+        (trawldebris.debristype == 'No Debris Present') & 
         (trawldebris.debriscount != 0)
     ].tmp_row.tolist()
     trawldebris_args = {
@@ -294,7 +294,7 @@ def debris(all_dfs):
         "badcolumn": "debriscount",
         "error_type": "Undefined Error",
         "is_core_error": False,
-        "error_message": "You have entered a DebrisType of None. DebrisCount must equal 0."
+        "error_message": "You have entered a DebrisType of No Debris Present. DebrisCount must equal 0."
     }
     errs = [*errs, checkData(**trawldebris_args)] 
     
