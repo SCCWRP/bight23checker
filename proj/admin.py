@@ -273,28 +273,30 @@ def column_order():
             data = request.get_json()
 
             tablename = str(data.get("tablename")).strip()
-            column_name = str(data.get("column_name")).strip()
-            column_position = str(data.get("column_position")).strip()
+            column_order_information = data.get("column_order_information")
 
             with connection.cursor() as cursor:
-                command = sql.SQL(
-                    """
-                    UPDATE column_order 
-                        SET custom_column_position = {pos} 
-                    WHERE 
-                        column_order.table_name = {tablename} 
-                        AND column_order.column_name = {column_name};
-                    """
-                ).format(
-                    pos = sql.Literal(column_position),
-                    tablename = sql.Literal(tablename),
-                    column_name = sql.Literal(column_name)
-                )
-                
-                cursor.execute(command)
+                for item in column_order_information:
+                    column_name = item.get('column_name')
+                    column_position = item.get('column_position')
+                    command = sql.SQL(
+                        """
+                        UPDATE column_order 
+                            SET custom_column_position = {pos} 
+                        WHERE 
+                            column_order.table_name = {tablename} 
+                            AND column_order.column_name = {column_name};
+                        """
+                    ).format(
+                        pos = sql.Literal(column_position),
+                        tablename = sql.Literal(tablename),
+                        column_name = sql.Literal(column_name)
+                    )
+                    
+                    cursor.execute(command)
 
             connection.close()
-            return jsonify(message=f"In {tablename}: Successfully updated ordinal position of {column_name} to {column_position}")
+            return jsonify(message=f"Successfully updated column order for {tablename}")
         except Exception as e:
             print(e)
             return jsonify(message=f"Error: {str(e)}")
