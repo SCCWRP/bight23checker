@@ -176,9 +176,12 @@ def template():
                 [
                     *[
                         x for x in pd.read_sql(
-                            f"""
-                                SELECT *  FROM {table} LIMIT 1
-                            """,
+                            """
+                                SELECT {} FROM {} LIMIT 1
+                            """.format(
+                                ','.join(pd.read_sql(f"SELECT column_name FROM column_order WHERE table_name = '{table}' ORDER BY custom_column_position;", eng).column_name.tolist()),
+                                table
+                            ),
                             eng
                         ).columns.to_list()
                         if x not in system_fields
