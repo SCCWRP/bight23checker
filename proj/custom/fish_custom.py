@@ -137,6 +137,7 @@ def fish(all_dfs):
     warnings.append(checkData(**trawlfishabundance_args))
     
     # 2. User is required to enter a QA Code, but multple anomalies are allowed to be entered
+    # 2a (Abundance)
     print("Fish Custom Checks")
     print("User is required to enter a QA Code, but multple anomalies are allowed to be entered")
     badrows = trawlfishabundance[
@@ -152,6 +153,23 @@ def fish(all_dfs):
         "error_message": f"You are required to enter at least one qualifier code, and they must all be found in the <a href=/{current_app.script_root}/scraper?action=help&layer=lu_trawlqualifier target=_blank>lookup list</a>. If entering multiple qualifiers, they must be separated by commas."
     })
     errs = [*errs, checkData(**trawlfishabundance_args)]
+
+    # 2b (Biomass)
+    print("Fish Custom Checks")
+    print("User is required to enter a QA Code, but multple anomalies are allowed to be entered")
+    badrows = trawlfishbiomass[
+        trawlfishbiomass.biomassqualifier.apply(
+            lambda x: 
+            not set([substring.strip() for substring in str(x).split(',')]).issubset(set(pd.read_sql("SELECT DISTINCT qualifier FROM lu_trawlqualifier", eng).qualifier.tolist()))
+        )
+    ].index.tolist()
+    trawlfishbiomass_args.update({
+        "badrows": badrows,
+        "badcolumn": "BiomassQualifier",
+        "error_type": "Lookup Error",
+        "error_message": f"You are required to enter at least one qualifier code, and they must all be found in the <a href=/{current_app.script_root}/scraper?action=help&layer=lu_trawlqualifier target=_blank>lookup list</a>. If entering multiple qualifiers, they must be separated by commas."
+    })
+    errs = [*errs, checkData(**trawlfishbiomass_args)]
 
     print("Fish Custom Checks")
     print("Comment required for anomalies Skeletal, Tumor or Lesion")
