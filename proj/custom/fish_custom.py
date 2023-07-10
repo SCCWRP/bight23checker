@@ -182,14 +182,15 @@ def fish(all_dfs):
     # 3. Return error if abundance records are not found in field assignment table
     print("Fish Custom Checks")
     print("Return error if abundance records are not found in field assignment table")
-    field_assgn_table = eng.execute("""SELECT stationid,assigned_agency AS trawlagency FROM field_assignment_table WHERE "parameter" = 'trawl';""")
-    f = pd.DataFrame(field_assgn_table.fetchall())
-    f.columns = field_assgn_table.keys()
-    unique_fat_records = zip(f.stationid,f.trawlagency)
+    fat = pd.read_sql("""SELECT stationid,assigned_agency AS trawlagency FROM field_assignment_table WHERE "parameter" = 'trawl';""", eng)
+    
+    unique_fat_records = [] if fat.empty else fat.apply(lambda row: (row.stationid, row.trawlagency), axis = 1).tolist()
+    
+
     
     # compare abundance records to field assignment table records (compare on stationid,samplingorganization).
     badrows = trawlfishabundance[
-        trawlfishabundance[['stationid','samplingorganization']].apply(lambda x: not (tuple([x.stationid,x.samplingorganization]) in unique_fat_records), axis=1)
+        trawlfishabundance[['stationid','samplingorganization']].apply(lambda x: (x.stationid,x.samplingorganization) not in unique_fat_records, axis=1)
     ].index.tolist()
     trawlfishabundance_args.update({
         "badrows": badrows,
@@ -317,7 +318,7 @@ def fish(all_dfs):
     # compare biomass records to field assignment table records (compare on stationid,samplingorganization).
     # same check exists for abundance
     badrows = trawlfishbiomass[
-        trawlfishbiomass[['stationid','samplingorganization']].apply(lambda x: not (tuple([x.stationid,x.samplingorganization]) in unique_fat_records), axis=1)
+        trawlfishbiomass[['stationid','samplingorganization']].apply(lambda x: (x.stationid,x.samplingorganization) not in unique_fat_records, axis=1)
     ].index.tolist()
     trawlfishbiomass_args.update({
         "badrows": badrows,
