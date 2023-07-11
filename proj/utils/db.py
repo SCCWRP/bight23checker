@@ -154,33 +154,33 @@ def foreign_keys(table, eng):
 #   WHERE table_catalog = {os.environ.get('DB_NAME')}
 def metadata_summary(table, eng):
     sql = f"""
-        WITH fkeys AS (
-	SELECT DISTINCT
-		kcu.COLUMN_NAME,
-		ccu.TABLE_NAME AS foreign_table_name 
-	FROM
-		information_schema.table_constraints AS tc
-		JOIN information_schema.key_column_usage AS kcu ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME 
-		AND tc.table_schema = kcu.table_schema
-		JOIN information_schema.constraint_column_usage AS ccu ON ccu.CONSTRAINT_NAME = tc.CONSTRAINT_NAME 
-		AND ccu.table_schema = tc.table_schema 
-	WHERE
-		tc.constraint_type = 'FOREIGN KEY' 
-		AND tc.TABLE_NAME = '{table}' 
-		AND ccu.TABLE_NAME LIKE'lu_%%' 
+    WITH fkeys AS (
+        SELECT DISTINCT
+            kcu.COLUMN_NAME,
+            ccu.TABLE_NAME AS foreign_table_name 
+        FROM
+            information_schema.table_constraints AS tc
+            JOIN information_schema.key_column_usage AS kcu ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME 
+            AND tc.table_schema = kcu.table_schema
+            JOIN information_schema.constraint_column_usage AS ccu ON ccu.CONSTRAINT_NAME = tc.CONSTRAINT_NAME 
+            AND ccu.table_schema = tc.table_schema 
+        WHERE
+            tc.constraint_type = 'FOREIGN KEY' 
+            AND tc.TABLE_NAME = '{table}' 
+            AND ccu.TABLE_NAME LIKE'lu_%%' 
 	),
 	pkey AS (
-	SELECT C
-		.COLUMN_NAME,
-		'YES' AS primary_key 
-	FROM
-		information_schema.table_constraints tc
-		JOIN information_schema.constraint_column_usage AS ccu USING ( CONSTRAINT_SCHEMA, CONSTRAINT_NAME )
-		JOIN information_schema.COLUMNS AS C ON C.table_schema = tc.CONSTRAINT_SCHEMA 
-		AND tc.TABLE_NAME = C.TABLE_NAME 
-		AND ccu.COLUMN_NAME = C.COLUMN_NAME 
-	WHERE
-		constraint_type = 'PRIMARY KEY' 
+        SELECT C
+            .COLUMN_NAME,
+            'YES' AS primary_key 
+        FROM
+            information_schema.table_constraints tc
+            JOIN information_schema.constraint_column_usage AS ccu USING ( CONSTRAINT_SCHEMA, CONSTRAINT_NAME )
+            JOIN information_schema.COLUMNS AS C ON C.table_schema = tc.CONSTRAINT_SCHEMA 
+            AND tc.TABLE_NAME = C.TABLE_NAME 
+            AND ccu.COLUMN_NAME = C.COLUMN_NAME 
+        WHERE
+            constraint_type = 'PRIMARY KEY' 
 		AND tc.table_name = '{table}' 
 	),
 	cmt AS (
@@ -200,7 +200,10 @@ def metadata_summary(table, eng):
             information_schema.COLUMNS cols 
         WHERE 
             cols.table_name = '{table}' 
-	) 
+	) ,
+	colorder AS (
+		SELECT table_name AS tablename, column_name, custom_column_position AS column_position FROM column_order WHERE table_name = '{table}'
+	)
     SELECT
         isc.table_name AS tablename,
         isc.COLUMN_NAME,
@@ -214,7 +217,9 @@ def metadata_summary(table, eng):
         LEFT JOIN pkey ON isc.column_name = pkey.column_name 
         LEFT JOIN fkeys ON fkeys.column_name = isc.column_name 
         LEFT JOIN cmt ON isc.table_name = cmt.tablename AND isc.column_name = cmt.column_name 
+        LEFT JOIN colorder ON isc.table_name = colorder.tablename AND isc.column_name = colorder.column_name 
     WHERE
-        TABLE_NAME = '{table}';
+        TABLE_NAME = '{table}'
+				ORDER BY colorder.column_position;
     """
     return read_sql(sql, eng)
