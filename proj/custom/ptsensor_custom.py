@@ -4,6 +4,7 @@ from inspect import currentframe
 from flask import current_app, g
 from .functions import checkData
 import pandas as pd
+import re
 
 
 def ptsensor(all_dfs):
@@ -97,6 +98,22 @@ def ptsensor(all_dfs):
     ## END LOGIC CHECKS ##
 
     ## CUSTOM CHECKS ##
+    
+    
+    # Check - sensortime must be in a 24 hour clock format   
+    def checkTime(df, col, args, time_format = re.compile(r'^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$'), custom_errmsg = None):
+        """default to checking the 24 hour clock time"""
+        args.update({
+            "badrows": df[~df[col.lower()].apply(lambda x: bool(time_format.match(str(x).strip())) )].tmp_row.tolist(),
+            "badcolumn": col,
+            "error_type" : "Formatting Error",
+            "error_message" : f"The column {col} is not in a valid 24 hour clock format (HH:MM:SS)" if not custom_errmsg else custom_errmsg
+        })
+        return checkData(**args)
+
+    errs = [*errs, checkTime(ptsensorresults, 'sensortime', ptsensorresults_args)]
+
+
     ## END CUSTOM CHECKS ##
 
 
