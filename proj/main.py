@@ -132,7 +132,7 @@ def main():
 
     for tblname in all_dfs.keys():
         # lowercase the column names
-        all_dfs[tblname].columns = [x.lower() for x in all_dfs[tblname].columns]
+        all_dfs[tblname].columns = [str(x).lower() for x in all_dfs[tblname].columns]
         # drop system fields from the dataframes
         all_dfs[tblname] = all_dfs[tblname].drop(list(set(all_dfs[tblname].columns).intersection(set(current_app.system_fields))), axis = 1)
 
