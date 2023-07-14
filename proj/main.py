@@ -318,7 +318,7 @@ def main():
         except NameError as err:
             print("Error with custom checks")
             print(err)
-            raise Exception(f"""Error calling custom checks function "{match_dataset}" - may not be defined, or was not imported correctly.""")
+            raise Exception(f"""Error calling custom checks function "{match_dataset}" - {err}""")
         # Leaving this in out of fear of breaking the application
         # All i know is if i leave it untouched, it wont affect anything
         except Exception as e:
