@@ -2,7 +2,7 @@
 
 from inspect import currentframe
 from flask import current_app, g
-from .functions import checkData, multivalue_lookup_check
+from .functions import checkData, multivalue_lookup_check, mismatch
 from sqlalchemy import create_engine
 import pandas as pd
 import re
@@ -52,6 +52,9 @@ def invert(all_dfs):
     }
 
     # STARTING CHECKS
+
+    # initialize the connection
+    eng = g.eng
 
     ## LOGIC ##
     # 1a. Logic check - each record in the trawlinvertebrate abundance and biomass has to have a corresponding record in the tbl_trawlevent #

@@ -84,16 +84,45 @@ def checkLogic(df1, df2, cols: list, error_type = "Logic Error", df1_name = "", 
         "error_message": f"""Each record in {df1_name} must have a matching record in {df2_name}. Records are matched on {','.join(cols)}"""
     }
 
-def mismatch(df1, df2, mergecols):
-    #dropping duplicates creates issue of marking incorrect rows
-    tmp = df1[mergecols] \
-        .merge(
-            df2[mergecols].drop_duplicates().assign(present='yes'),
-            on = mergecols, 
-            how = 'left'
-        )
+def mismatch(df1, df2, mergecols = None, left_mergecols = None, right_mergecols = None, row_identifier = 'tmp_row'):
+    
+    # gets rows in df1 that are not in df2
+    # row identifier column is tmp_row by default
 
-    badrows = tmp[isnull(tmp.present)].index.tolist()
+    if mergecols is not None:
+        assert set(mergecols).issubset(set(df1.columns)), f"""In mismatch function - {','.join(mergecols)} is not a subset of the columns of the dataframe """
+        assert set(mergecols).issubset(set(df2.columns)), f"""In mismatch function - {','.join(mergecols)} is not a subset of the columns of the dataframe """
+        tmp = df1 \
+            .merge(
+                df2.assign(_present_='yes'),
+                on = mergecols, 
+                how = 'left',
+                suffixes = ('','_df2')
+            )
+    
+    elif (right_mergecols is not None) and (left_mergecols is not None):
+        assert set(left_mergecols).issubset(set(df1.columns)), f"""In mismatch function - {','.join(left_mergecols)} is not a subset of the columns of the dataframe of the first argument"""
+        assert set(right_mergecols).issubset(set(df2.columns)), f"""In mismatch function - {','.join(right_mergecols)} is not a subset of the columns of the dataframe of the second argument"""
+        
+        tmp = df1 \
+            .merge(
+                df2.assign(_present_='yes'),
+                left_on = left_mergecols, 
+                right_on = right_mergecols, 
+                how = 'left',
+                suffixes = ('','_df2')
+            )
+
+    else:
+        raise Exception("In mismatch function - improper use of function - No merging columns are defined")
+
+    if not tmp.empty:
+        badrows = tmp[isnull(tmp._present_)][row_identifier].tolist() \
+            if row_identifier not in (None, 'index') \
+            else tmp[isnull(tmp._present_)].index.tolist()
+    else:
+        badrows = []
+
     return badrows
 
 
