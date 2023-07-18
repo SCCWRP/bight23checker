@@ -422,7 +422,7 @@ def fish(all_dfs):
                 "badrows": badrows,
                 "badcolumn": "Biomass",
                 "error_type": "Undefined Warning",
-                "error_message": "Impossibly large/questionable biomass values submitted for low abundances of extremely small taxa"
+                "error_message": "Questionable biomass value for a low abundance species, appears larger then expected. Please check if species size justifies the questionable biomass value."
             })
             warnings = [*warnings, checkData(**trawlfishbiomass_args)]
 
