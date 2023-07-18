@@ -153,6 +153,17 @@ def toxicity(all_dfs):
     })
     errs = [*errs, checkData(**toxwq_args)]
 
+    # Check - A lab should not have two different tox batches with the same name
+    toxbatch_args.update({
+        "badrows": toxbatch[toxbatch.duplicated(subset=['toxbatch'],keep=False)].tmp_row.tolist(),
+        "badcolumn": "toxbatch",
+        "error_type": "Logic Error",
+        "error_message": "There should never be two different toxbatches with the same toxbatch name (Records in toxbatch must be unique based on the toxbatch column)"
+    })
+    errs = [*errs, checkData(**toxbatch_args)]
+
+
+
     # 2 - Check for the minimum number of replicates - ee = 4 and mg = 5 and na = 10
     ## first get a lab replicate count grouped on stationid, toxbatch, species, and sampletypecode
     dfrep = pd.DataFrame(toxresults.groupby(['stationid','toxbatch','species','sampletypecode']).size().reset_index(name='replicatecount'))
@@ -736,7 +747,7 @@ def toxicity(all_dfs):
                 "badrows": badrows,
                 "badcolumn": "parameter",
                 "error_type": "Undefined Error",
-                "error_message": 'Associated water quality group %s/%s missing parameter(s): %s.' %(kk.species[j],kk.sampletypecode[j],list(kk.missing[j]))
+                "error_message": f"""Associated water quality group {kk.species[j]}/{kk.sampletypecode[j]} missing parameter(s): { ','.join(list(kk.missing[j])) }."""
             })
             errs = [*errs, checkData(**toxbatch_args)]
 
