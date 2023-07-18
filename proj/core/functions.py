@@ -65,6 +65,7 @@ def convert_dtype(t, x):
 
         if ((pd.isnull(x)) and (t == int)):
             return True
+        
         t(x)
 
         # if the type is an int, and it got this far, at least the literal matches that of a number
@@ -74,6 +75,12 @@ def convert_dtype(t, x):
             # If it matches a float we want to return False
             return not bool(re.match(floatpat, str(x)))
         
+        if t == pd.Timestamp:
+            # checking for a valid postgres timestamp literal
+            # Postgres technically also accepts the format like "January 8 00:00:00 1999" but we won't be checking for that unless it becomes a problem
+            datepat = re.compile("\d{4}-\d{1,2}-\d{1,2}\s*(\d{1,2}:\d{1,2}:\d{2}(\.\d+){0,1}){0,1}$")
+            return bool(re.match(datepat, str(x)))
+        
         return True
     except Exception as e:
         if t == pd.Timestamp:
@@ -81,6 +88,7 @@ def convert_dtype(t, x):
             # Postgres technically also accepts the format like "January 8 00:00:00 1999" but we won't be checking for that unless it becomes a problem
             datepat = re.compile("\d{4}-\d{1,2}-\d{1,2}\s*(\d{1,2}:\d{1,2}:\d{2}(\.\d+){0,1}){0,1}$")
             return bool(re.match(datepat, str(x)))
+        
         return False
 
 @lru_cache(maxsize=128, typed=True)
