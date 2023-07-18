@@ -59,7 +59,7 @@ def template_file():
 	                                swellheight,
                                     swellheightunits,
 	                                swellperiod, 
-                                    'Yes' AS swellperiodunits,
+                                    'seconds' AS swellperiodunits,
                                     swelldirection,
 	                                seastate, 
 	                                stationfail,
@@ -91,7 +91,7 @@ def template_file():
                                     swellheight,
                                     swellheightunits,
                                     swellperiod,
-                                    'Yes' AS swellperiodunits,
+                                    'seconds' AS swellperiodunits,
                                     swelldirection,
                                     seastate,
                                     stationfail,
@@ -140,7 +140,7 @@ def template_file():
                                         ptsensorserialnumber,
                                         netonbottomtemp as onbottomtemp, 
                                         netonbottomtime as onbottomtime, 
-                                        'Yes' AS debrisdetected,
+                                        COALESCE(debrisdetected, 'No') AS debrisdetected,
                                         trawlcomments as comments
                                     FROM mobile_trawl
                                     WHERE
@@ -179,7 +179,7 @@ def template_file():
                                     microplasticsfieldblank,
                                     equipmentblank,
                                     grabfail, 
-                                    debrisdetected, 
+                                    COALESCE(debrisdetected, 'No') AS debrisdetected, 
                                     grabcomments as comments 
                                 FROM mobile_grab
                                 WHERE grabsamplingorganization = '{agency}';
