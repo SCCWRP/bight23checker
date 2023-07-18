@@ -3,7 +3,7 @@
 from inspect import currentframe
 from flask import current_app, g
 from datetime import timedelta
-from .functions import checkData, checkLogic, sample_assignment_check
+from .functions import checkData, checkLogic, sample_assignment_check, mismatch
 from .chem_functions_custom import *
 import pandas as pd
 import re
@@ -69,6 +69,23 @@ def chemistry(all_dfs):
 
     # ----- LOGIC CHECKS ----- # 
     print('# ----- LOGIC CHECKS ----- # ')
+
+    # chem submission must have a corresponding grabevent record
+    print('# chem submission must have a corresponding grabevent record')
+
+    matchcols = ['stationid','sampledate']
+    grabevent = pd.read_sql("SELECT stationid, sampledate FROM tbl_grabevent;", eng)
+    
+    results_args.update({
+        "badrows": mismatch(results, grabevent, matchcols),
+        "badcolumn": ",".join(matchcols),
+        "error_type": "Logic Error",
+        "error_message": f"Each record in chemistry results must have a corresponding record in tbl_grabevent. Records are matched based on {', '.join(matchcols)}"
+    })
+    errs = [*errs, checkData(**results_args)]
+
+
+
     # Batch and Results must have matching records on Lab, PreparationBatchID and SampleID
 
     # check records that are in batch but not in results
@@ -80,7 +97,7 @@ def chemistry(all_dfs):
         "badcolumn": "Lab, PreparationBatchID",
         "error_type": "Logic Error",
         "is_core_error": False,
-        "error_message": "Each record in Chemistry Batch must have a matching record in Chemistry Results. Records are matched on Lab and PreparationID."
+        "error_message": "Each record in Chemistry Batch must have a matching record in Chemistry Results. Records are matched on Lab and PreparationBatchID."
     })
     errs.append(checkData(**batch_args))
 
@@ -91,7 +108,7 @@ def chemistry(all_dfs):
         "badcolumn": "Lab, PreparationBatchID",
         "error_type": "Logic Error",
         "is_core_error": False,
-        "error_message": "Each record in Chemistry Results must have a matching record in Chemistry Batch. Records are matched on Lab and PreparationID."
+        "error_message": "Each record in Chemistry Results must have a matching record in Chemistry Batch. Records are matched on Lab and PreparationBatchID."
     })
     errs.append(checkData(**results_args))
 
