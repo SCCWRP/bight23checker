@@ -75,6 +75,7 @@ RUN mkdir -p /var/www/checker/
 #WORKDIR /var/www/checker/
 
 RUN pip3 install geopy
+RUN pip3 install shareplum
 
 
 
