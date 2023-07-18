@@ -103,47 +103,47 @@ print("Be sure not to prefix the login fields with 'login' in the datasets.json 
 # This we can use for adding the login columns
 
 # It will be better in the future to simply store these in the environment separately
-constring = re.search("postgresql://(\w+):(.+)@(.+):(\d+)/(\w+)", os.environ.get('DB_CONNECTION_STRING')).groups()
-connection = psycopg2.connect(
-    host=constring[2],
-    database=constring[4],
-    user=constring[0],
-    password=constring[1],
-)
+# constring = re.search("postgresql://(\w+):(.+)@(.+):(\d+)/(\w+)", os.environ.get('DB_CONNECTION_STRING')).groups()
+# connection = psycopg2.connect(
+#     host=constring[2],
+#     database=constring[4],
+#     user=constring[0],
+#     password=constring[1],
+# )
 
-connection.set_session(autocommit=True)
+# connection.set_session(autocommit=True)
 
-for datasetname, dataset in app.datasets.items():
-    fields = [f"login_{f.get('fieldname')}" for f in dataset.get('login_fields')]
-    with connection.cursor() as cursor:
-        for fieldname in fields:
-            print("Attempting to add field to submission tracking table")
-            print(fieldname)
-            command = sql.SQL(
-                """
-                ALTER TABLE submission_tracking_table ADD COLUMN IF NOT EXISTS {field} VARCHAR(255);
-                """
-            ).format(
-                field = sql.Identifier(fieldname),
-            )
+# for datasetname, dataset in app.datasets.items():
+#     fields = [f"login_{f.get('fieldname')}" for f in dataset.get('login_fields')]
+#     with connection.cursor() as cursor:
+#         for fieldname in fields:
+#             print("Attempting to add field to submission tracking table")
+#             print(fieldname)
+#             command = sql.SQL(
+#                 """
+#                 ALTER TABLE submission_tracking_table ADD COLUMN IF NOT EXISTS {field} VARCHAR(255);
+#                 """
+#             ).format(
+#                 field = sql.Identifier(fieldname),
+#             )
             
-            cursor.execute(command)
-            print(dataset)
-            for tablename in dataset.get('tables'):
-                print(f"Attempting to add login fields to {tablename}")
-                print(fieldname)
-                command = sql.SQL(
-                    """
-                    ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {field} VARCHAR(255);
-                    """
-                ).format(
-                    field = sql.Identifier(fieldname),
-                    table = sql.Identifier(tablename)
-                )
-                cursor.execute(command)
+#             cursor.execute(command)
+#             print(dataset)
+#             for tablename in dataset.get('tables'):
+#                 print(f"Attempting to add login fields to {tablename}")
+#                 print(fieldname)
+#                 command = sql.SQL(
+#                     """
+#                     ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {field} VARCHAR(255);
+#                     """
+#                 ).format(
+#                     field = sql.Identifier(fieldname),
+#                     table = sql.Identifier(tablename)
+#                 )
+#                 cursor.execute(command)
             
-            # login fields need to be in the system fields list
-            app.system_fields.append(fieldname)
+#             # login fields need to be in the system fields list
+#             app.system_fields.append(fieldname)
 
 
 
