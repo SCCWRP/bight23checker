@@ -71,9 +71,15 @@ def convert_dtype(t, x):
         # if the type is an int, and it got this far, at least the literal matches that of a number
         # if it matches the float pattern though, we have a problem
         if (t == int):
-            floatpat = re.compile(r"^\d+\.0*[1-9]+")
-            # If it matches a float we want to return False
-            return not bool(re.match(floatpat, str(x)))
+
+            # remove negative sign
+            # remove decimal part if all zeros, retain if there is a non zero digit
+            # then call the isdigit method to see if all values in the string are digits, thus meaning it is an integer value
+            return re.sub(r'\.0*$','',(str(x)[1:] if str(x).startswith('-') else str(x))).isdigit()
+            
+            # floatpat = re.compile(r"^\d+\.0*[1-9]+")
+            # # If it matches a float we want to return False
+            # return not bool(re.match(floatpat, str(x)))
         
         if t == pd.Timestamp:
             # checking for a valid postgres timestamp literal
