@@ -80,24 +80,18 @@ def toxicity(all_dfs):
     # batch
     badrows = toxbatch[~toxbatch[['toxbatch','lab']].isin(toxresults[['toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
     toxbatch_args.update({
-        "dataframe": toxbatch,
-        "tablename": 'tbl_toxbatch',
         "badrows": badrows,
         "badcolumn": "toxbatch,lab",
         "error_type": "Logic Error",
-        "is_core_error": False,
         "error_message": "Each Toxicity Batch record must have a corresponding Toxicity Result record. Records are matched on ToxBatch and Lab"
     })
     errs = [*errs, checkData(**toxbatch_args)]
     
     badrows = toxbatch[~toxbatch[['toxbatch','lab']].isin(toxwq[['toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
     toxbatch_args.update({
-        "dataframe": toxbatch,
-        "tablename": 'tbl_toxbatch',
         "badrows": badrows,
         "badcolumn": "toxbatch,lab",
         "error_type": "Logic Error",
-        "is_core_error": False,
         "error_message": "Each Toxicity Batch record must have a corresponding Toxicity WQ record. Records are matched on ToxBatch and Lab."
     })
     errs = [*errs, checkData(**toxbatch_args)]
@@ -106,61 +100,40 @@ def toxicity(all_dfs):
     # result
     badrows = toxresults[~toxresults[['toxbatch','lab']].isin(toxbatch[['toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
     toxresults_args.update({
-        "dataframe": toxresults,
-        "tablename": 'tbl_toxresults',
         "badrows": badrows,
         "badcolumn": "toxbatch,lab",
         "error_type": "Logic Error",
-        "is_core_error": False,
-        "error_message": "Each Toxicity Batch record must have a corresponding Toxicity Result record. Records are matched on ToxBatch and Lab"
+        "error_message": "Each Toxicity Results record must have a corresponding Toxicity Batch record. Records are matched on ToxBatch and Lab"
     })
-    errs = [*errs, checkData(**toxbatch_args)]
+    errs = [*errs, checkData(**toxresults_args)]
 
     badrows = toxresults[~toxresults[['stationid','toxbatch','lab']].isin(toxwq[['stationid','toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
     toxresults_args.update({
-        "dataframe": toxresults,
-        "tablename": 'tbl_toxresults',
         "badrows": badrows,
         "badcolumn": "stationid,toxbatch,lab",
         "error_type": "Logic Error",
-        "is_core_error": False,
-        "error_message": "Each Toxicity Result record must have a corresponding Toxicity WQ record. Records are matched on ToxBatch and Lab."
+        "error_message": "Each Toxicity Result record must have a corresponding Toxicity WQ record. Records are matched on StationID, ToxBatch and Lab."
     })
     errs = [*errs, checkData(**toxresults_args)]
 
     # wq
     badrows = toxwq[~toxwq[['toxbatch','lab']].isin(toxbatch[['toxbatch',    'lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
     toxwq_args.update({
-        "dataframe": toxwq,
-        "tablename": 'tbl_toxwq',
         "badrows": badrows,
         "badcolumn": "toxbatch,lab",
         "error_type": "Logic Error",
-        "is_core_error": False,
         "error_message": "Each Toxicity WQ record must have a corresponding Toxicity Batch record. Records are matched on ToxBatch and Lab."
     })
     errs = [*errs, checkData(**toxwq_args)]
     
     badrows = toxwq[~toxwq[['stationid','toxbatch','lab']].isin(toxresults[['stationid','toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
     toxwq_args.update({
-        "dataframe": toxwq,
-        "tablename": 'tbl_toxwq',
         "badrows": badrows,
         "badcolumn": "stationid,toxbatch,lab",
         "error_type": "Logic Error",
-        "is_core_error": False,
-        "error_message": "Each Toxicity WQ record must have a corresponding Toxicity Result record. Records are matched on ToxBatch and Lab."
+        "error_message": "Each Toxicity WQ record must have a corresponding Toxicity Result record. Records are matched on StationID, ToxBatch and Lab."
     })
     errs = [*errs, checkData(**toxwq_args)]
-
-    # Check - A lab should not have two different tox batches with the same name
-    toxbatch_args.update({
-        "badrows": toxbatch[toxbatch.duplicated(subset=['toxbatch'],keep=False)].tmp_row.tolist(),
-        "badcolumn": "toxbatch",
-        "error_type": "Logic Error",
-        "error_message": "There should never be two different toxbatches with the same toxbatch name (Records in toxbatch must be unique based on the toxbatch column)"
-    })
-    errs = [*errs, checkData(**toxbatch_args)]
 
 
 
@@ -180,12 +153,9 @@ def toxicity(all_dfs):
         (dfrep['replicatecount'] < 4)
     ].tmp_row.tolist()
     toxresults_args.update({
-        "dataframe": toxresults,
-        "tablename": 'tbl_toxresults',
         "badrows": badrows,
         "badcolumn": "toxbatch,lab,sampletypecode",
         "error_type": "Logic Error",
-        "is_core_error": False,
         "error_message": "A minimum number of 4 replicates is required for species Eohaustorius estuarius with any of the following SampleTypeCode: CNEG, CNSL, Grab."
     })
     errs = [*errs, checkData(**toxresults_args)] 
@@ -316,12 +286,9 @@ def toxicity(all_dfs):
     # find what records dont match the unique stations in the database
     badrows = toxresults[ ( ~toxresults.stationid.isin(unique_stations) ) & (toxresults.sampletypecode == 'Grab') ].tmp_row.tolist()
     toxresults_args.update({
-        "dataframe": toxresults,
-        "tablename": 'tbl_toxresults',
         "badrows": badrows,
         "badcolumn": "stationid",
         "error_type": "Undefined Error",
-        "is_core_error": False,
         "error_message": "A toxicity submission requires that the field data be submitted first. Your station does not match the grab event table."
     })
     errs = [*errs, checkData(**toxresults_args)] 
@@ -724,6 +691,18 @@ def toxicity(all_dfs):
             "error_message": "Water quality parameter for paramter pH not in acceptable range: must be between 7.6-8.3."
         })
         warnings = [*warnings, checkData(**toxwq_args)]
+
+
+        # Check - Timepoint should be an integer between -1 and 10
+        badrows = toxwq[~toxwq.timepoint.between(-1, 10)].tmp_row.tolist()
+        toxwq_args.update({
+            "badrows": badrows,
+            "badcolumn": "timepoint",
+            "error_type": "Value Error",
+            "error_message": "Timepoint must be an integer from -1 to 10 (i.e. the units should be in terms of days, not hours) (use -1 to denote a measurement taken upon receiving the sample)"
+        })
+        errs = [*errs, checkData(**toxwq_args)]
+
         
         #UPDATE: Jordan - Make sure all Species/SampleTypeCode groups have all parameters present in data.
         #        Jordan - Check that all water quality parameters are present at required time points (beginning and end of test and on an every-other-day basis in between)
@@ -736,53 +715,73 @@ def toxicity(all_dfs):
         print(dfwq)
 
         # Creates series that consists of sets of submitted parameters
-        pgs = dfwq.groupby(['toxbatch','species','sampletypecode'])['parameter'].apply(set).reset_index()
+        # pgs = dfwq.groupby(['toxbatch','species','sampletypecode'])['parameter'].apply(set).reset_index()
+        pgs = dfwq.groupby(['toxbatch','species','sampletypecode']).agg({
+                'parameter' : set,
+                'tmp_row'   : list
+            }) \
+            .reset_index()
+
         # Determines whether all appropriate parameters have been submitted
-        pgs['missing'] = pgs.parameter.apply(lambda x: set(['Dissolved Oxygen', 'Salinity', 'Temperature', 'pH', 'Total Ammonia', 'Unionized Ammonia'])-x)
+        pgs['missing'] = pgs.parameter.apply(lambda x: set(['Dissolved Oxygen', 'Salinity', 'Temperature', 'pH', 'Total Ammonia', 'Unionized Ammonia']) - x)
         # Provide Error for any missing parameters
         kk = pgs[pgs.missing != set()]
-        for j in kk.index:
-            badrows = dfwq[(dfwq.toxbatch == kk.toxbatch[j])&(dfwq.species == kk.species[j])].tmp_row.tolist()
-            toxwq_args.update({
-                "badrows": badrows,
-                "badcolumn": "parameter",
-                "error_type": "Undefined Error",
-                "error_message": f"""Associated water quality group {kk.species[j]}/{kk.sampletypecode[j]} missing parameter(s): { ','.join(list(kk.missing[j])) }."""
-            })
-            errs = [*errs, checkData(**toxbatch_args)]
 
-        pg = dfwq.groupby(['toxbatch','parameter','species','sampletypecode'])['timepoint'].apply(set).reset_index()
+        if not kk.empty:
+            tmpargslist = kk.apply(
+                lambda row:
+                {
+                    "badrows"       : row.tmp_row,
+                    "badcolumn"     : "Timepoint",
+                    "error_type"    : "Missing Required Data",
+                    "error_message" : f"For the batch {row.toxbatch} (species {row.species} and sampletype {row.sampletypecode}), the following required parameters are missing: {sorted(list(row.missing))}"
+                },
+                axis = 1
+            )
+            
+
+            for args in tmpargslist:
+                toxwq_args.update(args)
+                errs = [*errs, checkData(**toxwq_args)]
+
+        # pg = dfwq.groupby(['toxbatch','parameter','species','sampletypecode'])['timepoint'].apply(set).reset_index()
         # CORRECTION: For Total and Unionized Ammonia Parameters with species EE, only required to make measurements for 0,10. With species MG 0,2. 
         # For EE & Unionized or Total Ammonia (CNEG/GRAB/QA):
+
+        # trying to preserve tmp_row of the problematic records
+        pg = dfwq.groupby(['toxbatch','parameter','species','sampletypecode']).agg({
+                'tmp_row'   : list,
+                'timepoint' : set
+            }) \
+            .reset_index()
+                
         
+        # NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE #
+        #  3/29/2023 - Darrin said these timepoint values should be in Hours rather than days                      #
+        #  7/18/2023 - Darrin said these it doesnt matter as long as it is consistent - we are going with days     #
+        # NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE #
         
-        # NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE #
-        #  3/29/2023 - Darrin said these timepoint values should be in Hours rather than days  #
-        # NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE #
-        
-        #p1 = pg[(pg.species=='Eohaustorius estuarius')&((pg.parameter == 'Total Ammonia')|(pg.parameter == 'Unionized Ammonia'))&((pg.sampletypecode=='CNEG')|(pg.sampletypecode=='Grab')|(pg.sampletypecode=='QA'))].timepoint.apply(lambda x: set([0,10])-x)
-        p1 = pg[(pg.species=='Eohaustorius estuarius')&((pg.parameter == 'Total Ammonia')|(pg.parameter == 'Unionized Ammonia'))&((pg.sampletypecode=='CNEG')|(pg.sampletypecode=='Grab')|(pg.sampletypecode=='QA'))] \
-            .timepoint.apply(lambda x: set([0, (10 * 24)]) - x)
+
+        # For EE & Total/Unionized Ammonia (CNEG/GRAB/QA):
+        p1 = pg[(pg.species=='Eohaustorius estuarius')&(pg.parameter.isin(['Total Ammonia', 'Unionized Ammonia'])) &((pg.sampletypecode.isin(['CNEG','Grab','QA'])))] \
+            .timepoint.apply(lambda x: set( [0, 10] ) - x)
         
         # For EE & All other parameters (CNEG/GRAB/QA):
-        # p2 = pg[(pg.species=='Eohaustorius estuarius')&((~pg.parameter.isin(['Total Ammonia', 'Unionized Ammonia'])) &((pg.sampletypecode.isin(['CNEG','Grab','QA'])))].timepoint.apply(lambda x: set([0,2,4,6,8,10])-x)
         p2 = pg[(pg.species=='Eohaustorius estuarius')&(~pg.parameter.isin(['Total Ammonia', 'Unionized Ammonia'])) &((pg.sampletypecode.isin(['CNEG','Grab','QA'])))] \
-            .timepoint.apply(lambda x: set( [ x * 24 for x in [0,2,4,6,8,10] ] ) - x)
+            .timepoint.apply(lambda x: set( [0,2,4,6,8,10] ) - x)
         
         # For EE & Unionized or Total Ammonia (Reference Toxicant):
-        # p3 = pg[(pg.species=='Eohaustorius estuarius')&(pg.parameter.isin(['Total Ammonia','Unionized Ammonia'])) & (pg.sampletypecode =='RFNH3')].timepoint.apply(lambda x: set([0,4])- x)
         p3 = pg[(pg.species=='Eohaustorius estuarius')&(pg.parameter.isin(['Total Ammonia','Unionized Ammonia'])) & (pg.sampletypecode =='RFNH3')] \
-            .timepoint.apply(lambda x: set([0, (4 * 24) ]) - x)
+            .timepoint.apply(lambda x: set( [0, 4] ) - x)
         
         # For EE & All other parameters (Reference Toxicant):
-        # p4 = pg[(pg.species=='Eohaustorius estuarius')&(~pg.parameter.isin(['Total Ammonia','Unionized Ammonia']))&(pg.sampletypecode == 'RFNH3')].timepoint.apply(lambda x: set([0,2,4])- x)
         p4 = pg[(pg.species=='Eohaustorius estuarius')&(~pg.parameter.isin(['Total Ammonia','Unionized Ammonia']))&(pg.sampletypecode == 'RFNH3')] \
-            .timepoint.apply(lambda x: set([0,(2 * 24),(4 * 24)]) - x)
+            .timepoint.apply(lambda x: set( [0,2,4] ) - x)
         
         # For MG (ALL):
         # p5 = pg[(pg.species=='Mytilus galloprovincialis')].timepoint.apply(lambda x: set([0,2])-x)
         p5 = pg[(pg.species=='Mytilus galloprovincialis')] \
-            .timepoint.apply(lambda x: set([0,2])-x)
+            .timepoint.apply(lambda x: set( [0,2] ) - x)
         
         # Concatenate to create field for missing timepoint values
         pg['missing'] = pd.concat([p1,p2,p3,p4,p5])
@@ -790,16 +789,35 @@ def toxicity(all_dfs):
         print("Provide Error for any missing timepoints")
         k = pg[pg.missing != set()]
         print(k)
-        for i in k.index:
-            if (k.sampletypecode[i] != 'CNSL') and (not pd.isnull(k.missing[i])):
-                badrows = dfwq[(dfwq.toxbatch == k.toxbatch[i])&(dfwq.species == k.species[i])].tmp_row.tolist()
-                toxwq_args.update({
-                    "badrows": badrows,
-                    "badcolumn": "timepoint",
-                    "error_type": "Undefined Error",
-                    "error_message": f'Associated water quality group {k.parameter[i]}/{k.species[i]}/{k.sampletypecode[i]} is missing time points {list(k.missing[i])}.'
-                })
-                errs = [*errs, checkData(**toxbatch_args)]
+
+        if not k.empty:
+            tmpargslist = k.apply(
+                lambda row:
+                {
+                    "badrows"       : row.tmp_row,
+                    "badcolumn"     : "Timepoint",
+                    "error_type"    : "Missing Required Data",
+                    "error_message" : f"For the batch {row.toxbatch} (species {row.species} and sampletype {row.sampletypecode}), the parameter {row.parameter} is missing a measurement at timepoint(s): {','.join([str(x) for x in sorted(list(row.missing))])}"
+                },
+                axis = 1
+            ).tolist()
+
+            for args in tmpargslist:
+                toxwq_args.update(args)
+                errs = [*errs, checkData(**toxwq_args)]
+
+
+        # for i in k.index:
+        #     if (k.sampletypecode[i] != 'CNSL') and (not pd.isnull(k.missing[i])):
+        #         badrows = dfwq[(dfwq.toxbatch == k.toxbatch[i])&(dfwq.species == k.species[i])].tmp_row.tolist()
+        #         toxwq_args.update({
+        #             "badrows": badrows,
+        #             "badcolumn": "timepoint",
+        #             "error_type": "Undefined Error",
+        #             "error_message": f'Associated water quality group {k.parameter[i]}/{k.species[i]}/{k.sampletypecode[i]} is missing time points {list(k.missing[i])}.'
+        #         })
+        #         errs = [*errs, checkData(**toxbatch_args)]
+    
     ## END WQ CHECKS ##
     ## END CUSTOM CHECKS ##
     
@@ -984,9 +1002,6 @@ def toxicity(all_dfs):
         toxsummary.reset_index(inplace = True, drop = True)
         toxsummary.drop('tmp_row', axis = 1, inplace = True)
         
-
-
-
 
         ## SUMMARY TABLE CHECKS ##
         # adding tmp_row column to back into toxsummary df (after it was removed right before summary table checks run)
