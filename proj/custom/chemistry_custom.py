@@ -77,7 +77,7 @@ def chemistry(all_dfs):
     grabevent = pd.read_sql("SELECT stationid, sampledate FROM tbl_grabevent;", eng)
     
     results_args.update({
-        "badrows": mismatch(results, grabevent, matchcols),
+        "badrows": mismatch(results[results.stationid.str.lower() != '0000'], grabevent, matchcols),
         "badcolumn": ",".join(matchcols),
         "error_type": "Logic Error",
         "error_message": f"Each record in chemistry results must have a corresponding record in tbl_grabevent. Records are matched based on {', '.join(matchcols)}"
