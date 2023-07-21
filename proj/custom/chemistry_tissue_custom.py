@@ -48,8 +48,10 @@ def chemistry_tissue(all_dfs):
             axis = 1
         )
     
-    # Later on we will most likely need to manipulate the labsampleid field to be what we need it to be 
-    results['sampleid'] = results.labsampleid
+    # sampleid should just be everything before the last occurrence of a hyphen character in the labsampleid
+    # if no hyphen, the sampleid is just the labsampleid
+    # checker_labsampleid is created in main.py for storing purposes in case it may be needed on how data is grouped for later use
+    results['sampleid'] = results.labsampleid.apply(lambda x: str(x).rpartition('-')[0 if '-' in str(x) else -1]  )
 
     batch_args = {
         "dataframe": batch,
@@ -186,6 +188,23 @@ def chemistry_tissue(all_dfs):
     # ----- CUSTOM CHECKS - TISSUE RESULTS ----- #
     print('# ----- CUSTOM CHECKS - TISSUE RESULTS ----- #')
 
+    # Check for duplicates on bioaccumulationsampleid, sampledate, analysisbatchid, sampletype, matrix, analytename, fieldduplicate, labreplicate, SAMPLEID
+    # Cant be done in Core since there is no sampleid column that we are having them submit, but rather it is a field we create internally based off the labsampleid column
+    dupcols = ['bioaccumulationsampleid', 'sampledate', 'analysisbatchid', 'sampletype', 'matrix', 'analytename', 'fieldduplicate', 'labreplicate', 'sampleid']
+    
+    # Technically doing sort_values is unnecessary and irrelevant, 
+    #   but if you were to test the code and examine, you would see that it would put the duplicated records next to each other
+    #   duplicated() needs keep=False argument to flag all duplicated rows instead of marking last occurrence 
+    results_args.update({
+        "badrows": results.sort_values(dupcols)[results.duplicated(dupcols, keep=False)].tmp_row.tolist(),
+        "badcolumn" : 'BioaccumulationSampleID,SampleDate,AnalysisBatchID,SampleType,Matrix,AnalyteName,FieldDuplicate,LabReplicate,LabSampleID',
+        "error_type": "Value Error",
+        "error_message" : "These appear to be duplicated records that need to be distinguished with the labreplicate field (labrep 1, and labrep 2)"
+    })
+    errs.append(checkData(**results_args))
+
+
+
     # Check - If the sampletype is "Lab blank" or "Blank spiked" then the matrix must be labwater
     results_args.update({
         "badrows": results[(results.sampletype.isin(["Lab blank","Blank spiked"])) & (~results.matrix.isin(["labwater"]))].tmp_row.tolist(),
@@ -244,9 +263,9 @@ def chemistry_tissue(all_dfs):
         "badrows": results[results.mdl > results.rl].tmp_row.tolist(),
         "badcolumn": "MDL",
         "error_type": "Value Error",
-        "error_message": "The MDL should never be greater than the RL"
+        "error_message": "The MDL should not be greater than the RL"
     })
-    errs.append(checkData(**results_args))
+    warnings.append(checkData(**results_args))
     
     # Check - The MDL should not be equal to the RL (Warning)
     print('# Check - The MDL should not be equal to the RL (Warning)')
@@ -444,44 +463,31 @@ def chemistry_tissue(all_dfs):
     # ----------------------------------------------------------------------------------------------------------------------------------#
 
 
-    # Check - For Inorganics, units must be in ug/g dw (for Reference Materials, mg/kg dw is ok too) (Error)
-    print('# Check - For Inorganics, units must be in ug/g dw (for Reference Materials, mg/kg dw is ok too) (Error)')
-    units_metals_mask = (
-        ((~results.sampletype.str.contains('Reference', case = False)) & (results.analyteclass == 'Inorganics')) 
-        & (results.units != 'ug/g dw')
-    ) 
-    units_metals_crm_mask = (
-        ((results.sampletype.str.contains('Reference', case = False)) & (results.analyteclass == 'Inorganics')) 
-        & (~results.units.isin(['mg/kg dw','ug/g dw']))
-    )
-    results_args.update({
-        "badrows": results[units_metals_mask | units_metals_crm_mask].tmp_row.tolist(),
-        "badcolumn": "Units",
-        "error_type": "Value Error",
-        "error_message": "For Inorganics, units must be in ug/g dw (for Reference Materials, mg/kg dw is ok too)"
-    })
-    errs.append(checkData(**results_args))
+    # Check - For Inorganics, units must be in ug/g dw (Error)
+    print('# Check - For Inorganics, units must be in ug/g dw (Error) (Not CRMs)')
+    # --- code --- #
+
 
     # Check - For sampletype Method blank, if Result is less than MDL, it must be -88
     print('# Check - For sampletype Method blank, if Result is less than MDL, it must be -88')
     # mb_mask = Method blank mask
     print('# mb_mask = Method blank mask')
-    mb_mask = (results.sampletype == 'Method blank') 
+    mb_mask = (results.sampletype == 'Lab blank') 
     results_args.update({
         "badrows": results[mb_mask & ((results.result < results.mdl) & (results.result != -88))].tmp_row.tolist(),
         "badcolumn": "Result",
         "error_type": "Value Error",
-        "error_message": "For Method blank sampletypes, if Result is less than MDL, it must be -88"
+        "error_message": "For Lab blank sampletypes, if Result is less than MDL, it must be -88"
     })
     errs.append(checkData(**results_args))
 
-    # Check - If SampleType=Method blank and Result=-88, then qualifier must be below MDL or none.
-    print('# Check - If SampleType=Method blank and Result=-88, then qualifier must be below MDL or none.')
+    # Check - If SampleType=Lab blank and Result=-88, then qualifier must be below MDL or none.
+    print('# Check - If SampleType=Lab blank and Result=-88, then qualifier must be below MDL or none.')
     results_args.update({
         "badrows": results[(mb_mask & (results.result == -88)) & (~results.qualifier.isin(['below method detection limit','none'])) ].tmp_row.tolist(),
         "badcolumn": "Qualifier",
         "error_type": "Value Error",
-        "error_message": "If SampleType=Method blank and Result=-88, then qualifier must be 'below method detection limit' or 'none'"
+        "error_message": "If SampleType=Lab blank and Result=-88, then qualifier must be 'below method detection limit' or 'none'"
     })
     errs.append(checkData(**results_args))
 
@@ -569,7 +575,7 @@ def chemistry_tissue(all_dfs):
         "badrows": results[results.sampletype.str.contains('Reference', case = False) & (results.matrix == 'labwater')].tmp_row.tolist(),
         "badcolumn": "SampleType, Matrix",
         "error_type": "Value Error",
-        "error_message": f"If sampletype is a Reference material, the matrix cannot be 'labwater'"
+        "error_message": "If sampletype is a Reference material, the matrix cannot be 'labwater'"
     })
     errs.append(checkData(**results_args))
     
