@@ -365,6 +365,26 @@ def fish(all_dfs):
             })
             warnings = [*warnings, checkData(**trawlfishabundance_args)]
 
+
+    # ---------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+    # 11a
+    # Error if Composite weight is found in abundance tab
+    
+    badrows = trawlfishabundance[trawlfishabundance.fishspecies.str.lower() == 'composite weight'].tmp_row.tolist()
+    trawlfishabundance_args = {
+        "dataframe": trawlfishabundance,
+        "tablename": 'tbl_trawlfishabundance',
+        "badrows": badrows,
+        "badcolumn": "fishspecies",
+        "error_type": "Value Error",
+        "is_core_error": False,
+        "error_message": "Composite weight cannot be a species in the abundance tab"
+    }
+    errs = [*errs, checkData(**trawlfishabundance_args)]
+
+
     # ---------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
 
@@ -414,7 +434,8 @@ def fish(all_dfs):
     print("Fish Custom Checks")
     print("Check biomass ranges (min&max) for each taxon at each station.")
     # NOTE Need to make sure this is doing what Dario wants it to be doing
-    #Kristin - Check biomass ranges (min&max) for each taxon at each station.  Error - Impossibly large/questionable biomass values subgmitted for low abundances of extremely small taxa
+    # NOTE Dario says leave for now, although the calculation seems odd (7/19/2023)
+    #Kristin - Check biomass ranges (min&max) for each taxon at each station.  Error - Impossibly large/questionable biomass values submitted for low abundances of extremely small taxa
     for spec in trawlfishbiomass.fishspecies.unique():
         badrows = trawlfishbiomass[(trawlfishbiomass.fishspecies == spec)&(trawlfishbiomass.biomass > 2 * sorted(trawlfishbiomass.biomass, reverse = True)[2])].tmp_row.tolist()
         if len(badrows) > 0:
