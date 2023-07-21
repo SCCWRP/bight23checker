@@ -6,7 +6,7 @@ import pandas as pd
 from json import loads
 
 # custom imports, from local files
-from .preprocess import clean_data, hardcoded_fixes
+from .preprocess import clean_data, hardcoded_fixes, rename_test_stations, check_test_stations
 from .match import match
 from .core.core import core
 from .core.functions import fetch_meta
@@ -190,18 +190,37 @@ def main():
 
 
 
-    # ----------------------------------------- #
+    # --------------------------------------------------------------------------------------------------------------------------------------- #
+    
     # Pre processing data before Core checks
     #  We want to limit the manual cleaning of the data that the user has to do
     #  This function will strip whitespace on character fields and fix columns to match lookup lists if they match (case insensitive)
 
-    # COMMENT OUT PRE PROCESS ROUTINE SINCE LAST BIGHT CYCLE THEY DIDNT WANT US MESSING WITH THEIR DATA
-    #print("preprocessing and cleaning data")
+
+    # NOTE We should confirm whether they are ok with us doing this or not
+    #   of course, the test station renaming is perfectly fine
+    print("preprocessing and cleaning data")
+    
     # We are not sure if we want to do this
     # some projects like bight prohibit this
     all_dfs = clean_data(all_dfs)
     all_dfs = hardcoded_fixes(all_dfs)
-    #print("DONE preprocessing and cleaning data")
+
+    
+    # if login_email == 'test@sccwrp.org' then it will rename the stations
+    
+    print("login_email")
+    print(str(session.get('login_info').get('login_email')) )
+    
+    all_dfs = rename_test_stations(all_dfs, str(session.get('login_info').get('login_email')) )
+
+
+
+    print("DONE preprocessing and cleaning data")
+    
+    # --------------------------------------------------------------------------------------------------------------------------------------- #
+
+
 
     # this is the same as results['sampleid'] in chemistry (sediment) custom checks. 
     # checker_labsampleid is created for record purposes so we know how the labsampleid is used after stripping everything with and after the last hyphen.
@@ -251,6 +270,9 @@ def main():
     errs = []
     warnings = []
 
+    # Special routine for test data:
+    errs.extend(check_test_stations(all_dfs, session.get('login_info').get('login_email')))
+
     print("Core Checks")
 
     # meta data is needed for the core checks to run, to check precision, length, datatypes, etc
@@ -271,6 +293,7 @@ def main():
 
     errs.extend(core_output['core_errors'])
     warnings.extend(core_output['core_warnings'])
+
 
 
     # clear up some memory space, i never wanted to store the core checks output in memory anyways 
