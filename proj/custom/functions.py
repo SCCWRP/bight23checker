@@ -435,20 +435,14 @@ def sample_assignment_check(eng, df, parameter_column, row_index_col = 'tmp_row'
         f'''SELECT DISTINCT {stationid_column}, parameter AS {parameter_column}, {assignment_agency_column} AS {dataframe_agency_column}, 'yes' AS present FROM "{assignment_table}"; ''', 
         eng
     )
-    print("df")
-    print(df)
-    print("assignment")
-    print(assignment)
 
     df = df.merge(assignment, on = [stationid_column, parameter_column, dataframe_agency_column], how = 'left')
 
-    print("df")
-    print(df)
-    print("df.columns")
-    print(df.columns)
+
     badrows = df[(df.present.isnull()) & (df[stationid_column] != '0000')][row_index_col].tolist() if row_index_col != 'index' else df[(df.present.isnull() ) & (df[stationid_column] != '0000')].index.tolist()
 
     return badrows
+
 
 
 # Check Logic of Grab/Trawl Numbers and only return the badrows

@@ -356,6 +356,25 @@ def invert(all_dfs):
     warnings = [*warnings, checkData(**trawlinvertebrateabundance_args)]
 
 
+    # ---------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+    # 10a
+    # Error if Composite weight is found in abundance tab
+    
+    badrows = trawlinvertebrateabundance[trawlinvertebrateabundance.invertspecies.str.lower() == 'composite weight'].tmp_row.tolist()
+    trawlinvertebrateabundance_args = {
+        "dataframe": trawlinvertebrateabundance,
+        "tablename": 'tbl_trawlinvertebrateabundance',
+        "badrows": badrows,
+        "badcolumn": "invertspecies",
+        "error_type": "Value Error",
+        "is_core_error": False,
+        "error_message": "Composite weight cannot be a species in the abundance tab"
+    }
+    errs = [*errs, checkData(**trawlinvertebrateabundance_args)]
+
+
 
     # ---------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
@@ -390,16 +409,12 @@ def invert(all_dfs):
         (trawlinvertebratebiomass['biomass'] < .01) 
     ].tmp_row.tolist()
     
-    trawlinvertebratebiomass_args = {
-        "dataframe": trawlinvertebratebiomass,
-        "tablename": 'tbl_trawlinvertebratebiomass',
+    trawlinvertebratebiomass_args.update({
         "badrows": badrows,
         "badcolumn": "biomass",
         "error_type": "Undefined Error",
-        "is_core_error": False,
-        "error_message":
-            'Biomass values that were less than 0.01 kg (e.g. 0.004 kg) should have been submitted as <0.01 kg (0.01 in biomass column, < in the biomassqualifier column)'
-    }
+        "error_message": 'Biomass values that were less than 0.01 kg (e.g. 0.004 kg) should have been submitted as <0.01 kg (0.01 in biomass column, < in the biomassqualifier column)'
+    })
     errs = [*errs, checkData(**trawlinvertebratebiomass_args)]  
 
     #Jordan - Biomass - Filter qualifiers to make sure that all < have corresponding values of 0.01
@@ -408,16 +423,12 @@ def invert(all_dfs):
         (trawlinvertebratebiomass.biomassqualifier == '<') & 
         (trawlinvertebratebiomass.biomass != 0.01)
     ].tmp_row.tolist()
-    trawlinvertebratebiomass_args = {
-        "dataframe": trawlinvertebratebiomass,
-        "tablename": 'tbl_trawlinvertebratebiomass',
+    trawlinvertebratebiomass_args.update({
         "badrows": badrows,
         "badcolumn": "biomass",
         "error_type": "Undefined Error",
-        "is_core_error": False,
-        "error_message":
-            'Less than qualifiers (<) must have corresponding biomass value of 0.01kg.'
-    }
+        "error_message": 'Less than qualifiers (<) must have corresponding biomass value of 0.01kg.'
+    })
     errs = [*errs, checkData(**trawlinvertebratebiomass_args)] 
 
 
@@ -429,34 +440,117 @@ def invert(all_dfs):
     # NOTE: The following 4 checks are no longer necessary because composite weights will not be submitted. -Jordan 9/12/2018
     # NOTE: The following 4 checks may now be necessary because composite weights will be submitted. -Robert 7/13/2023
     
-    # NOTE: I'm not quite sure what these checks are looking for
-    '''
-    #Jordan - Biomass - Check to make sure that all "<0.01 kg" records have corresponding "Composite Weight" totals.
-    lt = biomass[(biomass.biomassqualifier == '<')&(biomass.biomass == 0.01)&(biomass.invertspecies.str.lower() != 'composite weight')]
-    cp = biomass[(biomass.invertspecies.str.lower() == 'composite weight')]
-    errorLog('Biomass - Check to make sure that all <0.01 kg records have corresponding Composite Weight totals.')
-    checkData(biomass[biomass.stationid.isin(set(lt.stationid)-set(cp.stationid))].tmp_row.tolist(),'Species/BiomassQualifier/Biomass','Undefined Error','error','<0.01 kg records submitted but not accompanying composite weight record.',biomass)
+
+    # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
+    # Basically, this is saying if there are any "<0.01 kg" records, then there must be a composite weight record in the biomass tab
+    # Dario says we will retain this check, but we will make it a warning rather than an error (7/19/2023)
+
+    # Jordan - Biomass - Check to make sure that all "<0.01 kg" records have corresponding "Composite Weight" totals.
+    less_than_records = trawlinvertebratebiomass[(trawlinvertebratebiomass.biomassqualifier == '<') & (trawlinvertebratebiomass.biomass == 0.01) & (trawlinvertebratebiomass.invertspecies.str.lower() != 'composite weight') ]
+    composite_weight_records = trawlinvertebratebiomass[ (trawlinvertebratebiomass.invertspecies.str.lower() == 'composite weight') ]
+    badrows = trawlinvertebratebiomass[
+            # its a bad row if the stationid is in the set of stations that have "<" qualifiers, but no composite weight records
+            (
+                trawlinvertebratebiomass.stationid.isin( list(set(less_than_records.stationid.tolist()) - set(composite_weight_records.stationid.tolist())) )
+            ) & (
+                trawlinvertebratebiomass.biomassqualifier == '<'
+            )
+        ] \
+        .tmp_row.tolist()
     
+    trawlinvertebratebiomass_args.update({
+        "badrows": badrows,
+        "badcolumn": "stationid,invertspecies,biomass,biomassqualifier",
+        "error_type": "Undefined Error",
+        "error_message": 'This station has records with a "<" qualifier, so there should also be a composite weight record for the station as well'
+    })
+    warnings = [*warnings, checkData(**trawlinvertebratebiomass_args)] 
+
+    # errorLog('Biomass - Check to make sure that all <0.01 kg records have corresponding Composite Weight totals.')
+    # checkData(biomass[biomass.stationid.isin(set(lt.stationid)-set(cp.stationid))].tmp_row.tolist(),'Species/BiomassQualifier/Biomass','Undefined Error','error','<0.01 kg records submitted but not accompanying composite weight record.',biomass)
+    # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
     
-    #Jordan - Biomass - Check to see that each Composite weight has a corresponding record of "<0.01 kg".
-    errorLog('Check to see that each Composite weight has a corresponding record of <0.01 kg.')
-    checkData(biomass[biomass.stationid.isin(set(cp.stationid)-set(lt.stationid))].tmp_row.tolist(),'Species/BiomassQualifier/Biomass','Undefined Error','error','Composite weight submitted, but no accompanying <0.01 kg records for that station.',biomass)
+
+    # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
     
+    # Dario says we will retain this check, but we will make it a warning rather than an error (7/19/2023)
+
+    # Jordan - Biomass - Check to see that each Composite weight has a corresponding record of "<0.01 kg".
+    badrows = trawlinvertebratebiomass[
+            # its a bad row if the stationid is in the set of stations that have composite weight records, but no "<" qualifiers
+            (
+                trawlinvertebratebiomass.stationid.isin( list(set(composite_weight_records.stationid.tolist()) - set(less_than_records.stationid.tolist())) )
+            ) & (
+                trawlinvertebratebiomass.invertspecies.str.lower() == 'composite weight'
+            )
+        ] \
+        .tmp_row.tolist()
     
-    #Jordan - Biomass - Compare "<0.01 kg" records with "Composite Weight" records to make sure they make sense.
-    errorLog('Compare <0.01 kg records with Composite Weight records to make sure they make sense.')
-    single_lt_stations = lt.groupby('stationid').size().reset_index()[lt.groupby('stationid').size().reset_index()[0]==1].stationid.tolist()
-    bm = biomass[(biomass.stationid.isin(single_lt_stations))&(biomass.invertspecies.str.lower() == 'composite weight')&(biomass.biomass > 0.01)]
-    checkData(bm.tmp_row.tolist(),'Species/BiomassQualifier/Biomass','Undefined Error','error','Only one <0.01 kg record submitted but accompanying composite weight is more than 0.01 kg.',biomass)
+    trawlinvertebratebiomass_args.update({
+        "badrows": badrows,
+        "badcolumn": "stationid,invertspecies,biomass,biomassqualifier",
+        "error_type": "Undefined Error",
+        "error_message": 'This station has composite weight records, so there should also be at least one record with a biomass qualifier of "<" for the station as well'
+    })
+    warnings = [*warnings, checkData(**trawlinvertebratebiomass_args)] 
+    
+    # errorLog('Check to see that each Composite weight has a corresponding record of <0.01 kg.')
+    # checkData(biomass[biomass.stationid.isin(set(cp.stationid)-set(lt.stationid))].tmp_row.tolist(),'Species/BiomassQualifier/Biomass','Undefined Error','error','Composite weight submitted, but no accompanying <0.01 kg records for that station.',biomass)
+    
+    # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
 
-    #Jordan/Kristin - Cross table checks - abundance vs. biomass  Check to make sure that total amount of records in biomass table is one more than abundance table. If not, make sure the reason makes sense.
+
+    # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+    # Dario says we will retain this check, but we will make it a warning rather than an error (7/19/2023)
+
+    # Jordan - Biomass - Compare "<0.01 kg" records with "Composite Weight" records to make sure they make sense.
+    # errorLog('Compare <0.01 kg records with Composite Weight records to make sure they make sense.')
+    single_lt_stations = less_than_records.groupby('stationid').size().reset_index(name='stationcount')
+    single_lt_stations = single_lt_stations[single_lt_stations.stationcount == 1]
+
+    if not single_lt_stations.empty:
+        
+        # issue a warning if 'Only one <0.01 kg record submitted but accompanying composite weight is more than 0.01 kg.'
+        print("issue a warning if 'Only one <0.01 kg record submitted but accompanying composite weight is more than 0.01 kg.'")
+        
+        badrows = trawlinvertebratebiomass[
+            (trawlinvertebratebiomass.stationid.isin(single_lt_stations.stationid.tolist()))
+            & (trawlinvertebratebiomass.invertspecies.str.lower() == 'composite weight')
+            & (trawlinvertebratebiomass.biomass > 0.01)
+        ].tmp_row.tolist()
+   
+        trawlinvertebratebiomass_args.update({
+            "badrows": badrows,
+            "badcolumn": "stationid,invertspecies,biomass",
+            "error_type": "Undefined Error",
+            "error_message": 'Only one <0.01 kg record submitted for this station, but the accompanying composite weight is more than 0.01 kg.'
+        })
+        warnings = [*warnings, checkData(**trawlinvertebratebiomass_args)] 
+        
+    # checkData(bm.tmp_row.tolist(),'Species/BiomassQualifier/Biomass','Undefined Error','error','Only one <0.01 kg record submitted but accompanying composite weight is more than 0.01 kg.',biomass)
+
+    # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+    # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
+    
+    # Dario says we will retain this check, but we will make it a warning rather than an error (7/19/2023 1PM)
+
+    # Jordan/Kristin - Cross table checks - abundance vs. biomass  Check to make sure that total amount of records in biomass table is one more than abundance table. If not, make sure the reason makes sense.
+    
+    # Robert 7/19/2023 4PM - I can see what this is doing is checking that the number of unique taxa in the biomass table is one more than that of abundance
+    #     This is covered by the logic check above, therefore this below check will be excluded in bight 2023
+
     #Get list of different stations in df
-    stid = abundance.stationid.unique()
-    for station in stid:
-        if abs(len(biomass[biomass['stationid'] == station].invertspecies.unique()) - len(abundance[abundance['stationid'] == station].invertspecies.unique())) > 1 :
-            checkData(biomass[biomass['stationid'] == station].index.tolist(), 'InvertSpecies','biomass error','error','Biomass records were either too great or too small compared to abundance records',biomass)
-    '''
+    # stid = abundance.stationid.unique()
+    # for station in stid:
+    #     if abs(len(biomass[biomass['stationid'] == station].invertspecies.unique()) - len(abundance[abundance['stationid'] == station].invertspecies.unique())) > 1 :
+    #         checkData(biomass[biomass['stationid'] == station].index.tolist(), 'InvertSpecies','biomass error','error','Biomass records were either too great or too small compared to abundance records',biomass)
+    
+    # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
 
     # 7b 
     # Biomass units must be kg
