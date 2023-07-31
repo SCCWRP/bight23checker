@@ -43,9 +43,8 @@ def attnpts():
     datatype = str(datatype)
 
     if datatype.lower() not in [str(sn).lower() for sn in xls.sheet_names]: # sn = sheet name
-        flash(f"{datatype} not found")
-        # return render_template('attention_points.jinja2', datatypes_list = sheet_names)
-        return redirect(url_for('info.attnpts'))
+        flash(f"datatype {datatype} not found")
+        return render_template('attention_points.jinja2', datatypes_list = sheet_names)
     
     # safe to assume this list will be non-empty
     datatype = [dtyp for dtyp in sheet_names if str(dtyp).lower() == datatype.lower()][0]
