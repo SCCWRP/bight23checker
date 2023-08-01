@@ -185,10 +185,13 @@ def chemistry(all_dfs):
         # One PFAS equipment blank per lab
 
         # Get labs that have given us equipment blanks
+        print('# Get labs that have given us equipment blanks')
         equipblanks = pd.read_sql("SELECT DISTINCT lab FROM tbl_chemresults WHERE sampletype = 'Equipment blank'; ", g.eng)
         
+        
         # Filter down to the records where the lab is NOT in the list of labs that have already given equipment blanks
-        checkdf = checkdf[~pfasresults.lab.isin(equipblanks.lab.tolist())]
+        # if equipblanks is an empty dataframe, disregard - doing equipblanks.lab will give an error in that case
+        checkdf = pfasresults[~pfasresults.lab.isin(equipblanks.lab.tolist())]
         
         if not checkdf.empty:
             checkdf = checkdf.groupby(['lab','analytename']).agg(
@@ -202,7 +205,7 @@ def chemistry(all_dfs):
             if not bad.empty:
                 for _, row in bad.iterrows():
                     results_args.update({
-                        "badrows": bad.tmp_row,
+                        "badrows": row.tmp_row,
                         "badcolumn": "Lab,SampleType",
                         "error_type": "Missing Data",
                         "error_message": f"""You are submitting PFAS data but there is no Equipment blank provided for the analyte {row.analytename} """
