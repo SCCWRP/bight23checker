@@ -645,12 +645,51 @@ def chemistry_tissue(all_dfs):
     forbidden_crms = forbidden_crms.crm.tolist()
     
     results_args.update({
-        "badrows": results[results.sampletype.isin(forbidden_crms)],
+        "badrows": results[results.sampletype.isin(forbidden_crms)].tmp_row.tolist(),
         "badcolumn": "SampleType",
         "error_type": "Value Error",
-        "error_message": f"You are making a sediment chemistry submission but this Reference Material is for sediment"
+        "error_message": f"You are making a tissue chemistry submission but this Reference Material is for sediment"
     })
     errs.append(checkData(**results_args))
+
+
+
+    # Check - in a tissue submission, they should be reporting % by weight of Lipids for all samples
+    print("# Check - in a tissue submission, they should be reporting % by weight of Lipids for all samples")
+    if not results.empty:
+        # I cannot think of a single case where results here would be empty, but i always put that
+        
+        checkdf = results[(results.matrix == 'tissue') & (~results.bioaccumulationsampleid.isin(['LABQC','0000']))]
+        if not checkdf.empty:
+            checkdf = checkdf.groupby(['bioaccumulationsampleid']).agg({
+                    # True if Lipids is in there, False otherwise
+                    'analytename' : (lambda grp: 'Lipids' in grp.unique()), 
+                    'tmp_row': list
+                }) \
+                .reset_index() \
+                .rename(columns = {'analytename': 'has_lipids'}) # rename to has_lipids since really that is what the column is representing after the groupby operation
+            
+            bad = checkdf[~checkdf.has_lipids]
+            if not bad.empty:
+                for _, row in bad.iterrows():
+                    results_args.update({
+                        "badrows": row.tmp_row,
+                        "badcolumn": "BioAccumulationSampleID,AnalyteName",
+                        "error_type": "Missing Data",
+                        "error_message": f"""For the bioaccumulation sampleid {row.bioaccumulationsampleid} it appears the percent Lipid content was not reported"""
+                    })
+                    errs.append(checkData(**results_args))
+        
+        results_args.update({
+            "badrows": results[(results.analytename == 'Lipids') & (results.units != f'% by weight')].tmp_row.tolist(),
+            "badcolumn": "BioAccumulationSampleID,AnalyteName",
+            "error_type": "Missing Data",
+            "error_message": f"""If the analytename is 'Lipids' then the units must be '% by weight'"""
+        })
+        errs.append(checkData(**results_args))
+        
+    print("# DONE WITH Check - in a tissue submission, they should be reporting % by weight of Lipids for all samples")
+
 
 
 

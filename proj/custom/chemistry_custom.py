@@ -439,6 +439,15 @@ def chemistry(all_dfs):
         "error_message" : "if stationid != '0000' then sampletype should be 'Result' or 'Field blank'"
     })
     errs.append(checkData(**results_args))
+
+    # Check - if the sampletype is "Equipment blank" then the stationid must be '0000' 
+    results_args.update({
+        "badrows": results[results.sampletype.isin(['Equipment blank']) & (~results.stationid.isin(['0000'])) ].tmp_row.tolist(),
+        "badcolumn" : 'SampleType,StationID',
+        "error_type": "Value Error",
+        "error_message" : "if sampletype is Equipment blank, then the stationid must be 0000 - Equipment blanks are not considered to be associated with any particular station" 
+    })
+    errs.append(checkData(**results_args))
     
     # Check - if the stationid is not 0000 and the sampletype is Matrix spike, then it is an error
     # They should use the QA stationID with a correct QA code if they used the actual station sediment as the matrix for spiking
@@ -656,6 +665,7 @@ def chemistry(all_dfs):
         "PCB": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
         "Chlorinated Hydrocarbons": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
         "PBDE": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
+        "PFAS": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
         "Pyrethroid": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
         "Neonicotinoids": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],
         "TIREWEAR": ['Lab blank', 'Blank spiked', 'Matrix spike', 'Result'],

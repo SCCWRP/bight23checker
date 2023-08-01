@@ -70,8 +70,6 @@ def mark_workbook(all_dfs, excel_path, errs, warnings):
 
 
     wb = load_workbook(marked_path)
-    print("wb.sheetnames")
-    print(wb.sheetnames)
 
     for sheet in wb.sheetnames:
         # Mark warnings first - this way if there are an error and warning in the same cell, the error will be shown
