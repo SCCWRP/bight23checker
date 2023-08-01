@@ -1016,15 +1016,20 @@ def chemistry(all_dfs):
                 lambda row: (row.result < row.lower_bound ) | (row.result > row.upper_bound),
                 axis = 1
             )
-        ].tmp_row.tolist()
+        ]
+
+        if not badrows.empty:
+            badrows = badrows.tmp_row.tolist()
         
-        results_args.update({
-            "badrows": badrows,
-            "badcolumn": "Result",
-            "error_type": "Value Error",
-            "error_message": f"The value here is outside the PT performance limits for ERA 540 (<a href=/{current_app.script_root}/scraper?action=help&layer=lu_chemcrm target=_blank>See the CRM Lookup lsit values</a>)"
-        })
-        warnings.append(checkData(**results_args))
+            results_args.update({
+                "badrows": badrows,
+                "badcolumn": "Result",
+                "error_type": "Value Error",
+                "error_message": f"The value here is outside the PT performance limits for ERA 540 (<a href=/{current_app.script_root}/scraper?action=help&layer=lu_chemcrm target=_blank>See the CRM Lookup lsit values</a>)"
+            })
+            warnings.append(checkData(**results_args))
+        else:
+            badrows = []
         # --- END TABLE 5-3 Check #2 --- #
 
 
@@ -1045,32 +1050,33 @@ def chemistry(all_dfs):
         tmp = results[inorg_sed_mask].groupby(['analysisbatchid', 'sampleid','analytename']).apply(
             lambda df: 
             not df[(df.labreplicate == 2) & df.sampletype.isin(['Matrix spike','Result'])].empty
-        ) \
-        .reset_index(name = 'has_dup')
+        ) 
+        if not tmp.empty:    
+            tmp = tmp.reset_index(name = 'has_dup')
 
-        # identify samples where not all analytes had their duplicates
-        tmp = tmp.groupby(['analysisbatchid','sampleid']).agg({'has_dup': all}).reset_index()
-        
-        # get percentage of samples within batch that had all analytes with their dupes
-        tmp = tmp.groupby('analysisbatchid') \
-            .agg({'has_dup': lambda x: sum(x) / len(x)}) \
-            .reset_index() \
-            .rename(columns = {'has_dup':'percent_samples_with_dupes'})
-        
-        # batches where 
-        badbatches = tmp[tmp.percent_samples_with_dupes < 0.1]
+            # identify samples where not all analytes had their duplicates
+            tmp = tmp.groupby(['analysisbatchid','sampleid']).agg({'has_dup': all}).reset_index()
+            
+            # get percentage of samples within batch that had all analytes with their dupes
+            tmp = tmp.groupby('analysisbatchid') \
+                .agg({'has_dup': lambda x: sum(x) / len(x)}) \
+                .reset_index() \
+                .rename(columns = {'has_dup':'percent_samples_with_dupes'})
+            
+            # batches where 
+            badbatches = tmp[tmp.percent_samples_with_dupes < 0.1]
 
-        bad = results[results.analysisbatchid.isin(badbatches.analysisbatchid.tolist())]
-        if not bad.empty:
-            bad = bad.groupby('analysisbatchid').agg({'tmp_row': list}).reset_index()
-            for _, row in bad.iterrows():
-                results_args.update({
-                    "badrows": row.tmp_row, # list of rows associated with the batch that doesnt meet the matrix/sample dup requirement
-                    "badcolumn": "SampleType",
-                    "error_type": "Incomplete data",
-                    "error_message": f"Under 10% of samples in the batch {row.analysisbatchid} have a sample duplicate / matrix spike duplicate"
-                })
-                warnings.append(checkData(**results_args))
+            bad = results[results.analysisbatchid.isin(badbatches.analysisbatchid.tolist())]
+            if not bad.empty:
+                bad = bad.groupby('analysisbatchid').agg({'tmp_row': list}).reset_index()
+                for _, row in bad.iterrows():
+                    results_args.update({
+                        "badrows": row.tmp_row, # list of rows associated with the batch that doesnt meet the matrix/sample dup requirement
+                        "badcolumn": "SampleType",
+                        "error_type": "Incomplete data",
+                        "error_message": f"Under 10% of samples in the batch {row.analysisbatchid} have a sample duplicate / matrix spike duplicate"
+                    })
+                    warnings.append(checkData(**results_args))
 
         # --- END TABLE 5-3 Check #4 --- #
 
