@@ -202,7 +202,7 @@ def pyrethroid_analyte_logic_check(df, analytes, row_index_col = 'tmp_row'):
 
 #     return arglist
 
-# Method blanks - result has to be less than MDL, or less than 5% of the measured concentration in the sample
+# Lab blanks - result has to be less than MDL, or less than 5% of the measured concentration in the sample
 def MB_ResultLessThanMDL(dataframe):
     """
     dataframe should have the tmp_row column, and already be filtered according to the "table" (table 5-3, 5-4 etc)
@@ -211,12 +211,12 @@ def MB_ResultLessThanMDL(dataframe):
     print("IN MB_ResultLessThanMDL")
 
     print("filter to methodblank samples and select only 5 needed columns")
-    methodblanks = dataframe[dataframe.sampletype == 'Method blank'][['analysisbatchid','matrix','analytename','mdl', 'result']]
+    methodblanks = dataframe[dataframe.sampletype == 'Lab blank'][['analysisbatchid','analytename','mdl', 'result']]
     print("filter to Results to merge with methodblanks")
     res = dataframe[dataframe.sampletype == 'Result']
 
     print('merge')
-    checkdf = res.merge(methodblanks, on = ['analysisbatchid','matrix','analytename'], how = 'inner', suffixes = ('','_mb'))
+    checkdf = res.merge(methodblanks, on = ['analysisbatchid','analytename'], how = 'inner', suffixes = ('','_mb'))
 
     print('filter to rows with too high methodblank values')
     checkdf = checkdf[
@@ -238,7 +238,7 @@ def MB_ResultLessThanMDL(dataframe):
                 "badrows": row.badrows,
                 "badcolumn": "Result",
                 "error_type": "Value Error",
-                "error_message": f"For the Analyte {row.analytename} in the AnalysisBatch {row.analysisbatchid}, the Method blank result value is either above the MDL, or above 5% of the measured concentration in the sample {row.sampleid}"
+                "error_message": f"For the Analyte {row.analytename} in the AnalysisBatch {row.analysisbatchid}, the Lab blank result value is either above the MDL, or above 5% of the measured concentration in the sample {row.sampleid}"
             },
             axis = 1
         ).tolist()

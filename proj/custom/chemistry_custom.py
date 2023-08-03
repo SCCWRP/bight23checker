@@ -407,14 +407,14 @@ def chemistry(all_dfs):
 
     # Check for duplicates on stationid, sampledate, analysisbatchid, sampletype, matrix, analytename, fieldduplicate, labreplicate, SAMPLEID
     # Cant be done in Core since there is no sampleid column that we are having them submit, but rather it is a field we create internally based off the labsampleid column
-    dupcols = ['stationid', 'sampledate', 'analysisbatchid', 'sampletype', 'matrix', 'analytename', 'fieldduplicate', 'labreplicate', 'sampleid']
+    dupcols = ['analysisbatchid', 'sampletype', 'matrix', 'analytename', 'fieldduplicate', 'labreplicate', 'sampleid']
     
     # Technically doing sort_values is unnecessary and irrelevant, 
     #   but if you were to test the code and examine, you would see that it would put the duplicated records next to each other
     #   duplicated() needs keep=False argument to flag all duplicated rows instead of marking last occurrence 
     results_args.update({
         "badrows": results.sort_values(dupcols)[results.duplicated(dupcols, keep=False)].tmp_row.tolist(),
-        "badcolumn" : 'StationID,SampleDate,AnalysisBatchID,SampleType,Matrix,AnalyteName,FieldDuplicate,LabReplicate,LabSampleID',
+        "badcolumn" : 'AnalysisBatchID,SampleType,Matrix,AnalyteName,FieldDuplicate,LabReplicate,LabSampleID',
         "error_type": "Value Error",
         "error_message" : "These appear to be duplicated records that need to be distinguished with the labreplicate field (labrep 1, and labrep 2)"
     })
@@ -682,10 +682,10 @@ def chemistry(all_dfs):
         
         print("Check for sample duplicates or matrix spike duplicates")
         if anltclass != 'Inorganics':
-            print('Non-Inorganics')
+            print('Organics')
             # For Inorganics, they can have either or, so the way we deal with inorganics must be different
-            error_args = [*error_args, *check_dups(results, anltclass, 'Result')]
-            error_args = [*error_args, *check_dups(results, anltclass, 'Matrix spike')]
+            # error_args = [*error_args, *check_dups(results, anltclass, 'Result')]
+            error_args = [*error_args, *check_dups(results, anltclass, ('Matrix spike' if anltclass != 'TOC' else 'Result') )] 
         else:
             print('Inorganics')
             # Under the assumption of how we worded the error message. 
@@ -1123,14 +1123,19 @@ def chemistry(all_dfs):
         # for 'ICPAES', 'EPA200.7', 'EPA 6010B' it says "10% (within 3 standard deviations)" but lets set it to 25% rpd
         # for 'ICPMS', 'EPA200.8', 'EPA 6020Bm' it says within 25% RPD
         # for 'CVAA','FAA','GFAA','HAA','EPA245.7m','EPA245.5','EPA7473','SW846 7471','EPA7471B' it says within 30% RPD
+
+        # NOTE August 2, 2023
+        # Need to make sure these analysis methods match the lookup list
+        # Need to make sure that their analysis method makes sense based on the analyteclass (That check should most likely be added)
+        # But a much higher priority is to make sure these below analysis methods match the lookup list lu_chemanalysismethods
         
         icpaes_methods = ['ICPAES', 'EPA200.7', 'EPA6010D','EPA6010B'] # methods that require 20% RPD - Inductively Coupled Plasma Atomic Emission Spectrometry
         icpaes_tolerance = .25 
         icpaes_blankspike_tolerance = 0.25
-        icpms_methods = ['ICPMS', 'EPA200.8', 'EPA 6020Bm'] # methods that require 30% RPD - Inductively Coupled Plasma Mass Spectrometry
+        icpms_methods = ['ICPMS', 'EPA200.8', 'EPA6020'] # methods that require 30% RPD - Inductively Coupled Plasma Mass Spectrometry
         icpms_tolerance = .25 
         icpms_blankspike_tolerance = 0.15
-        aa_methods = ['CVAA','FAA','GFAA','HAA','EPA245.7m','EPA245.5','EPA7473','SW846 7471','EPA7471B'] # - Atomic Absorbtion
+        aa_methods = ['CVAA','CVAF','FAA','GFAA','HAA','EPA245.7','EPA245.5','EPA7473','SW846 7471','EPA7471B'] # - Atomic Absorbtion
         aa_tolerance = .3 
 
         rpdcheckmask = (
@@ -1270,14 +1275,45 @@ def chemistry(all_dfs):
         req_analytes_tbl54 = pd.read_sql("SELECT * FROM lu_analytes WHERE analyteclass = 'PAH'", eng).analyte.tolist()
 
         # --- END TABLE 5-4 Check #1 --- #
-        # Covered above
+        # Covered above, except it doesnt specifically tell which reference materials it requires
+        checkdf = results[pah_sed_mask]
+        if not checkdf.empty:
+            
+            # Go through each batch and analyte and see which reference materials values are missing
+            tmp = checkdf.groupby(['analysisbatchid','analytename']).agg({
+                'sampletype': ( lambda sampletypes: len(set(['Reference - SRM 1944 Sed','Reference - SRM 1941b Sed']).intersection(set(sampletypes))) > 0),
+                'tmp_row': list
+            }) 
+
+            # you can never be too careful
+            if not tmp.empty:
+                tmp = tmp.reset_index().rename(columns={'sampletype':'has_correct_crm'})
+                print('tmp')
+                print(tmp)
+                tmp = tmp[~tmp.has_correct_crm].apply(
+                    lambda row: 
+                    {
+                        "badrows": row.tmp_row, # The whole thing is bad since it is missing Reference Material
+                        "badcolumn": "SampleType",
+                        "error_type": "Incomplete data",
+                        "error_message": f"For PAHs in sediment, it is required that you have one of the following reference materials: 'Reference - SRM 1944 Sed' or 'Reference - SRM 1941b Sed' but it is missing for the batch {row.analysisbatchid} and analyte {row.analytename}"
+                    },
+                    axis = 1
+                )
+                if not tmp.empty:
+                    tmp = tmp.tolist()
+                    for argset in tmp:
+                        results_args.update(argset)
+                        errs.append(checkData(**results_args))
+
+
 
         # --- TABLE 5-4 Check #2 --- #
         # Check - For reference materials - Result should be within 40% of the specified value (in lu_chemcrm) for 80% of the analytes
         # print('# Check - For reference materials - Result should be within 40% of the specified value (in lu_chemcrm) for 80% of the analytes')
         crmvals = pd.read_sql(
             f"""
-            SELECT analytename, reference_value FROM lu_chemcrm 
+            SELECT crm AS sampletype, analytename, reference_value FROM lu_chemcrm 
             WHERE analytename IN ('{"','".join(req_analytes_tbl54).replace(';','')}')
             AND matrix = 'sediment'
             """,
@@ -1285,31 +1321,33 @@ def chemistry(all_dfs):
         )
         checkdf = results[pah_sed_mask & results.sampletype.str.contains('Reference', case = False)] 
         if not checkdf.empty:
-            checkdf = checkdf.merge(crmvals, on = 'analytename', how = 'inner')
-        
-        if not checkdf.empty:
-            checkdf['within40pct'] = checkdf.apply(
-                    lambda row:
-                    (0.6 * float(row.reference_value)) <= row.result <= (1.4 * float(row.reference_value)) if not pd.isnull(row.reference_value) else True,
-                    axis = 1
+            checkdf = checkdf.merge(crmvals, on = ['sampletype','analytename'], how = 'inner')
+            
+            if not checkdf.empty:
+                print("checkdf")
+                print(checkdf)
+                checkdf['within40pct'] = checkdf.apply(
+                        lambda row:
+                        (0.6 * float(row.reference_value)) <= row.result <= (1.4 * float(row.reference_value)) if not pd.isnull(row.reference_value) else True,
+                        axis = 1
+                    )
+                checkdf = checkdf.merge(
+                    checkdf.groupby('analysisbatchid') \
+                        .apply(
+                            lambda df: (sum(df.within40pct) / len(df)) < 0.8
+                        ) \
+                        .reset_index(name = 'failedcheck'),
+                    on = 'analysisbatchid',
+                    how = 'inner'
                 )
-            checkdf = checkdf.merge(
-                checkdf.groupby('analysisbatchid') \
-                    .apply(
-                        lambda df: sum(df.within40pct) / len(df) < 0.8
-                    ) \
-                    .reset_index(name = 'failedcheck'),
-                on = 'analysisbatchid',
-                how = 'inner'
-            )
-            checkdf = checkdf[checkdf.failedcheck]
-            results_args.update({
-                "badrows": checkdf.tmp_row.tolist(),
-                "badcolumn": "AnalysisBatchID",
-                "error_type": "Value Error",
-                "error_message": "Less than 80% of the analytes in this batch are within 40% of the CRM value"
-            })
-            warnings.append(checkData(**results_args))
+                checkdf = checkdf[checkdf.failedcheck]
+                results_args.update({
+                    "badrows": checkdf.tmp_row.tolist(),
+                    "badcolumn": "AnalysisBatchID",
+                    "error_type": "Value Error",
+                    "error_message": "Less than 80% of the analytes in this batch are within 40% of the CRM value"
+                })
+                warnings.append(checkData(**results_args))
 
         # --- END TABLE 5-4 Check #2 --- #
         print("# --- END TABLE 5-4 Check #2 --- #")
@@ -1473,9 +1511,42 @@ def chemistry(all_dfs):
     print("results55")
     print(results55)
     if not results55.empty:
+
+        print("# --- TABLE 5-5 Check #1 --- #")
         # --- TABLE 5-5 Check #1 --- #
         # Check - check for all required sampletypes
-        # covered above
+        # Covered above, except it doesnt specifically tell which reference materials it requires
+        checkdf = results55
+        if not checkdf.empty:
+            
+            # Go through each batch and analyte and see which reference materials values are missing
+            tmp = checkdf.groupby(['analysisbatchid','analytename']).agg({
+                'sampletype': ( lambda sampletypes: len(set(['Reference - SRM 1944 Sed','Reference - SRM 1941b Sed']).intersection(set(sampletypes))) > 0),
+                'tmp_row': list
+            }) 
+
+            # you can never be too careful
+            if not tmp.empty:
+                tmp = tmp.reset_index().rename(columns={'sampletype':'has_correct_crm'})
+                print('tmp')
+                print(tmp)
+                tmp = tmp[~tmp.has_correct_crm].apply(
+                    lambda row: 
+                    {
+                        "badrows": row.tmp_row, # The whole thing is bad since it is missing Reference Material
+                        "badcolumn": "SampleType",
+                        "error_type": "Incomplete data",
+                        "error_message": f"For Organics in sediment, it is required that you have one of the following reference materials: 'Reference - SRM 1944 Sed' or 'Reference - SRM 1941b Sed' but it is missing for the batch {row.analysisbatchid} and analyte {row.analytename}"
+                    },
+                    axis = 1
+                )
+                if not tmp.empty:
+                    tmp = tmp.tolist()
+                    for argset in tmp:
+                        results_args.update(argset)
+                        errs.append(checkData(**results_args))
+
+        print("# --- END TABLE 5-5 Check #1 --- #")
         # --- END TABLE 5-5 Check #1 --- #
         
 
