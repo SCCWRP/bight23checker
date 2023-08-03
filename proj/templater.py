@@ -148,7 +148,7 @@ def template():
             eng
         )
         df = df.assign(
-            sheet = pd.Series([tbl.replace("tbl_","") for _ in range(len(df))]),
+            sheet = pd.Series([tbl.replace("tbl_","").replace("microplastics_","") for _ in range(len(df))]),
             template_prefix = pd.Series([f"{file_prefix}-TEMPLATE" for _ in range(len(df))])
         )
         df = df[['template_prefix','sheet', 'field_name', 'field_type','description' ]]
@@ -171,7 +171,7 @@ def template():
             )
         },
         **{
-            table.replace("tbl_", ""): pd.DataFrame(
+            table.replace("tbl_", "").replace("microplastics_",""): pd.DataFrame(
                 columns=
                 [
                     *[

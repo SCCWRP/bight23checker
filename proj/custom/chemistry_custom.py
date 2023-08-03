@@ -1516,11 +1516,11 @@ def chemistry(all_dfs):
         # --- TABLE 5-5 Check #1 --- #
         # Check - check for all required sampletypes
         # Covered above, except it doesnt specifically tell which reference materials it requires
-        checkdf = results55
+        checkdf = results55[results55.analyteclass.isin(['PCB', 'PBDE', 'Chlorinated Hydrocarbons'])]
         if not checkdf.empty:
             
             # Go through each batch and analyte and see which reference materials values are missing
-            tmp = checkdf.groupby(['analysisbatchid','analytename']).agg({
+            tmp = checkdf.groupby(['analysisbatchid','analyteclass']).agg({
                 'sampletype': ( lambda sampletypes: len(set(['Reference - SRM 1944 Sed','Reference - SRM 1941b Sed']).intersection(set(sampletypes))) > 0),
                 'tmp_row': list
             }) 
@@ -1536,7 +1536,7 @@ def chemistry(all_dfs):
                         "badrows": row.tmp_row, # The whole thing is bad since it is missing Reference Material
                         "badcolumn": "SampleType",
                         "error_type": "Incomplete data",
-                        "error_message": f"For Organics in sediment, it is required that you have one of the following reference materials: 'Reference - SRM 1944 Sed' or 'Reference - SRM 1941b Sed' but it is missing for the batch {row.analysisbatchid} and analyte {row.analytename}"
+                        "error_message": f"For Organics in sediment, it is required that you have one of the following reference materials: 'Reference - SRM 1944 Sed' or 'Reference - SRM 1941b Sed' but it is missing for the batch {row.analysisbatchid} and compound class {row.analyteclass}"
                     },
                     axis = 1
                 )
