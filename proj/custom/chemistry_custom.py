@@ -461,17 +461,19 @@ def chemistry(all_dfs):
     
 
     # Check - if the qacode is 'Matrix spike done with the actual sediment sample as the matrix for spiking' then a comment containing the station it came from is required
+    print("# Check - if the qacode is 'Matrix spike done with the actual sediment sample as the matrix for spiking' then a comment containing the station it came from is required")
     results_args.update({
         "badrows": results[ 
             (results.qacode == 'Matrix spike done with the actual sediment sample as the matrix for spiking') 
             & 
-            (~results.comments.str.contains(r'B23-\d{5}', regex = True) )
+            (~results.comments.fillna("").str.contains(r'B23-\d{5}', regex = True) )
         ].tmp_row.tolist(),
         "badcolumn" : 'Comments',
         "error_type": "Value Error",
         "error_message" : "If the qacode is 'Matrix spike done with the actual sediment sample as the matrix for spiking' then we ask that a comment is provided telling which station it came from"
     })
     errs.append(checkData(**results_args))
+    print("# END OF Check - if the qacode is 'Matrix spike done with the actual sediment sample as the matrix for spiking' then a comment containing the station it came from is required")
 
 
 
@@ -1557,6 +1559,7 @@ def chemistry(all_dfs):
         crmvals = pd.read_sql(
             f"""
             SELECT
+                lu_chemcrm.crm AS sampletype,
                 lu_chemcrm.analytename,
                 lu_chemcrm.matrix,
                 lu_chemcrm.certified_value,
@@ -1572,7 +1575,7 @@ def chemistry(all_dfs):
         )
         checkdf = results[mask55 & results.sampletype.str.contains('Reference', case = False)]
         if not checkdf.empty:
-            checkdf = checkdf.merge(crmvals, on = 'analytename', how = 'left')
+            checkdf = checkdf.merge(crmvals, on = ['sampletype','analytename','matrix'], how = 'left')
         
         if not checkdf.empty:
             checkdf['within40pct'] = checkdf.apply(
@@ -1583,7 +1586,7 @@ def chemistry(all_dfs):
             checkdf = checkdf.merge(
                 checkdf.groupby('analysisbatchid') \
                     .apply(
-                        lambda df: sum(df.within40pct) / len(df) < 0.8
+                        lambda df: (sum(df.within40pct) / len(df) )< 0.8
                     ) \
                     .reset_index(name = 'failedcheck'),
                 on = 'analysisbatchid',
@@ -1669,7 +1672,7 @@ def chemistry(all_dfs):
                 "badrows": checkdf.tmp_row.tolist(),
                 "badcolumn": "AnalysisBatchID, SampleType, LabSampleID, LabReplicate, Result",
                 "error_type": "Value Error",
-                "error_message": f"For Matrix/blank spikes, over 70% of analytes should have 60-140% recovery"
+                "error_message": f"For Matrix spikes, over 70% of analytes should have 60-140% recovery"
             })
             warnings.append(checkData(**results_args))
         # --- END TABLE 5-5 Check # 4 and 7 --- #
@@ -1761,6 +1764,8 @@ def chemistry(all_dfs):
     
     
     # ------- END Table 5-6 - TOC and TN, Non-tissue matrices (Sediment and labwater) -------#
+
+    results56 = results[results.analyteclass.isin(['TOC','TN'])]
     
     # --- TABLE 5-6 Check #1 --- #
     # Check for all required sampletypes (covered above)
@@ -1773,7 +1778,7 @@ def chemistry(all_dfs):
     
     # crmvals dataframe has been defined above, in section 5-3
 
-    checkdf = results[(results.analytename == 'TOC') & (results.sampletype == 'Reference - SRM 1944 Sed')]
+    checkdf = results56[(results56.analytename == 'TOC') & (results56.sampletype == 'Reference - SRM 1944 Sed')]
     if not checkdf.empty:
         crmvals = pd.read_sql(
             f"""
@@ -1806,8 +1811,8 @@ def chemistry(all_dfs):
     print('# Check - For SampleType = Lab blank, we must require Result < 10 * MDL (WARNING)')
     #   if that criteria is met, the qualifier should be "none" (WARNING)
     # First check that the result is under 10 times the MDL
-    badrows = results[
-        ((results.analyteclass.isin(['TOC','TN'])) & (results.sampletype == 'Lab blank')) & (results.result >= (10 * results.mdl))
+    badrows = results56[
+        ((results56.analyteclass.isin(['TOC','TN'])) & (results56.sampletype == 'Lab blank')) & (results56.result >= (10 * results56.mdl))
     ].tmp_row.tolist()
     results_args.update({
         "badrows": badrows,
@@ -1818,10 +1823,10 @@ def chemistry(all_dfs):
     warnings.append(checkData(**results_args))
 
     # If the requirement is met, check that the qualifier says none
-    badrows = results[
-        (((results.analyteclass.isin(['TOC','TN'])) & (results.sampletype == 'Lab blank')) & (results.result < (10 * results.mdl)))
+    badrows = results56[
+        (((results56.analyteclass.isin(['TOC','TN'])) & (results56.sampletype == 'Lab blank')) & (results56.result < (10 * results56.mdl)))
         & 
-        (results.qualifier != 'none')
+        (results56.qualifier != 'none')
     ].tmp_row.tolist()
 
     results_args.update({
@@ -1836,7 +1841,7 @@ def chemistry(all_dfs):
 
     # --- Table 5-6 Check #4 --- #
     print('# Check - Sample duplicate required (1 per batch)')
-    tmp = results55.groupby(['analysisbatchid', 'analytename']).apply(
+    tmp = results56.groupby(['analysisbatchid', 'analytename']).apply(
         lambda df:
         not df[(df.sampletype == 'Result') & (df.labreplicate == 2)].empty # signifies whether or not a Matrix spike duplicate is present
     )
@@ -1860,7 +1865,7 @@ def chemistry(all_dfs):
     # --- TABLE 5-6 Check #5 --- #
     # Check - Duplicate Results must have RPD < 30% (WARNING)
     print('# Check - Duplicate Results must have RPD < 30% (WARNING)')
-    checkdf = results[results.analyteclass.isin(['TOC','TN']) & (results.sampletype == 'Result')]
+    checkdf = results56[results56.analyteclass.isin(['TOC','TN']) & (results56.sampletype == 'Result')]
     if not checkdf.empty:
         checkdf = checkdf.groupby(['analysisbatchid', 'analytename','sampleid']).apply(
             lambda subdf:
@@ -1878,7 +1883,7 @@ def chemistry(all_dfs):
                 f"Duplicate Matrix spikes should have an RPD under 30% (for TOC and TN)"
                 , axis = 1
             )
-            checkdf = results[results.analyteclass.isin(['TOC','TN']) & (results.sampletype == 'Result')] \
+            checkdf = results56[results56.analyteclass.isin(['TOC','TN']) & (results56.sampletype == 'Result')] \
                 .merge(
                     checkdf[
                         # just merge records that failed the check
