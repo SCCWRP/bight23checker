@@ -288,7 +288,7 @@ def check_dups(df, analyteclass, sampletype):
     else:
         baddf['errmsg'] = baddf.apply(
             lambda row: 
-            f"""The AnalysisBatch {row.analysisbatchid} is missing a duplicate {sampletype}"""
+            f"""The AnalysisBatch {row.analysisbatchid} is missing a duplicate {sampletype} (for the compound class {analyteclass})"""
             , axis = 1
         )
 
