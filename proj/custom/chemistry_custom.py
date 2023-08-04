@@ -919,7 +919,7 @@ def chemistry(all_dfs):
         "badrows": badrows,
         "badcolumn": "Units",
         "error_type": "Value Error",
-        "error_message": f"For SampleTypes Reference - ERA 540 Sed and Reference SRM 1944 Sed, units must match those in the reference material document. <a href=/{current_app.script_root}/scraper?action=help&layer=lu_chemcrm target=_blank>See the CRM Lookup list values</a>)"
+        "error_message": f"For Reference material SampleTypes, units must match those in the reference material document. <a href=/{current_app.script_root}/scraper?action=help&layer=lu_chemcrm target=_blank>See the CRM Lookup list values</a>)"
     })
     errs.append(checkData(**results_args))
 
