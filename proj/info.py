@@ -8,7 +8,7 @@ from shareplum import Office365
 from shareplum.site import Version
 from io import BytesIO
 
-info = Blueprint('info', __name__, url_prefix='/info')
+info = Blueprint('info', __name__)
 
 teams_username = os.environ.get("MS_USERNAME")
 teams_password = os.environ.get("MS_PASSWORD")
@@ -23,7 +23,7 @@ site = Site(os.path.join(url, 'sites', teamname), version=Version.v2016, authcoo
 folder = site.Folder(sitefolder)
 
 # attnpts = attention points
-@info.route('/')
+@info.route('/info', strict_slashes = False)
 def attnpts():
     datatype = request.args.get('dtype')
         
