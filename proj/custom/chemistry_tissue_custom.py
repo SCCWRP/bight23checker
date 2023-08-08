@@ -640,7 +640,7 @@ def chemistry_tissue(all_dfs):
         "badcolumn": "Units",
         "error_type": "Value Error",
         # @Zaib - changed your lookup list link to not have the full hard coded URL, but rather the one that uses the app script root variable
-        "error_message": f"For SRM 1974c and SRM 2976, units must match those in the reference material document. <a href=/{current_app.script_root}/scraper?action=help&layer=lu_chemcrm target=_blank>See the CRM Lookup list values</a>)"
+        "error_message": f"For SRM 1974c and SRM 2976, units must match those in the reference material document. <a href=scraper?action=help&layer=lu_chemcrm target=_blank>See the CRM Lookup list values</a>)"
     })
     errs.append(checkData(**results_args))
     
@@ -740,7 +740,7 @@ def chemistry_tissue(all_dfs):
         "badrows": tmp[tmp.failed_crmcheck].tmp_row.tolist(),
         "badcolumn": "result",
         "error_type": "Value Error",
-        "error_message": f"""For the reference material 'Reference - SRM 2976 Mussel Tissue' the result should be within 30% of the certified value (See the <a href={current_app.config.get("APP_SCRIPT_ROOT")}/scraper?action=help&layer=lu_chemcrm>CRM Lookup list</a>)"""
+        "error_message": f"""For the reference material 'Reference - SRM 2976 Mussel Tissue' the result should be within 30% of the certified value (See the <a href=scraper?action=help&layer=lu_chemcrm>CRM Lookup list</a>)"""
     })
     warnings.append(checkData(**results_args))
     # END Table 6-2 Check #2 - Result for the CRM sampletype (Reference - SRM 2976 Mussel Tissue) should be within 30% of certified value
@@ -762,7 +762,7 @@ def chemistry_tissue(all_dfs):
 
         results_args.update({
             "badrows": checkdf.tmp_row.tolist(),
-            "badcolumn": "AnalysisBatchID, SampleType, SampleID, LabReplicate, Result",
+            "badcolumn": "AnalysisBatchID, SampleType, LabSampleID, LabReplicate, Result",
             "error_type": "Value Error",
             "error_message": f"For Blank spikes, all analytes should have 75-125% recovery"
         })
@@ -951,7 +951,7 @@ def chemistry_tissue(all_dfs):
 
             results_args.update({
                 "badrows": checkdf.tmp_row.tolist(),
-                "badcolumn": "AnalysisBatchID, SampleType, SampleID, LabReplicate, Result",
+                "badcolumn": "AnalysisBatchID, SampleType, LabSampleID, LabReplicate, Result",
                 "error_type": "Value Error",
                 "error_message": f"For Matrix spikes (for Organics in Tissue), all analytes should have 50-150% recovery"
             })
@@ -1044,7 +1044,7 @@ def chemistry_tissue(all_dfs):
 
             results_args.update({
                 "badrows": checkdf.tmp_row.tolist(),
-                "badcolumn": "AnalysisBatchID, SampleType, SampleID, LabReplicate, Result",
+                "badcolumn": "AnalysisBatchID, SampleType, LabSampleID, LabReplicate, Result",
                 "error_type": "Value Error",
                 "error_message": f"For Blank spikes, all analytes should have 50-150% recovery (for PFAS)"
             })
