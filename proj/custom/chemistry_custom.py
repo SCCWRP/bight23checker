@@ -478,12 +478,54 @@ def chemistry(all_dfs):
 
 
 
-    # Check - If the sampletype is "Lab blank" or "Blank spiked" then the matrix must be labwater    
+    # Check - If the sampletype is "Lab blank", "Field blank", "Equipment blank", or "Blank spiked" then the matrix must be labwater or PFAS-free water
     results_args.update({
-        "badrows": results[(results.sampletype.isin(["Lab blank","Blank spiked"])) & (~results.matrix.isin(["labwater"]))].tmp_row.tolist(),
+        "badrows": results[
+            (results.sampletype.isin(["Lab blank","Blank spiked"])) & (~results.matrix.isin(["labwater","PFAS-free water"]))
+        ].tmp_row.tolist(),
         "badcolumn" : "matrix",
         "error_type": "Value error",
-        "error_message" : "If the sampletype is Lab blank or Blank spiked, the matrix must be 'labwater'"
+        "error_message" : "If the sampletype is Lab blank or Blank spiked, the matrix must be 'labwater' or 'PFAS-free water'"
+    })
+    errs.append(checkData(**results_args))
+
+
+    # Check - If the sampletype is "Field blank" or "Equipment blank" then the analyte should be a PFAS analyte
+    results_args.update({
+        "badrows": results[(results.sampletype.isin(["Field blank", "Equipment blank"])) & (~results.analyteclass.isin(["PFAS"]))].tmp_row.tolist(),
+        "badcolumn" : "sampletype,analytename",
+        "error_type": "Value error",
+        "error_message" : "If the sampletype is 'Field blank' or 'Equipment blank' then the analyte should be a PFAS analyte"
+    })
+    errs.append(checkData(**results_args))
+
+
+    # Check - If the sampletype is "Field blank" or "Equipment blank" then the matrix must be PFAS-free water
+    results_args.update({
+        "badrows": results[(results.sampletype.isin(["Field blank","Equipment blank"])) & (~results.matrix.isin(["PFAS-free water"]))].tmp_row.tolist(),
+        "badcolumn" : "matrix",
+        "error_type": "Value error",
+        "error_message" : "If the sampletype is 'Field blank' or 'Equipment blank' then the matrix must be PFAS-free water"
+    })
+    errs.append(checkData(**results_args))
+    
+    
+    # Check - If the matrix is labwater, then the sampletype must be Lab blank or Blank spiked
+    results_args.update({
+        "badrows": results[ (results.matrix == 'labwater') & (~results.sampletype.isin(["Lab blank","Blank spiked"])) ].tmp_row.tolist(),
+        "badcolumn" : "matrix, sampletype",
+        "error_type": "Value error",
+        "error_message" : "If the matrix is labwater, then the sampletype must be Lab blank or Blank spiked"
+    })
+    errs.append(checkData(**results_args))
+    
+    
+    # Check - If the matrix is PFAS-free water, then the sampletype must be Field blank or Equipment blank
+    results_args.update({
+        "badrows": results[ (results.matrix == 'PFAS-free water') & (~results.sampletype.isin(["Field blank","Equipment blank"])) ].tmp_row.tolist(),
+        "badcolumn" : "matrix, sampletype",
+        "error_type": "Value error",
+        "error_message" : "If the matrix is PFAS-free water, then the sampletype must be Field blank or Equipment blank"
     })
     errs.append(checkData(**results_args))
 
@@ -585,14 +627,14 @@ def chemistry(all_dfs):
     print('# Check - if the qualifier is "estimated" or "below reporting limit" then the result must be between the mdl and rl (inclusive) EXCEPT Lab blank sampletypes (Error)')
     results_args.update({
         "badrows": results[
-                ((results.qualifier.isin(["estimated", "below reporting limit"])) & (results.sampletype != 'Lab blank'))
+                ((results.qualifier.isin(["estimated", "below reporting limit"])) & (~results.sampletype.isin(['Lab blank', 'Field blank', 'Equipment blank']) ))
                 & (
                     (results.result < results.mdl) | (results.result > results.rl)
                 )
             ].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
-        "error_message": "If the Qualifier is 'estimated' or 'below reporting limit' then the Result should be between the MDL and RL (Inclusive)"
+        "error_message": "If the Qualifier is 'estimated' or 'below reporting limit' then the Result should be between the MDL and RL (Inclusive). (This does not apply to Lab blanks, Field blanks or Equipment blanks.)"
     })
     errs.append(checkData(**results_args))
     
@@ -610,17 +652,17 @@ def chemistry(all_dfs):
     errs.append(checkData(**results_args))
 
     # Check - if the qualifier is "none" then the result must be greater than the RL (Error) Except lab blanks
-    print('# Check - if the qualifier is "none" or "equal to" then the result must be greater than the RL (Error) Except lab blanks')
+    print('# Check - if the qualifier is "none" or "equal to" then the result must be greater than the RL (Error) Except lab/field/equipment blanks')
     results_args.update({
         "badrows": results[
             (
-                (results.qualifier.isin(['none', 'equal to'])) & (results.sampletype != 'Lab blank')
+                (results.qualifier.isin(['none', 'equal to'])) & (results.sampletype.isin(['Lab blank', 'Field blank', 'Equipment blank']) )
             ) & 
             (results.result <= results.rl)
         ].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
-        "error_message": "if the qualifier is 'none' or 'equal to' then the result must be greater than the RL"
+        "error_message": "if the qualifier is 'none' or 'equal to' then the result must be greater than the RL (Except Lab, Field, Equipment blanks)"
     })
     errs.append(checkData(**results_args))
 
@@ -746,12 +788,12 @@ def chemistry(all_dfs):
     print('# Check - For sampletype Lab blank, if Result is less than MDL, it must be -88')
     # mb_mask = Lab blank mask (lab blank is also called method blank)
     print('# mb_mask = Lab blank mask')
-    mb_mask = (results.sampletype == 'Lab blank') 
+    mb_mask = (results.sampletype.isin(['Lab blank', 'Field blank', 'Equipment blank']))
     results_args.update({
         "badrows": results[mb_mask & ((results.result < results.mdl) & (results.result != -88))].tmp_row.tolist(),
         "badcolumn": "Result",
         "error_type": "Value Error",
-        "error_message": "For Lab blank sampletypes, if Result is less than MDL, it must be -88"
+        "error_message": "For Lab blank/Equipment blank/Field blank sampletypes, if Result is less than MDL, it must be -88"
     })
     errs.append(checkData(**results_args))
 
@@ -761,7 +803,7 @@ def chemistry(all_dfs):
         "badrows": results[(mb_mask & (results.result == -88)) & (~results.qualifier.isin(['below method detection limit','none'])) ].tmp_row.tolist(),
         "badcolumn": "Qualifier",
         "error_type": "Value Error",
-        "error_message": "If SampleType=Lab blank and Result=-88, then qualifier must be 'below method detection limit' or 'none'"
+        "error_message": "If SampleType=Lab blank, Equipment blank, or Field blank, and Result=-88, then qualifier must be 'below method detection limit' or 'none'"
     })
     errs.append(checkData(**results_args))
 
