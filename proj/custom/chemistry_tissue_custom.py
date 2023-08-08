@@ -740,7 +740,7 @@ def chemistry_tissue(all_dfs):
         "badrows": tmp[tmp.failed_crmcheck].tmp_row.tolist(),
         "badcolumn": "result",
         "error_type": "Value Error",
-        "error_message": f"""For the reference material 'Reference - SRM 2976 Mussel Tissue' the result should be within 30% of the certified value (See the <a href=scraper?action=help&layer=lu_chemcrm>CRM Lookup list</a>)"""
+        "error_message": f"""For the reference material 'Reference - SRM 2976 Mussel Tissue' the result should be within 30% of the certified value (See the <a target=_blank href=scraper?action=help&layer=lu_chemcrm>CRM Lookup list</a>)"""
     })
     warnings.append(checkData(**results_args))
     # END Table 6-2 Check #2 - Result for the CRM sampletype (Reference - SRM 2976 Mussel Tissue) should be within 30% of certified value
