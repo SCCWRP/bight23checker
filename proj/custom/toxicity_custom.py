@@ -232,7 +232,7 @@ def toxicity(all_dfs):
     print("# 3. EACH BS or SWI BATCH MUST HAVE A REFERENCE TOXICANT BATCH WITHIN A SPECIFIED DATE RANGE.")
     # get reference toxicant dataframe
     batchrt = toxbatch[
-        ['toxbatch','teststartdate', 'actualtestduration', 'actualtestdurationunits', 'referencebatch']
+        ['toxbatch', 'teststartdate', 'actualtestduration', 'actualtestdurationunits', 'referencebatch']
     ].where(toxbatch['matrix'].isin(['RT','Reference Toxicant']))
     # drop emptys
     batchrt = batchrt.dropna()

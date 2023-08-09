@@ -211,7 +211,7 @@ def MB_ResultLessThanMDL(dataframe):
     print("IN MB_ResultLessThanMDL")
 
     print("filter to methodblank samples and select only 5 needed columns")
-    methodblanks = dataframe[dataframe.sampletype == 'Lab blank'][['analysisbatchid','analytename','mdl', 'result']]
+    methodblanks = dataframe[dataframe.sampletype == 'Lab blank'][['analysisbatchid','analytename','mdl', 'result','tmp_row']]
     print("filter to Results to merge with methodblanks")
     res = dataframe[dataframe.sampletype == 'Result']
 
@@ -230,7 +230,7 @@ def MB_ResultLessThanMDL(dataframe):
     if checkdf.empty:
         return []
     print('get bad rows for updating the args')
-    checkdf = checkdf.groupby(['analysisbatchid','analytename','sampleid']).apply(lambda df: df.tmp_row.tolist()).reset_index(name = 'badrows')
+    checkdf = checkdf.groupby(['analysisbatchid','analytename','sampleid']).apply(lambda df: list(set(df.tmp_row_mb.tolist())) ).reset_index(name = 'badrows')
 
     args = checkdf.apply(
             lambda row:

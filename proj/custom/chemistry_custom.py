@@ -476,6 +476,29 @@ def chemistry(all_dfs):
     print("# END OF Check - if the qacode is 'Matrix spike done with the actual sediment sample as the matrix for spiking' then a comment containing the station it came from is required")
 
 
+    # Check - for PFAS analytes, warning if there is a value that says "labwater"
+    results_args.update({
+        "badrows": results[
+            (results.analyteclass.isin(["PFAS"])) & ( results.matrix == 'labwater' )
+        ].tmp_row.tolist(),
+        "badcolumn" : "matrix",
+        "error_type": "Value error",
+        "error_message" : "For PFAS analytes, and for blank sampletypes, you should use 'PFAS-free water' as the matrix rather than 'labwater'. If you actually did not use PFAS-free water, then please leave a comment in the comments column"
+    })
+    warnings.append(checkData(**results_args))
+
+
+    # Check - for PFAS analytes, error if there is a value that says "labwater" but no corresponding comment
+    results_args.update({
+        "badrows": results[
+            ((results.analytename.isin(["PFOA","PFOS"])) & ( results.matrix == 'labwater' )) & (results.comments.fillna('').astype(str).replace('\s*','',regex=True) == '')
+        ].tmp_row.tolist(),
+        "badcolumn" : "matrix",
+        "error_type": "Value error",
+        "error_message" : "For PFAS analytes, and for blank sampletypes, you should use 'PFAS-free water' as the matrix rather than 'labwater'. If you did not use PFAS-free water, a comment is required"
+    })
+    errs.append(checkData(**results_args))
+
 
 
     # Check - If the sampletype is "Lab blank", "Field blank", "Equipment blank", or "Blank spiked" then the matrix must be labwater or PFAS-free water
@@ -656,7 +679,7 @@ def chemistry(all_dfs):
     results_args.update({
         "badrows": results[
             (
-                (results.qualifier.isin(['none', 'equal to'])) & (results.sampletype.isin(['Lab blank', 'Field blank', 'Equipment blank']) )
+                (results.qualifier.isin(['none', 'equal to'])) & (~results.sampletype.isin(['Lab blank', 'Field blank', 'Equipment blank']) )
             ) & 
             (results.result <= results.rl)
         ].tmp_row.tolist(),
