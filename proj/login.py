@@ -1,6 +1,6 @@
 import time, os
 import pandas as pd
-from flask import session, Blueprint, current_app, request, render_template, jsonify, g
+from flask import session, Blueprint, current_app, request, render_template, jsonify, g, redirect
 from .utils.exceptions import default_exception_handler
 from .utils.login import get_login_field
 
@@ -140,6 +140,11 @@ def login():
     )
 
     return jsonify(msg="login successful")
+
+
+@homepage.route('/microplastics', methods=['GET','POST'])
+def redirect_to_microplastics_checker():
+    return redirect(os.getenv("MICRPLASTICS_CHECKER_URL"))
 
 
     
