@@ -2,8 +2,9 @@
 
 from inspect import currentframe
 from flask import current_app, g
-from .functions import checkData
+from .functions import checkData, mismatch
 import pandas as pd
+import re
 
 
 def ptsensor(all_dfs):
@@ -40,63 +41,41 @@ def ptsensor(all_dfs):
     #Jordan - Station occupation and trawl event data should be submitted before pressure temperature data. Check those tables to make sure the agency has submitted those first. [records are matched on StationID, SampleDate, Sampling Organization, and Trawl Number]
     print('Station occupation and trawl event data should be submitted before pressure temperature data. Check those tables to make sure the agency has submitted those first. [records are matched on StationID, SampleDate, Sampling Organization, and Trawl Number] ')
 
-    # call database for trawl event data
-    eng = g.eng
-    ta_db = eng.execute("SELECT stationid,sampledate,samplingorganization,trawlnumber FROM tbl_trawlevent;")
-    ta = pd.DataFrame(ta_db.fetchall())
+    matchcols = ['stationid','sampledate','samplingorganization','trawlnumber']
+    trawlevent = pd.read_sql("SELECT stationid,sampledate,samplingorganization,trawlnumber FROM tbl_trawlevent;", g.eng)
     
-    if len(ta) > 0: 
-        ta.columns = ta_db.keys()
-
-        # Series containing pertinent trawl assemblage and fish abundance/biomass records
-        trawl_assemblage = zip(
-            ta.stationid, 
-            ta.sampledate,
-            ta.samplingorganization,
-            ta.trawlnumber
-        )
-        pt_data = pd.Series(
-            zip(
-                ptsensorresults.stationid,
-                ptsensorresults.sampledate,
-                ptsensorresults.samplingorganization,
-                ptsensorresults.trawlnumber
-            )
-        )
-
-        # Check To see if there is any data in fish abundance, not in trawl assemblage and vice versa
-        print(ptsensorresults.loc[~pt_data.apply(lambda x: x in trawl_assemblage)])
-        badrows = ptsensorresults.loc[
-            ~pt_data.apply(
-                lambda x: x in trawl_assemblage
-            )
-        ].tmp_row.tolist()
-        ptsensorresults_args = {
-            "dataframe": ptsensorresults,
-            "tablename": 'tbl_ptsensorresults',
-            "badrows": badrows,
-            "badcolumn": "stationid,sampledate,samplingorganization,trawlnumber",
-            "error_type": "Logic Error",
-            "is_core_error": False,
-            "error_message": "Each PTSensorResult record must have a corresponding Occupation and Trawl Event record. Records are matched on StationID, SampleDate, Sampling Organization, and Trawl Number."
-        }        
-        errs = [*errs, checkData(**ptsensorresults_args)]
-    else:
-        badrows = ptsensorresults.tmp_row.tolist()
-        ptsensorresults_args = {
-            "dataframe": ptsensorresults,
-            "tablename": 'tbl_ptsensorresults',
-            "badrows": badrows,
-            "badcolumn": "stationid",
-            "error_type": "Undefined Error",
-            "is_core_error": False,
-            "error_message": "Field data must be submitted before ptsensorresults data."
-        }        
-        errs = [*errs, checkData(**ptsensorresults_args)]    
+    ptsensorresults_args.update({
+        "badrows": mismatch(
+            # got an error about datatypes with the columns - not sure why
+            ptsensorresults.assign(sampledate = ptsensorresults.sampledate.astype(str)), 
+            trawlevent.assign(sampledate = trawlevent.sampledate.astype(str)), 
+            matchcols
+        ),
+        "badcolumn": ",".join(matchcols),
+        "error_type": "Logic Error",
+        "error_message": f"Each record in ptsensorresults must have a corresponding record in tbl_trawlevent. Records are matched based on {', '.join(matchcols)}"
+    })
+    errs = [*errs, checkData(**ptsensorresults_args)]
 
     ## END LOGIC CHECKS ##
 
     ## CUSTOM CHECKS ##
+    
+    
+    # Check - sensortime must be in a 24 hour clock format   
+    def checkTime(df, col, args, time_format = re.compile(r'^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$'), custom_errmsg = None):
+        """default to checking the 24 hour clock time"""
+        args.update({
+            "badrows": df[~df[col.lower()].apply(lambda x: bool(time_format.match(str(x).strip())) )].tmp_row.tolist(),
+            "badcolumn": col,
+            "error_type" : "Formatting Error",
+            "error_message" : f"The column {col} is not in a valid 24 hour clock format (HH:MM:SS)" if not custom_errmsg else custom_errmsg
+        })
+        return checkData(**args)
+
+    errs = [*errs, checkTime(ptsensorresults, 'sensortime', ptsensorresults_args)]
+
+
     ## END CUSTOM CHECKS ##
 
 

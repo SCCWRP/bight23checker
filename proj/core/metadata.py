@@ -131,7 +131,8 @@ def checkScale(dataframe, tablename, eng, meta, *args, output = None, **kwargs):
                     badcolumn = col,
                     error_type = "Value too long",
                     is_core_error = True,
-                    error_message = f"The value here will be rounded to {scale} decimal places when it is loaded to the database"
+                    # error_message = f"The value here will be rounded to {scale} decimal places when it is loaded to the database"
+                    error_message = f"The value here exceeds the maximum number of decimal places ({scale}) allowed for this column"
                 )
             )
         

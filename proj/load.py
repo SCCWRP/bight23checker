@@ -1,7 +1,9 @@
 from flask import Blueprint, current_app, session, jsonify, g
-from .utils.db import GeoDBDataFrame
+from .utils.db import GeoDBDataFrame, next_objectid, registration_id
 from .utils.mail import data_receipt
 from .utils.exceptions import default_exception_handler
+
+import subprocess as sp
 
 from psycopg2.errors import ForeignKeyViolation
 
@@ -29,6 +31,9 @@ def load():
     excel_path = session['excel_path']
 
     eng = g.eng
+    
+    converters = current_app.config.get('DTYPE_CONVERTERS')
+    converters = {k: eval(v) for k,v in converters.items()} if converters is not None else None
 
     all_dfs = {
 
@@ -37,13 +42,19 @@ def load():
         # For projects that do not set up their data templates in this way, that arg should be removed
 
         # Note also that only empty cells will be regarded as missing values
-        sheet: pd.read_excel(excel_path, sheet_name = sheet, skiprows = current_app.excel_offset, na_values = [''])
+        sheet: pd.read_excel(
+            excel_path, 
+            sheet_name = sheet, 
+            keep_default_na=False,
+            skiprows = current_app.excel_offset, 
+            na_values = [''], 
+            converters = converters
+        )
         
         for sheet in pd.ExcelFile(excel_path).sheet_names
         
         if ((sheet not in current_app.tabs_to_ignore) and (not sheet.startswith('lu_')))
     }
-
 
     valid_tables = pd.read_sql(
             # percent signs are escaped by doubling them, not with a backslash
@@ -128,9 +139,9 @@ def load():
     tables_to_load = list(
         set(
             [
-            *current_app.datasets.get(session.get('datatype')).get('tables'), 
-            *analysis_tables
-        ]
+                *current_app.datasets.get(session.get('datatype')).get('tables'), 
+                *analysis_tables
+            ]
         )
         .intersection(set(all_dfs.keys()))
     )
@@ -151,8 +162,15 @@ def load():
             ALTER TABLE "{tbl}" ADD COLUMN IF NOT EXISTS login_agency VARCHAR(50);
             """
         )
+
+        g.eng.execute(
+            f"""
+            ALTER TABLE {tbl} ALTER COLUMN globalid SET DEFAULT next_globalid();
+            ALTER TABLE {tbl} ALTER COLUMN objectid SET DEFAULT next_rowid('sde','{tbl}');
+            """
+        )
+
         all_dfs[tbl].to_geodb(tbl, g.eng)
- 
 
         print(f"done loading data to {tbl}")
 
@@ -181,9 +199,13 @@ def load():
     
     # So we know the massive argument list of the data receipt function, which is like the notification email for successful submission
     #def data_receipt(send_from, always_send_to, login_email, dtype, submissionid, originalfile, tables, eng, mailserver, *args, **kwargs):
+    send_to = current_app.maintainers
+    notify = current_app.datasets.get(session.get('datatype')).get("notify")
+    if notify is not None:
+        send_to = [*send_to, *notify]
     data_receipt(
         send_from = current_app.mail_from,
-        always_send_to = current_app.maintainers,
+        always_send_to = send_to,
         login_email = session.get('login_info').get('login_email'),
         dtype = session.get('datatype'),
         submissionid = session.get('submissionid'),

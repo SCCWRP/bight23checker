@@ -24,6 +24,7 @@ def core(all_dfs, eng, all_meta, debug = False):
                 checkNotNull(df, tbl, eng, all_meta[tbl]),
                 checkIntegers(df, tbl, eng, all_meta[tbl]),
                 checkPrecision(df, tbl, eng, all_meta[tbl]),
+                checkScale(df, tbl, eng, all_meta[tbl]),
                 checkLength(df, tbl, eng, all_meta[tbl])
             ]
             
@@ -38,6 +39,7 @@ def core(all_dfs, eng, all_meta, debug = False):
                     checkNotNull,
                     checkIntegers,
                     checkPrecision,
+                    checkScale,
                     checkLength,
                     checkDataTypes
                 ],
@@ -48,12 +50,12 @@ def core(all_dfs, eng, all_meta, debug = False):
             )
         )
 
-        warnings.extend(
-            [checkScale(df, tbl, eng, all_meta[tbl])]
-            if debug 
-            else
-            multitask([checkScale], df, tbl, eng, all_meta[tbl])
-        )
+        # warnings.extend(
+        #     [checkScale(df, tbl, eng, all_meta[tbl])]
+        #     if debug 
+        #     else
+        #     multitask([checkScale], df, tbl, eng, all_meta[tbl])
+        # )
 
     # flatten the lists
     # bug: 'ascii' codec can't encode character '\xb0' in position 2344: ordinal not in range(128) - app crashes here -- likely occuring when printing errs

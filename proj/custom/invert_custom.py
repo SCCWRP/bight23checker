@@ -2,7 +2,7 @@
 
 from inspect import currentframe
 from flask import current_app, g
-from .functions import checkData, multivalue_lookup_check
+from .functions import checkData, multivalue_lookup_check, mismatch
 from sqlalchemy import create_engine
 import pandas as pd
 import re
@@ -53,104 +53,115 @@ def invert(all_dfs):
 
     # STARTING CHECKS
 
-    ## LOGIC ##
-    print("Starting Invert Logic Checks")
-    # Jordan - Each invertebrate abundance/biomass record must have a corresponding trawl assemblage event record and each trawl assemblage event record must have must have a corresponding invertebrate abundance/biomass record. [records are matched on StationID, SampleDate, Sampling Organization, and Trawl Number]
-    print('Each invertebrate abundance/biomass record must have a corresponding trawl assemblage event record and each trawl assemblage event record must have must have a corresponding invertebrate abundance/biomass record. [records are matched on StationID, SampleDate, Sampling Organization, and Trawl Number]')
-
-    # call database for trawl assemblage data.
+    # initialize the connection
     eng = g.eng
-    ta_db = eng.execute("SELECT stationid,sampledate,samplingorganization,trawlnumber FROM tbl_trawlevent;")
-    ta = pd.DataFrame(ta_db.fetchall())
-    if len(ta) > 0:
-        ta.columns = ta_db.keys()
-        # Series containing pertinent trawl assemblage and invert abundance/biomass records
-        trawl_assemblage = zip(
-            ta.stationid, 
-            ta.sampledate,
-            ta.samplingorganization, 
-            ta.trawlnumber
-        )
-        invert_ab = pd.Series(
-            zip(
-                trawlinvertebrateabundance.stationid, 
-                trawlinvertebrateabundance.sampledate,
-                trawlinvertebrateabundance.samplingorganization, 
-                trawlinvertebrateabundance.trawlnumber
-            )
-        )
-        invert_bio = pd.Series(
-            zip(
-                trawlinvertebratebiomass.stationid, 
-                trawlinvertebratebiomass.sampledate,
-                trawlinvertebratebiomass.samplingorganization, 
-                trawlinvertebratebiomass.trawlnumber
-            )
-        )
 
-        # Check To see if there is any data in invert trawlinvertebrateabundance, not in trawl assemblage and vice versa
-        log_error1 = trawlinvertebrateabundance.loc[
-            ~invert_ab.apply(
-                lambda x: x in trawl_assemblage
-            )
-        ]
-        print(log_error1)
-        badrows = log_error1.tmp_row.tolist()
-        trawlinvertebrateabundance_args = {
-            "dataframe": trawlinvertebrateabundance,
-            "tablename": 'tbl_trawlinvertebrateabundance',
-            "badrows": badrows,
-            "badcolumn": "stationid,sampledate,samplingorganization,trawlnumber",
-            "error_type": "Logic Error",
-            "is_core_error": False,
-            "error_message": "Each invertebrate abundance record must have a corresponding trawl assemblage event record. Records are matched on StationID, SampleDate, SamplingOrganiztion and TrawlNumber."
-        }
-        errs = [*errs, checkData(**trawlinvertebrateabundance_args)]
+    ## LOGIC ##
+    # 1a. Logic check - each record in the trawlinvertebrate abundance and biomass has to have a corresponding record in the tbl_trawlevent #
+    print("Invert Custom Checks")
+    print("each record in the trawlinvertebrate abundance and biomass has to have a corresponding record in the tbl_trawlevent")
+    matchcols = ['stationid','sampledate','samplingorganization','trawlnumber']
+    trawlevent = pd.read_sql("SELECT stationid,sampledate,samplingorganization,trawlnumber FROM tbl_trawlevent;", eng)
+    
+    trawlinvertebrateabundance_args.update({
+        "badrows": mismatch(trawlinvertebrateabundance, trawlevent, matchcols),
+        "badcolumn": ",".join(matchcols),
+        "error_type": "Logic Error",
+        "error_message": f"Each record in trawlinvertebrateabundance must have a corresponding record in tbl_trawlevent. Records are matched based on {', '.join(matchcols)}"
+    })
+    errs = [*errs, checkData(**trawlinvertebrateabundance_args)]
+    
+    # 1b
+    trawlinvertebratebiomass_args.update({
+        "badrows": mismatch(trawlinvertebratebiomass, trawlevent, matchcols),
+        "badcolumn": ",".join(matchcols),
+        "error_type": "Logic Error",
+        "error_message": f"Each record in trawlinvertebratebiomass must have a corresponding record in tbl_trawlevent. Records are matched based on {', '.join(matchcols)}"
+    })
+    errs = [*errs, checkData(**trawlinvertebratebiomass_args)]
 
-        log_error2 = trawlinvertebratebiomass.loc[
-            ~invert_bio.apply(
-                lambda x: x in trawl_assemblage
-            )
-        ]
-        print(log_error2)
-        
-        badrows = log_error2.tmp_row.tolist()
-        trawlinvertebratebiomass_args = {
-            "dataframe": trawlinvertebratebiomass,
-            "tablename": 'tbl_trawlinvertebratebiomass',
-            "badrows": badrows,
-            "badcolumn": "stationid,sampledate,samplingorganization,trawlnumber",
-            "error_type": "Logic Error",
-            "is_core_error": False,
-            "error_message": "Each invertebrate biomass record must have a corresponding trawl assemblage event record. Records are matched on StationID, SampleDate, SamplingOrganization and TrawlNumber."
-        }
-        errs = [*errs, checkData(**trawlinvertebratebiomass_args)]
+    # ----------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
-    else:
+    # 2. Check abundance and biomass dataframes against the field assignment table
+    print("Return error if abundance records are not found in field assignment table")
 
-        badrows = trawlinvertebrateabundance.tmp_row.tolist()
-        trawlinvertebrateabundance_args = {
-            "dataframe": trawlinvertebrateabundance,
-            "tablename": 'tbl_trawlinvertebrateabundance',
-            "badrows": badrows,
-            "badcolumn": "stationid",
-            "error_type": "Abundance Error",
-            "is_core_error": False,
-            "error_message": "Table is Empty."
-        }
-        errs = [*errs, checkData(**trawlinvertebrateabundance_args)]
+    # Get the FAT records
+    fat = pd.read_sql("""SELECT stationid,assigned_agency AS trawlagency FROM field_assignment_table WHERE "parameter" = 'trawl';""", eng)
+    unique_fat_records = [] if fat.empty else fat.apply(lambda row: (row.stationid, row.trawlagency), axis = 1).tolist()
+    
+    # 2a
+    print("Invert Custom Checks")
+    print("compare biomass records to field assignment table records (compare on stationid,samplingorganization).")
+    # Logic check - compare biomass records to field assignment table records (compare on stationid,samplingorganization).
+    # same check exists for abundance
+    badrows = trawlinvertebrateabundance[
+        trawlinvertebrateabundance[['stationid','samplingorganization']].apply(lambda x: (x.stationid,x.samplingorganization) not in unique_fat_records, axis=1)
+    ].tmp_row.tolist()
+    trawlinvertebrateabundance_args.update({
+        "badrows": badrows,
+        "badcolumn": "StationID,SamplingOrganization",
+        "error_type": "Undefined Error",
+        "error_message": "You have submitted stations that are not bight stations or were not assigned to your organization."
+    })
+    errs = [*errs, checkData(**trawlinvertebrateabundance_args)]
 
-        badrows = trawlinvertebratebiomass.tmp_row.tolist()
-        trawlinvertebratebiomass_args = {
-            "dataframe": trawlinvertebratebiomass,
-            "tablename": 'tbl_trawlinvertebratebiomass',
-            "badrows": badrows,
-            "badcolumn": "stationid",
-            "error_type": "Biomass Error",
-            "is_core_error": False,
-            "error_message": "Table is Empty."
-        }
-        errs = [*errs, checkData(**trawlinvertebratebiomass_args)]
+    # 2b
+    print("Invert Custom Checks")
+    print("compare biomass records to field assignment table records (compare on stationid,samplingorganization).")
+    # Logic check - compare biomass records to field assignment table records (compare on stationid,samplingorganization).
+    # same check exists for abundance
+    badrows = trawlinvertebratebiomass[
+        trawlinvertebratebiomass[['stationid','samplingorganization']].apply(lambda x: (x.stationid,x.samplingorganization) not in unique_fat_records, axis=1)
+    ].tmp_row.tolist()
+    trawlinvertebratebiomass_args.update({
+        "badrows": badrows,
+        "badcolumn": "StationID,SamplingOrganization",
+        "error_type": "Undefined Error",
+        "error_message": "You have submitted stations that are not bight stations or were not assigned to your organization."
+    })
+    errs = [*errs, checkData(**trawlinvertebratebiomass_args)]
+
+    # ---------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+    # 3a
+    print("Invert Custom Checks")
+    print("Logic checks - abundance vs. biomass  Link both abundance and biomass submissions and run mismatch query to check for orphan records.")
+    # Logic checks - abundance vs. biomass  Link both abundance and biomass submissions and run mismatch query to check for orphan records. 
+    #    "Composite weight" should be only mismatch.  Error message - Orphan records for biomass vs abundance.
+    # 
+    matchcols = ['stationid','sampledate','samplingorganization','invertspecies']
+    trawlinvertebratebiomass_args.update({
+        "badrows": mismatch(
+            trawlinvertebratebiomass[~trawlinvertebratebiomass.invertspecies.str.lower().isin(['composite weight'])], 
+            trawlinvertebrateabundance[~trawlinvertebrateabundance.invertspecies.str.lower().isin(['composite weight'])], 
+            matchcols
+        ),
+        "badcolumn": ",".join(matchcols),
+        "error_type": "Logic Error",
+        "error_message": f"Each record in biomass must match a record in abundance - records are matched based on {','.join(matchcols)}"
+    })
+    errs = [*errs, checkData(**trawlinvertebratebiomass_args)]
+    
+    # 3b
+    # Check for those in abundance but not in biomass
+    trawlinvertebrateabundance_args.update({
+        "badrows": mismatch(
+            trawlinvertebrateabundance[~trawlinvertebrateabundance.invertspecies.str.lower().isin(['composite weight'])], 
+            trawlinvertebratebiomass[~trawlinvertebratebiomass.invertspecies.str.lower().isin(['composite weight'])], 
+            matchcols
+        ),
+        "badcolumn": ",".join(matchcols),
+        "error_type": "Logic Error",
+        "error_message": f"Each record in abundance must match a record in biomass - records are matched based on {','.join(matchcols)}"
+    })
+    errs = [*errs, checkData(**trawlinvertebrateabundance_args)]
+
+
+    # ---------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+    
+
     ## END LOGIC CHECKS ##
     print("## END LOGIC CHECKS ##")
 
@@ -159,9 +170,35 @@ def invert(all_dfs):
     # ABUNDANCE/BIOMASS CHECKS #
     ############################
     print("## CUSTOM CHECKS ##")
-    print("# ABUNDANCE/BIOMASS CHECKS #")
-    # Jordan - Species Check -
 
+    # ---------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+    # 4a
+    # Jordan - Anomaly - If Anomaly = Other, a comment is required.
+    # print('If Anomaly = Other, a comment is required.')
+    missing_comments = trawlinvertebrateabundance[
+        (trawlinvertebrateabundance.anomaly == 'Other') & 
+        ((trawlinvertebrateabundance.comments == '') | (trawlinvertebrateabundance.comments.isnull()))
+    ]
+    print(missing_comments)
+    badrows = missing_comments.tmp_row.tolist()
+    trawlinvertebrateabundance_args = {
+        "dataframe": trawlinvertebrateabundance,
+        "tablename": 'tbl_trawlinvertebrateabundance',
+        "badrows": badrows,
+        "badcolumn": "anomaly,comments",
+        "error_type": "Undefined Error",
+        "is_core_error": False,
+        "error_message":
+            'A comment is required for all anomalies listed as Other.'
+    }
+    errs = [*errs, checkData(**trawlinvertebrateabundance_args)]
+    
+    # ---------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+
+    # 5a
     # Duy: The below function replaces dcValueAgainstMultipleValues
     # Jordan - Anomaly Check - A single anomaly is required but multiple anomalies are possible (many to many).
     tmpargs = multivalue_lookup_check(
@@ -175,32 +212,42 @@ def invert(all_dfs):
     trawlinvertebrateabundance_args.update(tmpargs)
     errs = [*errs, checkData(**trawlinvertebrateabundance_args)]
 
-    # Jordan - QA Check - A single qualifier is required but multiple qualifiers are possible (many to many).
-    print("QA Check - A single qualifier is required but multiple qualifiers are possible (many to many).")
-    tmpargs = multivalue_lookup_check(
-        trawlinvertebrateabundance,
-        'abundancequalifier',
-        'lu_trawlqualifier',
-        'qualifier',
-        eng,
-        displayfieldname="AbundanceQualifier"
-    )
-    trawlinvertebrateabundance_args.update(tmpargs)
-    errs = [*errs, checkData(**trawlinvertebrateabundance_args)]
 
-    tmpargs = multivalue_lookup_check(
-        trawlinvertebratebiomass,
-        'biomassqualifier',
-        'lu_trawlqualifier',
-        'qualifier',
-        eng,
-        displayfieldname="BiomassQualifier"
-    )
-    trawlinvertebratebiomass_args.update(tmpargs)
-    errs = [*errs, checkData(**trawlinvertebratebiomass_args)]
+    # ---------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+    # 6a
+    # Jordan - Anomaly - Check for single records that contain anomalies.
+    print('Anomaly - Check for single records that contain anomalies.')
+    single_records = trawlinvertebrateabundance[
+        ~trawlinvertebrateabundance.duplicated(
+            subset = ['stationid', 'sampledate', 'samplingorganization', 'trawlnumber','invertspecies'],
+            keep=False
+        )
+    ]
+    badrows = single_records[single_records.anomaly.str.lower() != 'none'].tmp_row.tolist()
+    trawlinvertebrateabundance_args = {
+        "dataframe": trawlinvertebrateabundance,
+        "tablename": 'tbl_trawlinvertebrateabundance',
+        "badrows": badrows,
+        "badcolumn": "anomaly",
+        "error_type": "Undefined Warning",
+        "is_core_error": False,
+        "error_message":
+            'Anomalies and clean organisms may be lumped together( e.g. 128 urchins, all with parasites isnt likely'
+    }
+    warnings = [*warnings, checkData(**trawlinvertebrateabundance_args)]
+
+
+    # ---------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
 
     
+    # NOTE - The code that checks agains SCAMIT 12 is bight 18 code
+    #   needs to be updated
+    #   Bight 23 is going to use SCAMIT 14
+    #   We still need the updated list
 
+    # 7a
     # Jordan - Species - Check Southern California Association of Marine Invertebrate Taxonomists Edition 12 - Check old species name
     print("Species - Check Southern California Association of Marine Invertebrate Taxonomists Edition 12 - Check old species name")
     spcs_names = eng.execute("SELECT synonym, taxon FROM lu_invertsynonyms;")
@@ -221,6 +268,7 @@ def invert(all_dfs):
     }
     warnings = [*warnings, checkData(**trawlinvertebrateabundance_args)]
 
+    # 4b
     badrows = trawlinvertebratebiomass[
         trawlinvertebratebiomass.invertspecies.isin(sn.synonym.tolist())
     ].tmp_row.tolist()
@@ -236,81 +284,28 @@ def invert(all_dfs):
     }
     warnings = [*warnings, checkData(**trawlinvertebratebiomass_args)]
 
-    '''
-    NOTE: This check determines whether or not the stationID submitted can be found in the field assignment table. However, the logic checks already
-            determine whether the stations are found in trawl event table. Since the stations in the trawl event table is a subset of the stations in
-            the field assignment table, this check seems to be unnecessary. - Jordan 9/12/2018
-    # Jordan - Lookup list - Link data to Bight station list to look for mismatched records - Error -> Stations not Bight stations
-    errorLog("Lookup list - Link data to Bight station list to look for mismatched records - Error -> Stations not Bight stations")
-    field_assignment_table = eng.execute(
-        "select stationid from field_assignment_table;")
-    fat = DataFrame(field_assignment_table.fetchall()
-                    ); fat.columns = field_assignment_table.keys()
-    errorLog('field assignment table records')
-    errorLog(fat)
-    errorLog(abundance[~abundance.stationid.isin(fat.stationid.tolist())])
-    checkData(abundance[~abundance.stationid.isin(fat.stationid.tolist())].tmp_row.tolist(
-    ),'StationID','Undefined Error','error','Stations not Bight stations.',abundance)
-    errorLog(biomass[~biomass.stationid.isin(fat.stationid.tolist())])
-    checkData(biomass[~biomass.stationid.isin(fat.stationid.tolist())].tmp_row.tolist(
-    ),'StationID','Undefined Error','error','Stations not Bight stations.',biomass)
-    '''
 
-    # NOTE: "Composite Weight records are no longer going to be submitted for fish or invert." - Shelly 9/12/2018
-    # Jordan - Cross table checks - abundance vs. biomass  Link both abundance and biomass submissions and run mismatch query to check for orphan records. "Composite weight" should be only mismatch.  Error message - Orphan records for biomass vs abundance.
-    print('Cross table checks - abundance vs. biomass Link both abundance and biomass submissions and run mismatch query to check for orphan records.')
-    badrows = trawlinvertebratebiomass[
-        ~trawlinvertebratebiomass[['stationid', 'sampledate', 'samplingorganization', 'trawlnumber', 'invertspecies']].isin(
-            trawlinvertebrateabundance[['stationid', 'sampledate', 'samplingorganization', 'trawlnumber', 'invertspecies']].to_dict(orient='list')
-        ).all(axis=1)
-    ].tmp_row.tolist()
-    print(badrows)
-    trawlinvertebratebiomass_args = {
-        "dataframe": trawlinvertebratebiomass,
-        "tablename": 'tbl_trawlinvertebratebiomass',
-        "badrows": badrows,
-        "badcolumn": "stationid,sampledate,samplingorganization,invertspecies",
-        "error_type": "Biomass Error",
-        "is_core_error": False,
-        "error_message": "Orphan records for biomass vs. abundance."
-    }
-    errs = [*errs, checkData(**trawlinvertebratebiomass_args)]
+    # ---------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
-    print('finish cross table check')
-    ## END ABUNDANCE/BIOMASS CHECKS ##
-    print("## END ABUNDANCE/BIOMASS CHECKS ##")
 
-    
-    
-    
-    #########################
-    # ABUNDANCE ONLY CHECKS #
-    #########################
-    print("# ABUNDANCE ONLY CHECKS #")
-
+    # 8a
     # Jordan - Range check - Check depth ranges (min & max) for all species.
     print("Range check - Check depth ranges (min & max) for all species.")
     # 1st. Get StartDepth and EndDepth for each unique StationID/SampleDate/SamplingOrganization record from tbl_trawlevent
-    trawl_depths = eng.execute(
-        "SELECT stationid,sampledate,samplingorganization,trawlnumber,startdepth,enddepth FROM tbl_trawlevent;"
-    )
-    td = pd.DataFrame(trawl_depths.fetchall())
-    td.columns = trawl_depths.keys()
+    trawl_depths = pd.read_sql("SELECT stationid,sampledate,samplingorganization,trawlnumber,startdepth,enddepth FROM tbl_trawlevent;", eng)
+
     # 2nd. Get Min and Max Depths for each Species from lu_invertspeciesdepthrange
-    lu_depthranges = eng.execute(
-        "SELECT species AS invertspecies,mindepth,maxdepth FROM lu_invertspeciesdepthrange;"
-    )
-    depth_ranges = pd.DataFrame(lu_depthranges.fetchall())
-    depth_ranges.columns = lu_depthranges.keys()
+    depth_ranges = pd.read_sql("SELECT species AS invertspecies,mindepth,maxdepth FROM lu_invertspeciesdepthrange;", eng)
+
     # 3rd. Merge Trawl Depth Records and Submitted Invertebrate Abundance Records on StationID/SampleDate/SamplingOrganization
     tam = trawlinvertebrateabundance[
         ['stationid', 'sampledate', 'samplingorganization', 'trawlnumber', 'invertspecies', 'tmp_row']
     ]\
         .merge(
             depth_ranges, 
-            on='invertspecies'
+            on=['invertspecies']
         ).merge(
-            td, 
+            trawl_depths, 
             on=['stationid', 'sampledate', 'samplingorganization', 'trawlnumber']
         )
 
@@ -335,6 +330,15 @@ def invert(all_dfs):
             }
             warnings = [*warnings, checkData(**trawlinvertebrateabundance_args)]
         print("done with for loop")
+
+    # We only run the depth check on abundance since all species in abundance are also in biomass, based on the logic check near the top
+    
+
+    # ---------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+    # 9a
+    # Warn if the species is in lu_invertspeciesnotallowed
     # Jordan - Species - Check list of non-trawl taxa (next tab)
     invalid_species = eng.execute("SELECT species AS invertspecies FROM lu_invertspeciesnotallowed;")
     invs = pd.DataFrame(invalid_species.fetchall()); invs.columns= invalid_species.keys()
@@ -349,52 +353,30 @@ def invert(all_dfs):
         "error_message":
             f'Holoplanktonic or infaunal species. See lookup list: <a href=/{current_app.script_root}/scraper?action=help&layer=lu_invertspeciesnotallowed target=_blank>lu_invertspeciesnotallowed</a>'
     }
+    warnings = [*warnings, checkData(**trawlinvertebrateabundance_args)]
+
+
+    # ---------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+    # 10a
+    # Error if Composite weight is found in abundance tab
+    
+    badrows = trawlinvertebrateabundance[trawlinvertebrateabundance.invertspecies.str.lower() == 'composite weight'].tmp_row.tolist()
+    trawlinvertebrateabundance_args = {
+        "dataframe": trawlinvertebrateabundance,
+        "tablename": 'tbl_trawlinvertebrateabundance',
+        "badrows": badrows,
+        "badcolumn": "invertspecies",
+        "error_type": "Value Error",
+        "is_core_error": False,
+        "error_message": "Composite weight cannot be a species in the abundance tab"
+    }
     errs = [*errs, checkData(**trawlinvertebrateabundance_args)]
 
-    # Jordan - Anomaly - If Anomaly = Other, a comment is required.
-    # print('If Anomaly = Other, a comment is required.')
-    missing_comments = trawlinvertebrateabundance[
-        (trawlinvertebrateabundance.anomaly == 'Other') & 
-        ((trawlinvertebrateabundance.comments == '') | (trawlinvertebrateabundance.comments.isnull()))
-    ]
-    print(missing_comments)
-    badrows = missing_comments.tmp_row.tolist()
-    trawlinvertebrateabundance_args = {
-        "dataframe": trawlinvertebrateabundance,
-        "tablename": 'tbl_trawlinvertebrateabundance',
-        "badrows": badrows,
-        "badcolumn": "anomaly,comment",
-        "error_type": "Undefined Error",
-        "is_core_error": False,
-        "error_message":
-            'A comment is required for all anomalies listed as Other.'
-    }
-    errs = [*errs, checkData(**trawlinvertebrateabundance_args)]
-    
-    
-    # Jordan - Anomaly - Check for single records that contain anomalies.
-    print('Anomaly - Check for single records that contain anomalies.')
-    single_records = trawlinvertebrateabundance[
-        ~trawlinvertebrateabundance.duplicated(
-            subset = ['stationid', 'sampledate', 'samplingorganization', 'trawlnumber','invertspecies'],
-            keep=False
-        )
-    ]
-    print(single_records[single_records.anomaly != 'None'])
-    badrows = single_records[single_records.anomaly != 'None'].tmp_row.tolist()
-    trawlinvertebrateabundance_args = {
-        "dataframe": trawlinvertebrateabundance,
-        "tablename": 'tbl_trawlinvertebrateabundance',
-        "badrows": badrows,
-        "badcolumn": "anomaly",
-        "error_type": "Undefined Warning",
-        "is_core_error": False,
-        "error_message":
-            'Anomalies and clean organisms may be lumped together( e.g. 128 urchins, all with parasites isnt likely'
-    }
-    warnings = [*warnings, checkData(**trawlinvertebrateabundance_args)]
-    ## END ABUNDANCE ONLY CHECKS ##
-    print("## END ABUNDANCE ONLY CHECKS ##")
+
+
+    # ---------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
 
 
@@ -402,144 +384,187 @@ def invert(all_dfs):
     # BIOMASS ONLY CHECKS #
     #######################
 
-    # td = trawl depths - defined in beginning of abundance section
-    tbm = trawlinvertebratebiomass[
-        ['stationid', 'sampledate', 'samplingorganization', 'trawlnumber', 'invertspecies', 'tmp_row']
-    ]\
-        .merge(
-            depth_ranges, 
-            on='invertspecies'
-        ).merge(
-            td, 
-            on=['stationid', 'sampledate', 'samplingorganization', 'trawlnumber']
-        )
-
-    if not tbm.empty:
-        tbm['inrange'] = tbm.apply(
-            lambda x: 
-            False if (max(x.startdepth, x.enddepth) < x.mindepth) | (min(x.startdepth, x.enddepth) > x.maxdepth) else True, axis=1
-        )
-        badrecords = tbm[tbm.inrange == False]
-        
-        for i, row in badrecords.iterrows():
-            
-            trawlinvertebratebiomass_args = {
-                "dataframe": trawlinvertebratebiomass,
-                "tablename": 'tbl_trawlinvertebratebiomass',
-                "badrows": [row.tmp_row],
-                "badcolumn": "invertspecies",
-                "error_type": "Undefined Warning",
-                "is_core_error": False,
-                "error_message":
-                    '%s was caught in a depth range (%sm - %sm) that does not include the range it is typically found (%sm - %sm). Please verify the species is correct. Check <a href=/%s/scraper?action=help&layer=lu_invertspeciesdepthrange target=_blank>lu_invertspeciesdepthrange</a> for more information.' % (tam.invertspecies[i], int(tam.startdepth[i]), int(tam.enddepth[i]), tam.mindepth[i], tam.maxdepth[i], current_app.script_root)
-            }
-            warnings = [*warnings, checkData(**trawlinvertebratebiomass_args)]
-        print("done with for loop")
 
 
 
     print("# BIOMASS ONLY CHECKS #")
-    print("Kristin - Check data to make sure minimum weight is not less than value of <0.1 kg")
-    print(trawlinvertebratebiomass[trawlinvertebratebiomass.biomass == 0])
-    badrows = trawlinvertebratebiomass[trawlinvertebratebiomass.biomass == 0].tmp_row.tolist()
-    trawlinvertebratebiomass_args = {
-        "dataframe": trawlinvertebratebiomass,
-        "tablename": 'tbl_trawlinvertebratebiomass',
-        "badrows": badrows,
-        "badcolumn": "biomass",
-        "error_type": "Undefined Error",
-        "is_core_error": False,
-        "error_message":
-            'Weight submitted as 0 should have been <0.1kg'
-    }
-    errs = [*errs, checkData(**trawlinvertebratebiomass_args)]  
+    print("Fish Custom Checks")
+    print("If it was submitted as 0 it should rather be submitted as <0.01kg")
+    # If it was submitted as 0 it should rather be submitted as <0.01kg
+    trawlinvertebratebiomass_args.update({
+        "badrows": trawlinvertebratebiomass[trawlinvertebratebiomass.biomass < 0.01].tmp_row.tolist(),
+        "badcolumn": "Biomass",
+        "error_type": "Value Error",
+        "error_message": 'Any weight less than 0.01kg should be submitted as <0.01kg (0.01 in the biomass column, "<" in the biomassqualifier column)'
+    })
+    errs = [*errs, checkData(**trawlinvertebratebiomass_args)]
 
-    #NOTE: the following check is alot more tricky than expected due to the way pandas (or possible Excel?) handles floats. -Jordan 9/12/18
-    # Function provides us a way to strip trailing 0's from floats. 
-    # def format_number(num):
-    #     try:
-    #         dec = decimal.Decimal(num)
-    #     except:
-    #         return 'bad'
-    #     tup = dec.as_tuple()
-    #     delta = len(tup.digits) + tup.exponent
-    #     digits = ''.join(str(d) for d in tup.digits)
-    #     if delta <= 0:
-    #         zeros = abs(tup.exponent) - len(tup.digits)
-    #         val = '0.' + ('0'*zeros) + digits
-    #     else:
-    #         val = digits[:delta] + ('0'*tup.exponent) + '.' + digits[delta:]
-    #     val = val.rstrip('0')
-    #     if val[-1] == '.':
-    #         val = val[:-1]
-    #     if tup.sign:
-    #         return '-' + val
-    #     return val
-    print("Kristin - If biomass was measured with greater resolution than what is required in the IM plan ( only one decimal place is allowed), data should be rounded to the nearest 0.1")
-    #Rounding biomass to the nearest 0.1
-    trawlinvertebratebiomass['biomass'] = [round(trawlinvertebratebiomass['biomass'][x], 1) for x in trawlinvertebratebiomass.index.tolist()]
-    print(trawlinvertebratebiomass[(trawlinvertebratebiomass['biomass'] <.1)&~(trawlinvertebratebiomass['biomassqualifier'].isin(['<']))])
+
+    print("Kristin - If biomass was measured with greater resolution than what is required in the IM plan ( only one decimal place is allowed), data should be rounded to the nearest 0.01")
+    #Rounding biomass to the nearest 0.01
+    trawlinvertebratebiomass['biomass'] = [round(trawlinvertebratebiomass['biomass'][x], 2) for x in trawlinvertebratebiomass.index.tolist()]
+    print(trawlinvertebratebiomass[(trawlinvertebratebiomass['biomass'] < .01)&~(trawlinvertebratebiomass['biomassqualifier'].isin(['<']))])
     
     badrows = trawlinvertebratebiomass[
-        (trawlinvertebratebiomass['biomass'] < .1) 
-    ].index.tolist()
+        (trawlinvertebratebiomass['biomass'] < .01) 
+    ].tmp_row.tolist()
     
-    trawlinvertebratebiomass_args = {
-        "dataframe": trawlinvertebratebiomass,
-        "tablename": 'tbl_trawlinvertebratebiomass',
+    trawlinvertebratebiomass_args.update({
         "badrows": badrows,
         "badcolumn": "biomass",
         "error_type": "Undefined Error",
-        "is_core_error": False,
-        "error_message":
-            'Biomass values that were less than 0.1 kg (e.g. 0.004 kg) should have been submitted as <0.1 kg'
-    }
+        "error_message": 'Biomass values that were less than 0.01 kg (e.g. 0.004 kg) should have been submitted as <0.01 kg (0.01 in biomass column, < in the biomassqualifier column)'
+    })
     errs = [*errs, checkData(**trawlinvertebratebiomass_args)]  
 
-    #Jordan - Biomass - Filter qualifiers to make sure that all < have corresponding values of 0.1
-    print('Biomass - Filter qualifiers to make sure that all < have corresponding values of 0.1')
+    #Jordan - Biomass - Filter qualifiers to make sure that all < have corresponding values of 0.01
+    print('Biomass - Filter qualifiers to make sure that all < have corresponding values of 0.01')
     badrows = trawlinvertebratebiomass[
         (trawlinvertebratebiomass.biomassqualifier == '<') & 
-        (trawlinvertebratebiomass.biomass != 0.1)
+        (trawlinvertebratebiomass.biomass != 0.01)
     ].tmp_row.tolist()
-    trawlinvertebratebiomass_args = {
-        "dataframe": trawlinvertebratebiomass,
-        "tablename": 'tbl_trawlinvertebratebiomass',
+    trawlinvertebratebiomass_args.update({
         "badrows": badrows,
         "badcolumn": "biomass",
         "error_type": "Undefined Error",
-        "is_core_error": False,
-        "error_message":
-            'Less than qualifiers must have corresponding biomass value of 0.1kg.'
-    }
+        "error_message": 'Less than qualifiers (<) must have corresponding biomass value of 0.01kg.'
+    })
     errs = [*errs, checkData(**trawlinvertebratebiomass_args)] 
+
+
+
 
     # Jordan said the below is no longer necessary, but that only applies to the year 2018
     # Need to make sure if it's necessary for 2023, so I am going to leave the below code commented out in case we need it - Duy
-    '''
-    NOTE: The following 4 checks are no longer necessary because composite weights will not be submitted. -Jordan 9/12/2018
+    
+    # NOTE: The following 4 checks are no longer necessary because composite weights will not be submitted. -Jordan 9/12/2018
+    # NOTE: The following 4 checks may now be necessary because composite weights will be submitted. -Robert 7/13/2023
+    
 
-    #Jordan - Biomass - Check to make sure that all "<0.1 kg" records have corresponding "Composite Weight" totals.
-    lt = biomass[(biomass.biomassqualifier == '<')&(biomass.biomass == 0.1)&(biomass.invertspecies.str.lower() != 'compositewt')]
-    cp = biomass[(biomass.invertspecies.str.lower() == 'compositewt')]
-    errorLog('Biomass - Check to make sure that all <0.1 kg records have corresponding Composite Weight totals.')
-    checkData(biomass[biomass.stationid.isin(set(lt.stationid)-set(cp.stationid))].tmp_row.tolist(),'Species/BiomassQualifier/Biomass','Undefined Error','error','<0.1 kg records submitted but not accompanying composite weight record.',biomass)
-    #Jordan - Biomass - Check to see that each Composite weight has a corresponding record of "<0.1 kg".
-    errorLog('Check to see that each Composite weight has a corresponding record of <0.1 kg.')
-    checkData(biomass[biomass.stationid.isin(set(cp.stationid)-set(lt.stationid))].tmp_row.tolist(),'Species/BiomassQualifier/Biomass','Undefined Error','error','Composite weight submitted, but no accompanying <0.1 kg records for that station.',biomass)
-    #Jordan - Biomass - Compare "<0.1 kg" records with "Composite Weight" records to make sure they make sense.
-    errorLog('Compare <0.1 kg records with Composite Weight records to make sure they make sense.')
-    single_lt_stations = lt.groupby('stationid').size().reset_index()[lt.groupby('stationid').size().reset_index()[0]==1].stationid.tolist()
-    bm = biomass[(biomass.stationid.isin(single_lt_stations))&(biomass.invertspecies.str.lower() == 'compositewt')&(biomass.biomass > 0.1)]
-    checkData(bm.tmp_row.tolist(),'Species/BiomassQualifier/Biomass','Undefined Error','error','Only one <0.1 kg record submitted but accompanying composite weight is more than 0.1 kg.',biomass)
+    # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
+    # Basically, this is saying if there are any "<0.01 kg" records, then there must be a composite weight record in the biomass tab
+    # Dario says we will retain this check, but we will make it a warning rather than an error (7/19/2023)
 
-    #Jordan/Kristin - Cross table checks - abundance vs. biomass  Check to make sure that total amount of records in biomass table is one more than abundance table. If not, make sure the reason makes sense.
+    # Jordan - Biomass - Check to make sure that all "<0.01 kg" records have corresponding "Composite Weight" totals.
+    less_than_records = trawlinvertebratebiomass[(trawlinvertebratebiomass.biomassqualifier == '<') & (trawlinvertebratebiomass.biomass == 0.01) & (trawlinvertebratebiomass.invertspecies.str.lower() != 'composite weight') ]
+    composite_weight_records = trawlinvertebratebiomass[ (trawlinvertebratebiomass.invertspecies.str.lower() == 'composite weight') ]
+    badrows = trawlinvertebratebiomass[
+            # its a bad row if the stationid is in the set of stations that have "<" qualifiers, but no composite weight records
+            (
+                trawlinvertebratebiomass.stationid.isin( list(set(less_than_records.stationid.tolist()) - set(composite_weight_records.stationid.tolist())) )
+            ) & (
+                trawlinvertebratebiomass.biomassqualifier == '<'
+            )
+        ] \
+        .tmp_row.tolist()
+    
+    trawlinvertebratebiomass_args.update({
+        "badrows": badrows,
+        "badcolumn": "stationid,invertspecies,biomass,biomassqualifier",
+        "error_type": "Undefined Error",
+        "error_message": 'This station has records with a "<" qualifier, so there should also be a composite weight record for the station as well'
+    })
+    warnings = [*warnings, checkData(**trawlinvertebratebiomass_args)] 
+
+    # errorLog('Biomass - Check to make sure that all <0.01 kg records have corresponding Composite Weight totals.')
+    # checkData(biomass[biomass.stationid.isin(set(lt.stationid)-set(cp.stationid))].tmp_row.tolist(),'Species/BiomassQualifier/Biomass','Undefined Error','error','<0.01 kg records submitted but not accompanying composite weight record.',biomass)
+    # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
+    
+
+    # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
+    
+    # Dario says we will retain this check, but we will make it a warning rather than an error (7/19/2023)
+
+    # Jordan - Biomass - Check to see that each Composite weight has a corresponding record of "<0.01 kg".
+    badrows = trawlinvertebratebiomass[
+            # its a bad row if the stationid is in the set of stations that have composite weight records, but no "<" qualifiers
+            (
+                trawlinvertebratebiomass.stationid.isin( list(set(composite_weight_records.stationid.tolist()) - set(less_than_records.stationid.tolist())) )
+            ) & (
+                trawlinvertebratebiomass.invertspecies.str.lower() == 'composite weight'
+            )
+        ] \
+        .tmp_row.tolist()
+    
+    trawlinvertebratebiomass_args.update({
+        "badrows": badrows,
+        "badcolumn": "stationid,invertspecies,biomass,biomassqualifier",
+        "error_type": "Undefined Error",
+        "error_message": 'This station has composite weight records, so there should also be at least one record with a biomass qualifier of "<" for the station as well'
+    })
+    warnings = [*warnings, checkData(**trawlinvertebratebiomass_args)] 
+    
+    # errorLog('Check to see that each Composite weight has a corresponding record of <0.01 kg.')
+    # checkData(biomass[biomass.stationid.isin(set(cp.stationid)-set(lt.stationid))].tmp_row.tolist(),'Species/BiomassQualifier/Biomass','Undefined Error','error','Composite weight submitted, but no accompanying <0.01 kg records for that station.',biomass)
+    
+    # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+
+    # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+    # Dario says we will retain this check, but we will make it a warning rather than an error (7/19/2023)
+
+    # Jordan - Biomass - Compare "<0.01 kg" records with "Composite Weight" records to make sure they make sense.
+    # errorLog('Compare <0.01 kg records with Composite Weight records to make sure they make sense.')
+    single_lt_stations = less_than_records.groupby('stationid').size().reset_index(name='stationcount')
+    single_lt_stations = single_lt_stations[single_lt_stations.stationcount == 1]
+
+    if not single_lt_stations.empty:
+        
+        # issue a warning if 'Only one <0.01 kg record submitted but accompanying composite weight is more than 0.01 kg.'
+        print("issue a warning if 'Only one <0.01 kg record submitted but accompanying composite weight is more than 0.01 kg.'")
+        
+        badrows = trawlinvertebratebiomass[
+            (trawlinvertebratebiomass.stationid.isin(single_lt_stations.stationid.tolist()))
+            & (trawlinvertebratebiomass.invertspecies.str.lower() == 'composite weight')
+            & (trawlinvertebratebiomass.biomass > 0.01)
+        ].tmp_row.tolist()
+   
+        trawlinvertebratebiomass_args.update({
+            "badrows": badrows,
+            "badcolumn": "stationid,invertspecies,biomass",
+            "error_type": "Undefined Error",
+            "error_message": 'Only one <0.01 kg record submitted for this station, but the accompanying composite weight is more than 0.01 kg.'
+        })
+        warnings = [*warnings, checkData(**trawlinvertebratebiomass_args)] 
+        
+    # checkData(bm.tmp_row.tolist(),'Species/BiomassQualifier/Biomass','Undefined Error','error','Only one <0.01 kg record submitted but accompanying composite weight is more than 0.01 kg.',biomass)
+
+    # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+    # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
+    
+    # Dario says we will retain this check, but we will make it a warning rather than an error (7/19/2023 1PM)
+
+    # Jordan/Kristin - Cross table checks - abundance vs. biomass  Check to make sure that total amount of records in biomass table is one more than abundance table. If not, make sure the reason makes sense.
+    
+    # Robert 7/19/2023 4PM - I can see what this is doing is checking that the number of unique taxa in the biomass table is one more than that of abundance
+    #     This is covered by the logic check above, therefore this below check will be excluded in bight 2023
+
     #Get list of different stations in df
-    stid = abundance.stationid.unique()
-    for station in stid:
-        if abs(len(biomass[biomass['stationid'] == station].invertspecies.unique()) - len(abundance[abundance['stationid'] == station].invertspecies.unique())) > 1 :
-            checkData(biomass[biomass['stationid'] == station].index.tolist(), 'InvertSpecies','biomass error','error','Biomass records were either too great or too small compared to abundance records',biomass)
-    '''
+    # stid = abundance.stationid.unique()
+    # for station in stid:
+    #     if abs(len(biomass[biomass['stationid'] == station].invertspecies.unique()) - len(abundance[abundance['stationid'] == station].invertspecies.unique())) > 1 :
+    #         checkData(biomass[biomass['stationid'] == station].index.tolist(), 'InvertSpecies','biomass error','error','Biomass records were either too great or too small compared to abundance records',biomass)
+    
+    # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+    # 7b 
+    # Biomass units must be kg
+    trawlinvertebratebiomass_args.update({
+        "badrows": trawlinvertebratebiomass[trawlinvertebratebiomass.biomassunits.astype(str) != 'kg'].tmp_row.tolist(),
+        "badcolumn": "BiomassUnits",
+        "error_type": "Value Error",
+        "error_message": 'Biomass units must be kg'
+    })
+    errs = [*errs, checkData(**trawlinvertebratebiomass_args)]
+
+
+
+
     ## END BIOMASS ONLY CHECKS ##
     ## END CUSTOM CHECKS ##
     print("## END BIOMASS ONLY CHECKS ##")

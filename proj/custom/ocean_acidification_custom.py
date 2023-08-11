@@ -205,6 +205,7 @@ def ocean_acidification(all_dfs):
 
     print("merging bottle and ctd")
     
+    # App is "criticaling" here because datatypes of sub_ctd and sub_bottle are not matching
     depths = sub_ctd.merge(sub_bottle, on = ['season', 'agency', 'sampledate', 'station', 'fieldrep', 'labrep'], how = 'inner')
     #result = df_bottle.merge(df_ctd, on=['sampledate','station'],how='inner')
     
@@ -309,7 +310,7 @@ def ocean_acidification(all_dfs):
     print(ctd[(ctd.depth < 0)|(ctd.depth > 75)][['season','agency','sampledate','sampletime','station','depth']])
     warnings.append(checkData('tbl_oactd', ctd[(ctd.depth < 0)|(ctd.depth > 75)].tmp_row.tolist(),'Depth','Range Warning', 'Depth value is outside of what would be considered a normal range of values, (0 to 75)'))
     # temperature check
-    print(ctd[(ctd.temperature < 0)|(ctd.temperature > 20)][['season','agency','sampledate','sampletime','station','temperature']])
+    print(ctd[(ctd.temperature.astype(float) < 0)|(ctd.temperature.astype(float) > 20)][['season','agency','sampledate','sampletime','station','temperature']])
     warnings.append(checkData('tbl_oactd', ctd[(ctd.temperature < 0)|(ctd.temperature > 20)].tmp_row.tolist(),'Temperature','Range Warning', 'Temperature value outside of what would be considered a normal range (e.g. 0-15).'))
     # salinity check
     print(ctd[(ctd.salinity < 33.0)|(ctd.salinity > 33.7)][['season','agency','sampledate','sampletime','station','salinity']])
@@ -344,9 +345,11 @@ def ocean_acidification(all_dfs):
 
     print("End of OA Custom Checks")
 
+    # remove empty dictionaries from the errors list
     errs = [er for er in errs if len(er) > 0]
     warnings = [w for w in warnings if len(w) > 0]
-
+    
+    print("-------------------------------------------R Script -------------------------------------------------------")
     # OA Analysis routine - pH correction and omega aragonite
     if len(errs) == 0:
         print("No errors - run analysis routine")
@@ -355,6 +358,7 @@ def ocean_acidification(all_dfs):
         print(session.get('excel_path'))
         print("os.path.join(os.getcwd(), 'R', 'oa.R')")
         print(os.path.join(os.getcwd(), 'R', 'oa.R'))
+        
         cmdlist = [
             'Rscript',
             f"{os.path.join(os.getcwd(), 'R', 'oa.R')}", 
@@ -370,6 +374,7 @@ def ocean_acidification(all_dfs):
         msg = f"STDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}"
         print(msg)
 
+        # We can use proc.statuscode instead
         if not bool(re.search(proc.stderr, '\s*')):
             print(f"Error occurred in OA analysis script:\n{proc.stderr}")
             

@@ -3,9 +3,10 @@ from werkzeug.utils import secure_filename
 from gc import collect
 import os
 import pandas as pd
+from json import loads
 
 # custom imports, from local files
-from .preprocess import clean_data
+from .preprocess import clean_data, hardcoded_fixes, rename_test_stations, check_test_stations
 from .match import match
 from .core.core import core
 from .core.functions import fetch_meta
@@ -14,6 +15,17 @@ from .utils.excel import mark_workbook
 from .utils.exceptions import default_exception_handler
 from .custom import *
 
+# So i can see more of the columns when i print the dataframes
+# if it doesnt exist, it will return None, and all columns will be printed in dataframes
+CUSTOM_CONFIG_PATH = os.path.join(os.getcwd(), 'proj', 'config')
+CONFIG_FILEPATH = os.path.join(CUSTOM_CONFIG_PATH, 'config.json')
+
+assert os.path.exists(CONFIG_FILEPATH), "config.json not found"
+CONFIG = loads(open(CONFIG_FILEPATH, 'r').read())
+
+max_print_cols = CONFIG.get("DF_PRINT_MAX_COLUMNS")
+max_print_cols = int(max_print_cols) if max_print_cols is not None else max_print_cols
+pd.set_option('display.max_columns', max_print_cols)
 
 upload = Blueprint('upload', __name__)
 @upload.route('/upload',methods = ['GET','POST'])
@@ -44,7 +56,7 @@ def main():
 
             # To be accessed later by the upload routine that loads data to the tables
             session['excel_path'] = excel_path
-
+            
             # Put their original filename in the submission tracking table
             g.eng.execute(
                 f"""
@@ -94,6 +106,7 @@ def main():
             excel_path, 
             sheet_name = sheet,
             skiprows = current_app.excel_offset,
+            keep_default_na=False,
             na_values = [''],
             converters = converters
         )
@@ -103,15 +116,23 @@ def main():
         if ((sheet not in ignored_tabs) and (not sheet.startswith('lu_')))
     }
 
+    print("before filtering out empty dataframes")
     # filter out empty dataframes
     all_dfs = { dfname: df for dfname, df in all_dfs.items() if not df.empty }
+
+    if len(all_dfs) == 0:
+        returnvals = {
+            "critical_error": False,
+            "user_error_msg": "You submitted a file with all empty tabs.",
+        }
+        return jsonify(**returnvals)
     
+    #assert len(all_dfs) > 0, f"submissionid - {session.get('submissionid')} all_dfs is empty"
     
-    assert len(all_dfs) > 0, f"submissionid - {session.get('submissionid')} all_dfs is empty"
-    
+
     for tblname in all_dfs.keys():
         # lowercase the column names
-        all_dfs[tblname].columns = [x.lower() for x in all_dfs[tblname].columns]
+        all_dfs[tblname].columns = [str(x).lower() for x in all_dfs[tblname].columns]
         # drop system fields from the dataframes
         all_dfs[tblname] = all_dfs[tblname].drop(list(set(all_dfs[tblname].columns).intersection(set(current_app.system_fields))), axis = 1)
 
@@ -169,17 +190,45 @@ def main():
 
 
 
-    # ----------------------------------------- #
+    # --------------------------------------------------------------------------------------------------------------------------------------- #
+    
     # Pre processing data before Core checks
     #  We want to limit the manual cleaning of the data that the user has to do
     #  This function will strip whitespace on character fields and fix columns to match lookup lists if they match (case insensitive)
 
-    # COMMENT OUT PRE PROCESS ROUTINE SINCE LAST BIGHT CYCLE THEY DIDNT WANT US MESSING WITH THEIR DATA
-    #print("preprocessing and cleaning data")
+
+    # NOTE We should confirm whether they are ok with us doing this or not
+    #   of course, the test station renaming is perfectly fine
+    print("preprocessing and cleaning data")
+    
     # We are not sure if we want to do this
     # some projects like bight prohibit this
-    #all_dfs = clean_data(all_dfs)
-    #print("DONE preprocessing and cleaning data")
+    all_dfs = clean_data(all_dfs)
+    all_dfs = hardcoded_fixes(all_dfs)
+
+    
+    # if login_email == 'test@sccwrp.org' then it will rename the stations
+    
+    print("login_email")
+    print(str(session.get('login_info').get('login_email')) )
+    
+    all_dfs = rename_test_stations(all_dfs, str(session.get('login_info').get('login_email')) )
+
+
+
+    print("DONE preprocessing and cleaning data")
+    
+    # --------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+
+    # this is the same as results['sampleid'] in chemistry (sediment) custom checks. 
+    # checker_labsampleid is created for record purposes so we know how the labsampleid is used after stripping everything with and after the last hyphen.
+    # Based on the assumption of labsampleid always having a format with the characters at the last hyphen and on being removed after meetings Bight Chemistry data.
+    if match_dataset in ['chemistry']:
+        all_dfs['tbl_chemresults']['checker_labsampleid'] = all_dfs['tbl_chemresults'].labsampleid.apply(lambda x: str(x).rpartition('-')[0 if '-' in str(x) else -1]  )
+    if match_dataset in ['chemistry_tissue']:
+        all_dfs['tbl_chemresults_tissue']['checker_labsampleid'] = all_dfs['tbl_chemresults_tissue'].labsampleid.apply(lambda x: str(x).rpartition('-')[0 if '-' in str(x) else -1]  )
     
     # write all_dfs again to the same excel path
     # Later, if the data is clean, the loading routine will use the tab names to load the data to the appropriate tables
@@ -187,7 +236,7 @@ def main():
     #   With the way the code is structured, that should always be the case, but the assert statement will let us know if we messed up or need to fix something 
     #   Technically we could write it back with the original tab names, and use the tab_to_table_map in load.py,
     #   But for now, the tab_table_map is mainly used by the javascript in the front end, to display error messages to the user
-    writer = pd.ExcelWriter(excel_path, engine = 'xlsxwriter', options = {"strings_to_formulas":False})
+    writer = pd.ExcelWriter(excel_path, engine = 'xlsxwriter') #, engine_kwargs = {"strings_to_formulas":False})
     for tblname in all_dfs.keys():
         all_dfs[tblname].to_excel(
             writer, 
@@ -195,7 +244,7 @@ def main():
             startrow = current_app.excel_offset, 
             index=False
         )
-    writer.save()
+    #writer.save()
     writer.close()
     
     # Yes this is weird but if we write the all_dfs back to the excel file, and read it back in,
@@ -204,6 +253,7 @@ def main():
         sheet: pd.read_excel(
             excel_path, 
             sheet_name = sheet,
+            keep_default_na=False,
             skiprows = current_app.excel_offset,
             na_values = ['']
         )
@@ -220,6 +270,9 @@ def main():
     errs = []
     warnings = []
 
+    # Special routine for test data:
+    errs.extend(check_test_stations(all_dfs, session.get('login_info').get('login_email')))
+
     print("Core Checks")
 
     # meta data is needed for the core checks to run, to check precision, length, datatypes, etc
@@ -234,12 +287,13 @@ def main():
     # debug = False will cause corechecks to run with multiprocessing, 
     # but the logs will not show as much useful information
     print("Right before core runs")
-    #core_output = core(all_dfs, g.eng, dbmetadata, debug = False)
+    # core_output = core(all_dfs, g.eng, dbmetadata, debug = False)
     core_output = core(all_dfs, g.eng, dbmetadata, debug = True)
     print("Right after core runs")
 
     errs.extend(core_output['core_errors'])
     warnings.extend(core_output['core_warnings'])
+
 
 
     # clear up some memory space, i never wanted to store the core checks output in memory anyways 
@@ -275,7 +329,7 @@ def main():
         print("Custom Checks")
         print(f"Datatype: {match_dataset}")
         print(f"{match_dataset} function:")
-        print(eval(match_dataset))
+        
 
         # custom output should be a dictionary where errors and warnings are the keys and the values are a list of "errors" 
         # (structured the same way as errors are as seen in core checks section)
@@ -283,11 +337,11 @@ def main():
         # The custom checks function is stored in __init__.py in the datasets dictionary and accessed and called accordingly
         # match_dataset is a string, which should also be the same as one of the function names imported from custom, so we can "eval" it
         try:
-            custom_output = eval(match_dataset)(all_dfs)
+            custom_output = eval(str(match_dataset).replace("_nobatch",""))(all_dfs)
         except NameError as err:
             print("Error with custom checks")
             print(err)
-            raise Exception(f"""Error calling custom checks function "{match_dataset}" - may not be defined, or was not imported correctly.""")
+            raise Exception(f"""Error calling custom checks function "{match_dataset}" - {err}""")
         # Leaving this in out of fear of breaking the application
         # All i know is if i leave it untouched, it wont affect anything
         except Exception as e:
@@ -359,9 +413,7 @@ def main():
 
     # Mark up the excel workbook
     print("Marking Excel file")
-    print(session.get('excel_path'))
-    print(errs)
-    print(warnings)
+
     # mark_workbook function returns the file path to which it saved the marked excel file
     session['marked_excel_path'] = mark_workbook(
         all_dfs = all_dfs, 
@@ -388,7 +440,8 @@ def main():
         "submissionid": session.get("submissionid"),
         "critical_error": False,
         "all_datasets": list(current_app.datasets.keys()),
-        "table_to_tab_map" : session['table_to_tab_map']
+        "table_to_tab_map" : session['table_to_tab_map'],
+        "final_submit_requested" : session.get("final_submit_requested")
     }
     
     #print(returnvals)

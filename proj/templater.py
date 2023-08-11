@@ -3,20 +3,13 @@
 #below is from microplastics
 #from flask import send_from_directory, render_template, request, redirect, Response, jsonify, send_file, json, current_app
 #below is from empa main.py
-from pandas.io import excel
-from flask import render_template, request, jsonify, current_app, Blueprint, session, g, send_file
-from werkzeug.utils import secure_filename
-from sqlalchemy import create_engine, text, exc, Table, MetaData
-import urllib, json
+from flask import request, current_app, Blueprint, g, send_file
+from sqlalchemy import Table, MetaData
 import pandas as pd
 from pandas import DataFrame
-import numpy as np
 import re
 import os
-from os import environ
-import xlsxwriter
 import openpyxl
-from openpyxl import load_workbook
 from openpyxl.worksheet.datavalidation import DataValidation
 # dynamic lookup lists to template
 # skip the formatting
@@ -33,6 +26,15 @@ def template():
     file_prefix = datatype.upper()
     database_name = str(g.eng).replace(")","").split("/")[-1]
     print(current_app.datasets.keys())
+
+    static_template = current_app.datasets.get(datatype).get('template_filename')
+    print("datatype")
+    print(datatype)
+    print("static_template")
+    print(static_template)
+    if static_template is not None:
+        print("Static template")
+        return send_file(f"{os.getcwd()}/export/data_templates/{static_template}", as_attachment=True, download_name=f'{static_template}')
     
     eng = g.eng
     # intialize metadata
@@ -139,7 +141,7 @@ def template():
             eng
         )
         df = df.assign(
-            sheet = pd.Series([tbl.replace("tbl_","") for _ in range(len(df))]),
+            sheet = pd.Series([tbl.replace("tbl_","").replace("microplastics_","") for _ in range(len(df))]),
             template_prefix = pd.Series([f"{file_prefix}-TEMPLATE" for _ in range(len(df))])
         )
         df = df[['template_prefix','sheet', 'field_name', 'field_type','description' ]]
@@ -162,14 +164,17 @@ def template():
             )
         },
         **{
-            table.replace("tbl_", ""): pd.DataFrame(
+            table.replace("tbl_", "").replace("microplastics_",""): pd.DataFrame(
                 columns=
                 [
                     *[
                         x for x in pd.read_sql(
-                            f"""
-                                SELECT *  FROM {table} LIMIT 1
-                            """,
+                            """
+                                SELECT {} FROM {} LIMIT 1
+                            """.format(
+                                ','.join(pd.read_sql(f"SELECT column_name FROM column_order WHERE table_name = '{table}' ORDER BY custom_column_position;", eng).column_name.tolist()),
+                                table
+                            ),
                             eng
                         ).columns.to_list()
                         if x not in system_fields
@@ -181,7 +186,7 @@ def template():
             'glossary': glossary
         },
         **{
-            lu_name: pd.read_sql(f"SELECT * from {lu_name}", eng).drop(columns=['objectid'])
+            lu_name: pd.read_sql(f"SELECT * from {lu_name}", eng).drop(columns=['objectid'], errors = 'ignore')
             for lu_name in list(set(list_lu_needed))
         }
     }

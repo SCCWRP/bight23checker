@@ -99,9 +99,13 @@
 
         //show the final submit buttin
         if (Object.keys(result).includes("errs")) {
+            console.log("result['final_submit_requested']");
+            console.log(result['final_submit_requested']);
             if (result['errs'].length == 0){
-                document.querySelector("#final-submit-button-container").classList.remove("hidden");
-                addFinalSubmitListener()
+                if (result['final_submit_requested'] === true) {
+                    document.querySelector("#final-submit-button-container").classList.remove("hidden");
+                    addFinalSubmitListener()
+                }
                 if (result.warnings?.length > 0) {
                     // Cover the case where there are no errors but there are warnings
                     // Giving the user a final warning/final chance to check their warnings

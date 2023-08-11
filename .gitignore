@@ -14,3 +14,5 @@ proj/core/__pycache__/
 proj/utils/__pycache__/
 
 docker/deploy.sh
+
+env.py

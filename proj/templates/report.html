@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <title>{{ report_title }}</title>
+
 </head>
 <body>
     {% if datatype %}
@@ -14,10 +15,14 @@
     {% endfor %}
 
     {% else %}
-
-    Please insert datatype 
-
-    <!-- <a href="{{request.script_root}}/report?datatype=chemistry">Chemistry</a> -->
+    <h2>Choose a datatype</h2>
+    <ul class="styled-list">
+        <li><a href="{{request.script_root}}/report?datatype=field">Field</a></li>
+        <li><a href="{{request.script_root}}/report?datatype=chemistry">Chemistry</a></li>
+        <li><a href="{{request.script_root}}/report?datatype=toxicity">Toxicity</a></li>
+        <li><a href="{{request.script_root}}/report?datatype=infauna">Infauna</a></li>
+    </ul>
+      
 
     {% endif %}
 </body>

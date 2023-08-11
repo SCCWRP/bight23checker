@@ -1,7 +1,8 @@
 import os, time
-from flask import send_file, Blueprint, jsonify, request, g, current_app, render_template, send_from_directory
+from flask import send_file, Blueprint, jsonify, request, g, current_app, render_template, send_from_directory, g 
 import pandas as pd
 from pandas import read_sql, DataFrame
+import re
 
 download = Blueprint('download', __name__)
 @download.route('/download/<submissionid>/<filename>', methods = ['GET','POST'])
@@ -12,47 +13,32 @@ def submission_file(submissionid, filename):
 
 @download.route('/export', methods = ['GET','POST'])
 def template_file():
-    filename = request.args.get('filename')
-    tablename = request.args.get('tablename')
-    agency = request.args.get('agency')
-    if request.args.get("agency"):
-        agencycode = request.args.get("agency")
-        if agencycode == "ABC":
-            agency = "Aquatic Bioassay and Consulting Laboratories"
-        elif agencycode == "ANCHOR":
-            agency = "Anchor QEA"
-        elif agencycode == "AMEC":
-            agency = "AMEC, Foster, & Wheeler / WOOD"
-        elif agencycode == "CSD":
-            agency = "City of San Diego"
-        elif agencycode == "LACSD":
-            agency = "Los Angeles County Sanitation Districts"
-        elif agencycode == "MBC":
-            agency = "Marine Biological Consulting"
-        elif agencycode == "OCSD":
-            agency = "Orange County Sanitation Districts"
-        elif agencycode == "CLAEMD":
-            agency = "City of Los Angeles Environmental Monitoring Division"
-        elif agencycode == "CLAWPD":
-            agency = "City of Los Angeles Watershed Protection Division"
-        elif agencycode == "SCCWRP":
-            agency = "Southern California Coastal Water Research Project"
-        elif agencycode == "SPAWAR":
-            agency = "Space and Naval Warfare Systems Command"
-        elif agencycode == "WESTON":
-            agency = "Weston Solutions"
-        print(f'agency: {agency}')
-        # variables use timestamp at end of the export file IF storing and downloading export data file gives an issue
-        #gettime = int(time.time())
-        #timestamp = str(gettime)
 
+    # define the "engine" (database connection)
+    eng = g.eng
+    
+    agencycode = request.args.get('agency')
+    print("Agency code")
+    print(agencycode)
+
+    if request.args.get("agency"):
+
+        # Make sure the query string argument is a valid agency code
+        if not agencycode in pd.read_sql("SELECT DISTINCT agencycode FROM lu_agencies;", eng).agencycode.values:
+            return f"Agency code {agencycode} not found!"
+        
+        # We know a record exists for this query in the database at this point because if there wasnt, it would have already returned above
+        agency = pd.read_sql(f"SELECT agency FROM lu_agencies WHERE agencycode = '{agencycode}';", eng).agency.values[0]
+
+        print(f'agency: {agency}')
+        
         # add another folder within /export folder for returning data to user (either in browser or via excel file)
         # probably better to not store all these queries in an excel file for storage purposes - use timestamp if this is an issue
         # name after agency and table for now
         export_name = f'{agencycode}-export.xlsx'
         export_file = os.path.join(os.getcwd(), "export", "data_query", export_name)
         export_writer = pd.ExcelWriter(export_file, engine='xlsxwriter')
-        eng = g.eng
+        
 
         #call database to get occupation data
         occupation_df = pd.read_sql(f"""SELECT 
@@ -73,6 +59,7 @@ def template_file():
 	                                swellheight,
                                     swellheightunits,
 	                                swellperiod, 
+                                    'seconds' AS swellperiodunits,
                                     swelldirection,
 	                                seastate, 
 	                                stationfail,
@@ -104,6 +91,7 @@ def template_file():
                                     swellheight,
                                     swellheightunits,
                                     swellperiod,
+                                    'seconds' AS swellperiodunits,
                                     swelldirection,
                                     seastate,
                                     stationfail,
@@ -152,6 +140,7 @@ def template_file():
                                         ptsensorserialnumber,
                                         netonbottomtemp as onbottomtemp, 
                                         netonbottomtime as onbottomtime, 
+                                        COALESCE(debrisdetected, 'No') AS debrisdetected,
                                         trawlcomments as comments
                                     FROM mobile_trawl
                                     WHERE
@@ -184,8 +173,13 @@ def template_file():
                                     sedimentchemistry, 
                                     grainsize, 
                                     toxicity, 
+                                    pfas,
+                                    pfasfieldblank,
+                                    microplastics,
+                                    microplasticsfieldblank,
+                                    equipmentblank,
                                     grabfail, 
-                                    debris as debrisdetected, 
+                                    COALESCE(debrisdetected, 'No') AS debrisdetected, 
                                     grabcomments as comments 
                                 FROM mobile_grab
                                 WHERE grabsamplingorganization = '{agency}';
@@ -194,11 +188,6 @@ def template_file():
         print(grab_df)
         print(type(grab_df))
 
-
-    if filename is not None:
-        return send_file( os.path.join(os.getcwd(), "export", "data_query", filename), as_attachment = True, download_name = filename ) \
-            if os.path.exists(os.path.join(os.getcwd(), "export", "data_query", filename)) \
-            else jsonify(message = "file not found")
     
     with export_writer:
         occupation_df.to_excel(export_writer, sheet_name = "occupation", index = False)
@@ -210,35 +199,10 @@ def template_file():
 
 
 # idea is to serve export.html above, then have this route serve the exported file
+# This route works with the export tool (above)
 @download.route('/export/data_query/<export_name>', methods = ['GET','POST'])
 def data_query(export_name):
     return send_from_directory(os.path.join(os.getcwd(), "export", "data_query"), export_name, as_attachment=True)
 
 
-# def template_file():
-#     filename = request.args.get('filename')
-#     tablename = request.args.get('tablename')
 
-#     if filename is not None:
-#         return send_file( os.path.join(os.getcwd(), "export", "data_query", filename), as_attachment = True, download_name = filename ) \
-#             if os.path.exists(os.path.join(os.getcwd(), "export", "data_query", filename)) \
-#             else jsonify(message = "file not found")
-    
-#     elif tablename is not None:
-#         eng = g.eng
-#         valid_tables = read_sql("SELECT table_name FROM information_schema.tables WHERE table_name LIKE 'tbl%%';", g.eng).values
-        
-#         if tablename not in valid_tables:
-#             return "invalid table name provided in query string argument"
-        
-#         data = read_sql(f"SELECT * FROM {tablename};", eng)
-#         data.drop( set(data.columns).intersection(set(current_app.system_fields)), axis = 1, inplace = True )
-
-#         datapath = os.path.join(os.getcwd(), "export", "data", f'{tablename}.csv')
-
-#         data.to_csv(datapath, index = False)
-
-#         return send_file( datapath, as_attachment = True, download_name = f'{tablename}.csv' )
-
-#     else:
-#         return jsonify(message = "neither a filename nor a database tablename were provided")

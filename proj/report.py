@@ -17,7 +17,7 @@ def report():
             datatype=datatype
         )
     if datatype in valid_datatypes:
-        report_df = pd.read_sql(f'select * from vw_{datatype}_completeness_report', g.eng)
+        report_df = pd.read_sql(f'SELECT * FROM vw_tac_{datatype}_completion_status', g.eng)
         report_df.set_index(['submissionstatus', 'lab', 'parameter'], inplace = True)
     else:
         report_df = pd.DataFrame(columns = ['submissionstatus', 'lab', 'parameter', 'stations'])

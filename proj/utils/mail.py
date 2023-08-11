@@ -44,7 +44,7 @@ def send_mail(send_from, send_to, subject, text, filename=None, server="localhos
         print("Error: unable to send email")
 
 
-def data_receipt(send_from, always_send_to, login_email, dtype, submissionid, originalfile, tables, eng, mailserver, login_info, *args, **kwargs):
+def data_receipt(send_from, always_send_to, login_email, dtype, submissionid, originalfile, tables, eng, mailserver, login_info, cc = None, *args, **kwargs):
     """
     Depending on the project, this function will likely need to be modified. In some cases there are agencies and data owners that
     must be incuded in the email body or subject.
@@ -74,7 +74,12 @@ def data_receipt(send_from, always_send_to, login_email, dtype, submissionid, or
         ]
     )
 
-    send_mail(send_from, [*always_send_to, login_email], email_subject, email_body, filename = originalfile, server = mailserver)
+    send_to = [*always_send_to, login_email]
+    if cc is not None:
+        assert isinstance(cc, str), f'Invalid email address: {cc}'
+        send_to.append(cc)
+   
+    send_mail(send_from, send_to, email_subject, email_body, filename = originalfile, server = mailserver)
 
 
 

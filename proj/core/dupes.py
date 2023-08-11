@@ -2,7 +2,7 @@ import re
 import pandas as pd
 from pandas import isnull, read_sql, concat
 from .functions import checkData, get_primary_key
-from flask import current_app
+from flask import current_app, session
 
 # All the functions for the Core Checks should have the dataframe and the datatype as the two main arguments
 # This is to allow the multiprocessing to work, so it can pass in the same args to all the functions
@@ -58,6 +58,9 @@ def checkDuplicatesInProduction(dataframe, tablename, eng, *args, output = None,
     """
     print("BEGIN function - checkDuplicatesInProduction")
     
+    if session.get("final_submit_requested") == False:
+        return []
+
     pkey = get_primary_key(tablename, eng)
     print(pkey)
     

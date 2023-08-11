@@ -1,4 +1,6 @@
 from .chemistry_custom import chemistry
+from .chemistry_tissue_custom import chemistry_tissue
+from .chemistry_intercal_custom import chemistry_intercal
 from .toxicity_custom import toxicity
 from .infauna_initial_custom import infauna_initial
 from .infauna_reid_custom import infauna_reid
@@ -11,3 +13,4 @@ from .invert_custom import invert
 from .debris_custom import debris
 from .ptsensor_custom import ptsensor
 from .ocean_acidification_custom import ocean_acidification
+from .test_custom import test
