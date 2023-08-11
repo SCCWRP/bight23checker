@@ -139,9 +139,9 @@ def load():
     tables_to_load = list(
         set(
             [
-            *current_app.datasets.get(session.get('datatype')).get('tables'), 
-            *analysis_tables
-        ]
+                *current_app.datasets.get(session.get('datatype')).get('tables'), 
+                *analysis_tables
+            ]
         )
         .intersection(set(all_dfs.keys()))
     )

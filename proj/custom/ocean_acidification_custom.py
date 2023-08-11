@@ -345,6 +345,7 @@ def ocean_acidification(all_dfs):
 
     print("End of OA Custom Checks")
 
+    # remove empty dictionaries from the errors list
     errs = [er for er in errs if len(er) > 0]
     warnings = [w for w in warnings if len(w) > 0]
     
@@ -357,6 +358,7 @@ def ocean_acidification(all_dfs):
         print(session.get('excel_path'))
         print("os.path.join(os.getcwd(), 'R', 'oa.R')")
         print(os.path.join(os.getcwd(), 'R', 'oa.R'))
+        
         cmdlist = [
             'Rscript',
             f"{os.path.join(os.getcwd(), 'R', 'oa.R')}", 
@@ -372,6 +374,7 @@ def ocean_acidification(all_dfs):
         msg = f"STDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}"
         print(msg)
 
+        # We can use proc.statuscode instead
         if not bool(re.search(proc.stderr, '\s*')):
             print(f"Error occurred in OA analysis script:\n{proc.stderr}")
             

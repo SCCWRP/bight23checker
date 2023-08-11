@@ -3,20 +3,13 @@
 #below is from microplastics
 #from flask import send_from_directory, render_template, request, redirect, Response, jsonify, send_file, json, current_app
 #below is from empa main.py
-from pandas.io import excel
-from flask import render_template, request, jsonify, current_app, Blueprint, session, g, send_file
-from werkzeug.utils import secure_filename
-from sqlalchemy import create_engine, text, exc, Table, MetaData
-import urllib, json
+from flask import request, current_app, Blueprint, g, send_file
+from sqlalchemy import Table, MetaData
 import pandas as pd
 from pandas import DataFrame
-import numpy as np
 import re
 import os
-from os import environ
-import xlsxwriter
 import openpyxl
-from openpyxl import load_workbook
 from openpyxl.worksheet.datavalidation import DataValidation
 # dynamic lookup lists to template
 # skip the formatting
