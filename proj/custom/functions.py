@@ -234,7 +234,8 @@ def check_strata_grab(grab, strata_lookup, field_assignment_table):
     if not pd.notnull(grab.region_exists_in_featurelayer).all():
         print("THERE IS A PROBLEM")
         print("There are region/stratum combinations in the field assignment table that do not match the bight region feature layer")
-    print("After assertion")
+        raise Exception("There are region/stratum combinations in the field assignment table that do not match the bight region feature layer")
+    
 
 
     print("grab after merge")

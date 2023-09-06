@@ -321,7 +321,7 @@ require([
             let popUp = {
                 title: "{stationid}",
                 content: `
-                    <p><strong>Warning: The Lat/Longs given for station {stationid} were not found inside the region where the station lives ({region})</strong></p>
+                    <p><strong>Warning: The Lat/Longs given for station {stationid} were not found inside the stratum/region where the station lives (stratum: {stratum}, region: {region})</strong></p>
                     <p>This point corresponds to grab event number: {grabeventnumber}</p>
                 `
             }
@@ -347,7 +347,7 @@ require([
             let popUp = {
                 title: "{stationid}",
                 content: `
-                    <p><strong>Warning: This trawl for {stationid} was not found to intersect the region where the station lives ({region})</strong></p>
+                    <p><strong>Warning: This trawl for {stationid} was not found to intersect the stratum/region where the station lives ({region})</strong></p>
                     <p>This line corresponds to trawl number: {trawlnumber}</p>
                     <p>Start LatLongs: {startlatitude}, {startlongitude}</p>
                     <p>Over LatLongs: {overlatitude}, {overlongitude}</p>
