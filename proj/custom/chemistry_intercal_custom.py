@@ -228,7 +228,7 @@ def chemistry_intercal(all_dfs):
     # Check - If SampleType=Lab blank and Result=-88, then qualifier must be below MDL or none.
     print('# Check - If SampleType=Lab blank and Result=-88, then qualifier must be below MDL or none.')
     results_args.update({
-        "badrows": results[(mb_mask & (results.result != -88)) & (~results.qualifier.isin(['below method detection limit','none'])) ].tmp_row.tolist(),
+        "badrows": results[(mb_mask & (results.result == -88)) & (~results.qualifier.isin(['below method detection limit','none'])) ].tmp_row.tolist(),
         "badcolumn": "Qualifier",
         "error_type": "Value Error",
         "error_message": "If SampleType=Lab blank and Result=-88, then qualifier must be 'below method detection limit' or 'none'"
@@ -289,10 +289,10 @@ def chemistry_intercal(all_dfs):
 
     # ---------- check - if the matrix is Ottawa sand, the sampletype must be Lab blank ------------- #
     results_args.update({
-        "badrows": results[(results.matrix == 'Ottawa sand') & (results.sampletype != 'Lab blank')].tmp_row.tolist(),
+        "badrows": results[(results.matrix == 'Ottawa sand') & (~results.sampletype.isin(['Lab blank','Blank spiked']) )].tmp_row.tolist(),
         "badcolumn": "sampletype",
         "error_type": "Value Error",
-        "error_message": f"if the matrix is Ottawa sand, the sampletype must be Lab blank"
+        "error_message": f"if the matrix is Ottawa sand, the sampletype must be Lab blank or Blank spiked"
     })
     warnings.append(checkData(**results_args))
 
