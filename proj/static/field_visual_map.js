@@ -367,6 +367,25 @@ require([
                     });
 
                 graphicsLayer.add(pointGraphic);
+
+                // Create a text graphic for the label
+                let textGraphic = new Graphic({
+                    geometry: point,
+                    symbol: {
+                        type: "text",
+                        color: "black",
+                        haloColor: "white",
+                        haloSize: "1px",
+                        text: targets[i].properties.stationid, // assuming stationid is in properties
+                        yoffset: -20,  // Adjust as needed to place the label above the point
+                        font: { 
+                            size: 12,
+                            weight: "bold"
+                        }
+                    }
+                });
+
+                graphicsLayer.add(textGraphic);
             }
         }
         if (points !== "None" ) {
