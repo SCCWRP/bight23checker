@@ -317,31 +317,7 @@ require([
             }
         } 
         
-        if (points !== "None" ) {
-            let popUp = {
-                title: "{stationid}",
-                content: `
-                    <p><strong>Warning: The Lat/Longs given for station {stationid} were not found inside the stratum/region where the station lives (stratum: {stratum}, region: {region})</strong></p>
-                    <p>This point corresponds to grab event number: {grabeventnumber}</p>
-                `
-            }
-            for (let i = 0; i < points.length; i++){
-                
-                let point = points[i].geometry
-
-                console.log(point)
-                
-                
-                let pointGraphic = new Graphic({
-                    geometry: point,
-                    symbol: simpleMarkerSymbol,
-                    attributes: points[i].properties,
-                    popupTemplate: popUp
-                    });
-
-                graphicsLayer.add(pointGraphic);
-            }
-        }
+        
 
         if (polylines !== "None" ) {
             let popUp = {
@@ -391,6 +367,30 @@ require([
                     });
 
                 graphicsLayer.add(pointGraphic);
+            }
+        }
+        if (points !== "None" ) {
+            let popUp = {
+                title: "{stationid}",
+                content: `
+                    <p><strong>Warning: The Lat/Longs given for station {stationid} were not found inside the stratum/region where the station lives (stratum: {stratum}, region: {region})</strong></p>
+                    <p>This point corresponds to grab event number: {grabeventnumber}</p>
+                `
+            }
+            for (let i = 0; i < points.length; i++){
+
+                console.log('point')
+                console.log(points[i])
+                
+                
+                let actualLatLongPointGraphic = new Graphic({
+                    geometry: points[i].geometry,
+                    symbol: simpleMarkerSymbol,
+                    attributes: points[i].properties,
+                    popupTemplate: popUp
+                });
+
+                graphicsLayer.add(actualLatLongPointGraphic);
             }
         }
         

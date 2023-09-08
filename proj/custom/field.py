@@ -897,12 +897,13 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             print("field_assignment_table")
             print(field_assignment_table)
             bad_df = check_strata_grab(grab, strata, field_assignment_table)
+            print("bad_df")
             print(bad_df)
             grabpath = os.path.join(session['submission_dir'], "bad_grab.json")
             bad_grab_region_path = os.path.join(session['submission_dir'], "bad_grab_bight_regions.json")
             if len(bad_df) > 0:
-                export_sdf_to_json(grabpath, bad_df)
-                export_sdf_to_json(bad_grab_region_path, strata[strata['region'].isin(bad_df['region'])])
+                export_sdf_to_json(grabpath, bad_df.drop('shape', axis = 'columns', errors='ignore'))
+                export_sdf_to_json(bad_grab_region_path, strata[strata['region'].isin(bad_df['region'])].drop('shape', axis = 'columns', errors='ignore') )
             else:
                 if os.path.exists(grabpath):
                     os.remove(grabpath)
