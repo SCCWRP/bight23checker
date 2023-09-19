@@ -1,8 +1,8 @@
-import os, json, re
-from flask import Flask,current_app, g
+import os, json
+from flask import Flask, g
+from flask_cors import CORS
 from sqlalchemy import create_engine
-import psycopg2
-from psycopg2 import sql
+
 
 # import blueprints to register them
 from .main import upload
@@ -15,6 +15,7 @@ from .templater import templater # for dynamic lookup lists called into template
 from .strata_map_check import map_check, getgeojson
 from .admin import admin
 from .info import info
+from .query import query
 
 CUSTOM_CONFIG_PATH = os.path.join(os.getcwd(), 'proj', 'config')
 
@@ -31,6 +32,8 @@ assert all([item in CONFIG.keys() for item in ["EXCEL_OFFSET", "SYSTEM_FIELDS", 
 app = Flask(__name__, static_url_path='/static')
 app.debug = True # remove for production
 
+# data.sccwrp.org query app wont work without this
+CORS(app)
 
 # does your application require uploaded filenames to be modified to timestamps or left as is
 app.config['CORS_HEADERS'] = 'Content-Type'
@@ -161,3 +164,4 @@ app.register_blueprint(map_check)
 app.register_blueprint(getgeojson)
 app.register_blueprint(admin)
 app.register_blueprint(info)
+app.register_blueprint(query)
