@@ -54,6 +54,11 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     eng = g.eng
     
     field_assignment_table = pd.read_sql("SELECT * FROM field_assignment_table", eng)
+
+    noshapestations = pd.read_sql(
+        "SELECT fat.stationid, fat.stratum AS fatstrat, sr.stratum, fat.region AS fatregion, sr.region, sr.shape FROM field_assignment_table fat LEFT JOIN strataregion sr ON fat.stratum = sr.stratum AND fat.region = sr.region WHERE sr.shape is null", 
+        g.eng
+    )
     
     # Initiates the parts needed for strata check
     strata = pd.read_sql("SELECT * FROM strataregion", eng)
@@ -450,9 +455,50 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     })
     errs = [*errs, checkData(**occupation_args)]
 
+
+
+
+    # Begin routine to check if the field assignment table is set up correctly for their submission
+    HAS_REGION_GEOMETRY = False
+
+    # Check if stationids are in field_assignment_table
+    merged = pd.merge(
+        occupation, 
+        field_assignment_table.filter(items=['stationid','stratum','region']).drop_duplicates(), 
+        how='left', 
+        on=['stationid'],
+        indicator=True
+    )
+    bad_df = merged[merged['_merge'] == 'left_only']
+    badrows = occupation[occupation.stationid.isin(noshapestations.stationid)].tmp_row.tolist()
+    
+    if len(bad_df) > 0:
+        occupation_args.update({
+            "badrows": bad_df.tmp_row.tolist(),
+            "badcolumn": 'stationid',
+            "error_type": "Lookup Error",
+            "error_message" : f'These stations are not in the field assignment table, contact b23-im@sccwrp.org for assistance'
+        })
+        errs = [*errs, checkData(**occupation_args)]
+    else:
+        HAS_REGION_GEOMETRY = True
+
+    if len(badrows) > 0:
+        occupation_args.update({
+            "badrows": badrows,
+            "badcolumn": 'stationid',
+            "error_type": "Lookup Error",
+            "error_message" : f'These stations do not have geometry field assignment table, contact b23-im@sccwrp.org for assistance'
+        })
+        errs = [*errs, checkData(**occupation_args)]
+    else:
+        HAS_REGION_GEOMETRY = True
+
+    
+
+
+
     ### END OCCUPATION CHECKS ###
-    
-    
     if trawl is not None:
         # ------- Trawl Checks ------- #
         # Eric Hermoso - (TrawlOverDistance) - Distance from net start (Trawl/OverLat/OverLon) to end (Trawl/StartLat/StartLon) in meters.
@@ -661,31 +707,32 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         # Check if trawl stations are in strata
         print("Check if trawl stations are in strata")
         # checker thing is breaking 
-        print("-------------------- it broke between this --------------------")
-        trawl_map_errors_df = check_strata_trawl(trawl, strata, field_assignment_table)
-        print("-------------------- and this --------------------") # yes it is breaking here :/
-
-        trawlpath = os.path.join(session['submission_dir'], "bad_trawl.json")
-        bad_trawl_bight_region_path = os.path.join(session['submission_dir'], "bad_trawl_bight_regions.json")
-        if len(trawl_map_errors_df) > 0:
-            export_sdf_to_json(trawlpath, trawl_map_errors_df)
-            export_sdf_to_json(
-                bad_trawl_bight_region_path , 
-                strata.merge( trawl_map_errors_df[['stationid','region']], on = 'region', how = 'inner' )
-            )
-        else:
-            if os.path.exists(trawlpath):
-                os.remove(trawlpath)
-            if os.path.exists(bad_trawl_bight_region_path):
-                os.remove(bad_trawl_bight_region_path)
         
-        trawl_args.update({
-            "badrows": trawl_map_errors_df.tmp_row.tolist(),
-            "badcolumn": 'startlatitude,startlongitude, endlatitude, endlongitude',
-            "error_type": "Location Error",
-            "error_message" : f'This station has lat/longs outside of the region/stratum where the target lat/longs are (See Map tab for more details)'
-        })
-        warnings = [*warnings, checkData(**trawl_args)]
+
+        if HAS_REGION_GEOMETRY:
+            trawl_map_errors_df = check_strata_trawl(trawl, strata, field_assignment_table)
+
+            trawlpath = os.path.join(session['submission_dir'], "bad_trawl.json")
+            bad_trawl_bight_region_path = os.path.join(session['submission_dir'], "bad_trawl_bight_regions.json")
+            if len(trawl_map_errors_df) > 0:
+                export_sdf_to_json(trawlpath, trawl_map_errors_df)
+                export_sdf_to_json(
+                    bad_trawl_bight_region_path , 
+                    strata.merge( trawl_map_errors_df[['stationid','region']], on = 'region', how = 'inner' )
+                )
+            else:
+                if os.path.exists(trawlpath):
+                    os.remove(trawlpath)
+                if os.path.exists(bad_trawl_bight_region_path):
+                    os.remove(bad_trawl_bight_region_path)
+            
+            trawl_args.update({
+                "badrows": trawl_map_errors_df.tmp_row.tolist(),
+                "badcolumn": 'startlatitude,startlongitude, endlatitude, endlongitude',
+                "error_type": "Location Error",
+                "error_message" : f'This station has lat/longs outside of the region/stratum where the target lat/longs are (See Map tab for more details)'
+            })
+            warnings = [*warnings, checkData(**trawl_args)]
     else:
         # catch the case where the submission is only grab - trawl file should NOT be there...
         trawlpath = os.path.join(session['submission_dir'], "bad_trawl.json")
@@ -801,28 +848,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         })
         errs = [*errs, checkData(**grab_args)]
         
-        # Check if grab stationid is in field_assignment_table
-        merged = pd.merge(
-            grab, 
-            field_assignment_table.filter(items=['stationid','stratum','region']).drop_duplicates(), 
-            how='left', 
-            on=['stationid'],
-            indicator=True
-
-        )
-        bad_df = merged[merged['_merge'] == 'left_only']
-        if len(bad_df) > 0:
-            grab_args.update({
-                "badrows": bad_df.tmp_row.tolist(),
-                "badcolumn": 'stationid',
-                "error_type": "Lookup Error",
-                "error_message" : f'These stations are not in the field assignment table'
-            })
-            errs = [*errs, checkData(**grab_args)]
-            strata_check = False
-        else:
-            strata_check = True
-
+        
 
         # Check for the parameters grabbed based on the sample assignment table
         all_param_names_dict = {
@@ -889,16 +915,16 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
                 warnings = [*warnings, checkData(**grab_args)]
 
 
-        if strata_check:
+        if HAS_REGION_GEOMETRY:
             # Check if grab stations are in strata
             print("# Check if grab stations are in strata")
-            print("grab")
-            print(grab)
-            print("field_assignment_table")
-            print(field_assignment_table)
+            # print("grab")
+            # print(grab)
+            # print("field_assignment_table")
+            # print(field_assignment_table)
             bad_df = check_strata_grab(grab, strata, field_assignment_table)
-            print("bad_df")
-            print(bad_df)
+            # print("bad_df")
+            # print(bad_df)
             grabpath = os.path.join(session['submission_dir'], "bad_grab.json")
             bad_grab_region_path = os.path.join(session['submission_dir'], "bad_grab_bight_regions.json")
             if len(bad_df) > 0:
@@ -930,12 +956,9 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             os.remove(bad_grab_region_path)
 
     # export geojson with target latlongs
-    print('field_assignment_table')
-    print(field_assignment_table)
     targets = occupation[['stationid']].merge(field_assignment_table[['stationid','latitude','longitude']], on = 'stationid', how = 'inner') \
         .drop_duplicates()
-    print('targets')
-    print(targets[['latitude','longitude']])
+
     targets['SHAPE'] = targets.apply(
         lambda row: arcgisPoint({                
             "x" :  row['longitude'], 
@@ -944,8 +967,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         }),
         axis=1
     )
-    print('targets after')
-    print(targets)
+    
     targetpath = os.path.join(session['submission_dir'], "target_stations.json")
     if os.path.exists(targetpath):
         os.remove(targetpath)

@@ -88,6 +88,18 @@ def mismatch(df1, df2, mergecols = None, left_mergecols = None, right_mergecols 
     
     # gets rows in df1 that are not in df2
     # row identifier column is tmp_row by default
+    
+    # If the first dataframe is empty, then there can be no badrows
+    if df1.empty:
+        return []
+
+    # if second dataframe is empty, all rows in df1 are mismatched
+    if df2.empty:
+        return df1[row_identifier].tolist() if row_identifier != 'index' else df1.index.tolist()
+    
+    # Hey, you never know...
+    assert not '_present_' in df1.columns, 'For some reason, the reserved column name _present_ is in columns of df1'
+    assert not '_present_' in df2.columns, 'For some reason, the reserved column name _present_ is in columns of df2'
 
     if mergecols is not None:
         assert set(mergecols).issubset(set(df1.columns)), f"""In mismatch function - {','.join(mergecols)} is not a subset of the columns of the dataframe """
@@ -310,6 +322,7 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
     # We already asserted that there will be no missing values in the SHAPE column
     print("trawl")
     print(trawl)
+
     trawl['region_polygon'] = trawl.apply(
         lambda row: 
         [shapelyPolygon(ring) for ring in row.SHAPE.get('rings')],

@@ -45,7 +45,7 @@ require([
         "rgba(117, 107, 177, 0.25)",
         "rgba(84, 39, 143, 0.25)"
     ];
-    const colorForTheSpecifiedRegionOfTheUser = '#f88379';  // coral pink
+    const colorForTheSpecifiedRegionOfTheUser = 'rgba(248, 131, 121, 0.45)';  // coral pink
     const targetLatLongColor = [0,255,0];
     const actualGrabLatLongColor = [255,0,0];
     const actualTrawlLineColor = [255,0,0];
@@ -288,7 +288,7 @@ require([
 
         if (grab_polygons !== "None" ) {
             let popupTemplate = {
-                title: "{region}",
+                title: "Region: {region}, Stratum: {stratum}",
                 content: `
                     <p>The Region specified in your sediment grab submission was: {region}</p>
                     <p>The Stratum specified in your sediment grab submission was: {stratum}</p>
@@ -319,31 +319,7 @@ require([
         
         
 
-        if (polylines !== "None" ) {
-            let popUp = {
-                title: "{stationid}",
-                content: `
-                    <p><strong>Warning: This trawl for {stationid} was not found to intersect the stratum/region where the station lives ({region})</strong></p>
-                    <p>This line corresponds to trawl number: {trawlnumber}</p>
-                    <p>Start LatLongs: {startlatitude}, {startlongitude}</p>
-                    <p>Over LatLongs: {overlatitude}, {overlongitude}</p>
-                    <p>End LatLongs: {endlatitude}, {endlongitude}</p>
-                `
-            }
-            for (let i = 0; i < polylines.length; i++){
-                let polyline = polylines[i].geometry
-                console.log('polyline')
-                console.log(polyline)
-                
-                let polylineGraphic  = new Graphic({
-                    geometry: polyline,
-                    symbol: simpleLineSymbol,
-                    attributes: polylines[i].properties,
-                    popupTemplate: popUp
-                });
-                graphicsLayer.add(polylineGraphic);
-            }
-        }
+        
        
         if (targets !== "None" ) {
             let popUp = {
@@ -410,6 +386,31 @@ require([
                 });
 
                 graphicsLayer.add(actualLatLongPointGraphic);
+            }
+        }
+        if (polylines !== "None" ) {
+            let popUp = {
+                title: "{stationid}",
+                content: `
+                    <p><strong>Warning: This trawl for {stationid} was not found to intersect the stratum/region where the station lives ({region})</strong></p>
+                    <p>This line corresponds to trawl number: {trawlnumber}</p>
+                    <p>Start LatLongs: {startlatitude}, {startlongitude}</p>
+                    <p>Over LatLongs: {overlatitude}, {overlongitude}</p>
+                    <p>End LatLongs: {endlatitude}, {endlongitude}</p>
+                `
+            }
+            for (let i = 0; i < polylines.length; i++){
+                let polyline = polylines[i].geometry
+                console.log('polyline')
+                console.log(polyline)
+                
+                let polylineGraphic  = new Graphic({
+                    geometry: polyline,
+                    symbol: simpleLineSymbol,
+                    attributes: polylines[i].properties,
+                    popupTemplate: popUp
+                });
+                graphicsLayer.add(polylineGraphic);
             }
         }
         
