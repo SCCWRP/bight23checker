@@ -967,6 +967,8 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         }),
         axis=1
     )
+
+    targets = targets.merge(field_assignment_table[['stationid','stratum','region']].drop_duplicates(), on = 'stationid', how = 'left')
     
     targetpath = os.path.join(session['submission_dir'], "target_stations.json")
     if os.path.exists(targetpath):

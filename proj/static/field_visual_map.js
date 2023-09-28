@@ -326,6 +326,7 @@ require([
                 title: "{stationid} (Target)",
                 content: `
                     <p>This point corresponds to the Target LatLongs for the station {stationid}</p>
+                    <p>Station {stationid} is in Stratum: {stratum} and Region: {region}</p>
                 `
             }
             for (let i = 0; i < targets.length; i++){
