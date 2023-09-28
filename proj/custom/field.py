@@ -65,7 +65,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     strata = pd.read_sql("SELECT * FROM strataregion", eng)
 
     # Convert geometry from WKB to polygon objects
-    strata['SHAPE'] = strata['shape'].apply( lambda x:  wkb.loads(binascii.unhexlify(x)) )
+    # strata['SHAPE'] = strata['shape'].apply( lambda x:  wkb.loads(binascii.unhexlify(x)) )
     
 
     # ------- LOGIC CHECKS ------- #

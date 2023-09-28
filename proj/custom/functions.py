@@ -1,4 +1,4 @@
-import json, os
+import json, binascii, os
 from pandas import isnull, DataFrame, to_datetime, read_sql
 import math
 import numpy as np
@@ -11,10 +11,12 @@ import pandas as pd
 from flask import current_app
 import json
 
+
 # for trawl distance function
 from shapely.geometry import Point as shapelyPoint
 from shapely.geometry import Polygon as shapelyPolygon
 from shapely.geometry import LineString as shapelyLineString
+from shapely import wkb
 from pyproj import CRS, Transformer
 
 def checkData(tablename, badrows, badcolumn, error_type, error_message = "Error", is_core_error = False, errors_list = [], q = None, **kwargs):
@@ -221,6 +223,9 @@ def multivalue_lookup_check(df, field, listname, listfield, dbconnection, displa
 
 
 def check_strata_grab(grab, strata_lookup, field_assignment_table):
+
+    strata_lookup['SHAPE'] = strata_lookup['shape'].apply( lambda x:  wkb.loads(binascii.unhexlify(x)) )
+
     # Get the columns stratum, region from stations_grab_final, merged on stationid.
     # We need these columns to look up for the polygon the stations are supposed to be in
     grab = pd.merge(
@@ -274,6 +279,9 @@ def check_strata_grab(grab, strata_lookup, field_assignment_table):
     return bad_df
 
 def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
+
+    strata_lookup['SHAPE'] = strata_lookup['shape'].apply( lambda x:  wkb.loads(binascii.unhexlify(x)) )
+    
     # Get the columns stratum, region from stations_grab_final, merged on stationid.
     # We need these columns to look up for the polygon the stations are supposed to be in
     trawl = pd.merge(
