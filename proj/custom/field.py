@@ -14,6 +14,7 @@ import numpy as np
 from arcgis.geometry import Point as arcgisPoint
 from arcgis.geometry import Geometry
 from shapely import wkb
+import shapely
 
 
 def fieldchecks(occupation, eng, trawl = None, grab = None):
@@ -64,18 +65,8 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     strata = pd.read_sql("SELECT * FROM strataregion", eng)
 
     # Convert geometry from WKB to polygon objects
-    # strata['SHAPE'] = strata['shape'].apply(lambda x: Geometry.from_shapely(wkb.loads(binascii.unhexlify(x))) )
-    strata['SHAPE'] = strata['shape'].apply(
-        lambda x: 
-        Geometry(
-            {
-                "spatialReference": {"wkid": 4326}, 
-                "rings": Geometry.from_shapely( wkb.loads(binascii.unhexlify(x)) ).rings 
-            }
-        )
-    )
+    strata['SHAPE'] = strata['shape'].apply( lambda x:  wkb.loads(binascii.unhexlify(x)) )
     
-
 
     # ------- LOGIC CHECKS ------- #
     print("# ------- LOGIC CHECKS ------- #")
@@ -718,7 +709,10 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
                 export_sdf_to_json(trawlpath, trawl_map_errors_df)
                 export_sdf_to_json(
                     bad_trawl_bight_region_path , 
-                    strata.merge( trawl_map_errors_df[['stationid','region']], on = 'region', how = 'inner' )
+                    (
+                        strata.merge( trawl_map_errors_df[['stationid','region']], on = 'region', how = 'inner' )
+                        .assign(SHAPE = strata['shape'].apply(lambda x: Geometry(shapely.geometry.mapping(wkb.loads(binascii.unhexlify(x))))))
+                     )
                 )
             else:
                 if os.path.exists(trawlpath):
@@ -929,7 +923,13 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             bad_grab_region_path = os.path.join(session['submission_dir'], "bad_grab_bight_regions.json")
             if len(bad_df) > 0:
                 export_sdf_to_json(grabpath, bad_df.drop('shape', axis = 'columns', errors='ignore'))
-                export_sdf_to_json(bad_grab_region_path, strata[strata['region'].isin(bad_df['region'])].drop('shape', axis = 'columns', errors='ignore') )
+                export_sdf_to_json(
+                    bad_grab_region_path, 
+                    (
+                        strata[strata['region'].isin(bad_df['region'])].drop('shape', axis = 'columns', errors='ignore')
+                        .assign(SHAPE = strata['shape'].apply(lambda x: Geometry(shapely.geometry.mapping(wkb.loads(binascii.unhexlify(x))))))
+                    )
+                )
             else:
                 if os.path.exists(grabpath):
                     os.remove(grabpath)

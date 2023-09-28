@@ -14,7 +14,7 @@ import json
 # for trawl distance function
 from shapely.geometry import Point as shapelyPoint
 from shapely.geometry import Polygon as shapelyPolygon
-from shapely.geometry import LineString
+from shapely.geometry import LineString as shapelyLineString
 from pyproj import CRS, Transformer
 
 def checkData(tablename, badrows, badcolumn, error_type, error_message = "Error", is_core_error = False, errors_list = [], q = None, **kwargs):
@@ -173,7 +173,7 @@ def calculate_distance(row):
 
     # Define point and line
     point = shapelyPoint(transformer.transform(row['targetlongitude'], row['targetlatitude']))
-    line = LineString([(transformer.transform(row['startlongitude'], row['startlatitude'])), (transformer.transform(row['endlongitude'], row['endlatitude']))])
+    line = shapelyLineString([(transformer.transform(row['startlongitude'], row['startlatitude'])), (transformer.transform(row['endlongitude'], row['endlatitude']))])
     
     # Calculate distance in meters
     distance = point.distance(line)
@@ -254,19 +254,13 @@ def check_strata_grab(grab, strata_lookup, field_assignment_table):
     print(grab)
     # Make the points based on long, lat columns of grab
     grab['grabpoint'] = grab.apply(
-        lambda row: Point({                
-            "x" :  row['longitude'], 
-            "y" :  row['latitude'], 
-            "spatialReference" : {'latestWkid': 4326, 'wkid': 4326}
-        }),
-        axis=1
+        lambda row: shapelyPoint(row['longitude'], row['latitude']), axis=1
     )
 
     # Now we check if the points are in associated polygon or not. Assign True if they are in
     print("Now we check if the points are in associated polygon or not. Assign True if they are in")
     grab['is_station_in_strata'] = grab.apply(
-        lambda row: row.SHAPE.contains(row['grabpoint']),
-        axis=1
+        lambda row: row.SHAPE.contains(row['grabpoint']) if row.SHAPE else False, axis=1
     )
 
     # the geojson we give to the browser at the end will expect the point to be in the SHAPE column
@@ -312,7 +306,7 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
 
     # Make the points based on long, lat columns of grab
     trawl['trawl_line'] = trawl.apply(
-        lambda row: LineString([
+        lambda row: shapelyLineString([
             (row['startlongitude'], row['startlatitude']), (row['endlongitude'], row['endlatitude'])
         ]),
         axis=1
@@ -320,22 +314,11 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
 
     # make a column of shapely polygons - this will be the bight region polygon to check for intersection with trawl line
     # We already asserted that there will be no missing values in the SHAPE column
-    print("trawl")
-    print(trawl)
-
-    trawl['region_polygon'] = trawl.apply(
-        lambda row: 
-        [shapelyPolygon(ring) for ring in row.SHAPE.get('rings')],
-        axis=1
-    )
     
     
-    # We are assuming that the region and stratum combination is in the strata lookup list
-    # Now we check if the points are in associated polygon or not. Assign True if they are in
+    # Now we check if the LineStrings intersect associated polygon or not. Assign True if they do
     trawl['is_station_in_strata'] = trawl.apply(
-        lambda row: 
-        any([polygon.intersects(row.trawl_line) for polygon in row.region_polygon]),
-        axis=1
+        lambda row: row.SHAPE.intersects(row['trawl_line']) if row.SHAPE else False, axis=1
     )
 
     # Need to ensure the SHAPE column is the trawl line as an arcgis geometry Polyline object
@@ -344,7 +327,7 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
 
     # We also should drop the temp columns created in this function, since we dont want them included in the geojson that will be put on the map
     # these objects are also not json serializable so it makes it difficult, so its better we just drop the columns
-    trawl.drop(['region_polygon','trawl_line'], axis = 'columns', inplace = True)
+    trawl.drop(['region_polygon','trawl_line'], axis = 'columns', inplace = True, errors = 'ignore')
 
     print('in the trawl strata check - trawl dataframe')
 
