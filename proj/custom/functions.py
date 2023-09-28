@@ -264,15 +264,17 @@ def check_strata_grab(grab, strata_lookup, field_assignment_table):
 
     # Now we check if the points are in associated polygon or not. Assign True if they are in
     print("Now we check if the points are in associated polygon or not. Assign True if they are in")
+    print("strata_lookup")
+    print(strata_lookup)
     grab['is_station_in_strata'] = grab.apply(
         lambda row: row.SHAPE.contains(row['grabpoint']) if row.SHAPE else False, axis=1
     )
 
-    # the geojson we give to the browser at the end will expect the point to be in the SHAPE column
-    grab['SHAPE'] = grab.grabpoint
+    # Convert shapely Point to ArcGIS Point and assign it to the SHAPE column
+    grab['SHAPE'] = grab.apply(lambda row: Point({"x": row['longitude'], "y": row['latitude'], "spatialReference": {"wkid": 4326}}), axis=1)
 
-    # geojson will not like this column in there so we will drop it now
-    grab.drop(['grabpoint'], axis = 'columns', inplace = True)
+    # Drop the temporary grabpoint column
+    grab.drop(['grabpoint'], axis='columns', inplace=True)
 
     # Now we get the bad rows
     bad_df = grab.assign(tmp_row=grab.index).query("is_station_in_strata == False")

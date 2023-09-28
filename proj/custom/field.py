@@ -703,26 +703,27 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         if HAS_REGION_GEOMETRY:
             trawl_map_errors_df = check_strata_trawl(trawl, strata, field_assignment_table)
 
+            #
+            tmpstrata = strata.merge( trawl_map_errors_df[['stationid','region']], on = 'region', how = 'inner' )
+            tmpstrata['SHAPE'] = tmpstrata['shape'] \
+                .apply(
+                    lambda x: 
+                    Geometry(
+                        {
+                            "spatialReference": {"wkid": 4326}, 
+                            "rings": Geometry.from_shapely( wkb.loads(binascii.unhexlify(x)) ).rings 
+                        }
+                    )
+                )
+            
+
             trawlpath = os.path.join(session['submission_dir'], "bad_trawl.json")
             bad_trawl_bight_region_path = os.path.join(session['submission_dir'], "bad_trawl_bight_regions.json")
             if len(trawl_map_errors_df) > 0:
                 export_sdf_to_json(trawlpath, trawl_map_errors_df)
                 export_sdf_to_json(
                     bad_trawl_bight_region_path , 
-                    (
-                        strata.merge( trawl_map_errors_df[['stationid','region']], on = 'region', how = 'inner' )
-                        .assign(
-                            SHAPE = strata['shape'].apply(
-                                lambda x: 
-                                Geometry(
-                                    {
-                                        "spatialReference": {"wkid": 4326}, 
-                                        "rings": Geometry.from_shapely( wkb.loads(binascii.unhexlify(x)) ).rings 
-                                    }
-                                )
-                            )
-                        )
-                     )
+                    tmpstrata
                 )
             else:
                 if os.path.exists(trawlpath):
@@ -927,28 +928,31 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             # print("field_assignment_table")
             # print(field_assignment_table)
             bad_df = check_strata_grab(grab, strata, field_assignment_table)
-            # print("bad_df")
-            # print(bad_df)
+
+            # export_sdf_to_json(bad_grab_region_path, strata[strata['region'].isin(bad_df['region'])].drop('shape', axis = 'columns', errors='ignore') )
+            tmpstrata = strata[strata['region'].isin(bad_df['region'])]
+            tmpstrata['SHAPE'] = tmpstrata['shape'] \
+                .apply(
+                    lambda x: 
+                    Geometry(
+                        {
+                            "spatialReference": {"wkid": 4326}, 
+                            "rings": Geometry.from_shapely( wkb.loads(binascii.unhexlify(x)) ).rings 
+                        }
+                    )
+                )
+            
+            tmpstrata.drop('shape', axis = 'columns', errors='ignore')
+            
+            print("tmpstrata")
+            print(tmpstrata)
             grabpath = os.path.join(session['submission_dir'], "bad_grab.json")
             bad_grab_region_path = os.path.join(session['submission_dir'], "bad_grab_bight_regions.json")
             if len(bad_df) > 0:
                 export_sdf_to_json(grabpath, bad_df.drop('shape', axis = 'columns', errors='ignore'))
                 export_sdf_to_json(
                     bad_grab_region_path, 
-                    (
-                        strata[strata['region'].isin(bad_df['region'])].drop('shape', axis = 'columns', errors='ignore')
-                        .assign(
-                            SHAPE = strata['shape'].apply(
-                                lambda x: 
-                                Geometry(
-                                    {
-                                        "spatialReference": {"wkid": 4326}, 
-                                        "rings": Geometry.from_shapely( wkb.loads(binascii.unhexlify(x)) ).rings 
-                                    }
-                                )
-                            )
-                        )
-                    )
+                    tmpstrata
                 )
             else:
                 if os.path.exists(grabpath):
