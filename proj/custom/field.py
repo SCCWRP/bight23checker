@@ -711,7 +711,17 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
                     bad_trawl_bight_region_path , 
                     (
                         strata.merge( trawl_map_errors_df[['stationid','region']], on = 'region', how = 'inner' )
-                        .assign(SHAPE = strata['shape'].apply(lambda x: Geometry(shapely.geometry.mapping(wkb.loads(binascii.unhexlify(x))))))
+                        .assign(
+                            SHAPE = strata['shape'].apply(
+                                lambda x: 
+                                Geometry(
+                                    {
+                                        "spatialReference": {"wkid": 4326}, 
+                                        "rings": Geometry.from_shapely( wkb.loads(binascii.unhexlify(x)) ).rings 
+                                    }
+                                )
+                            )
+                        )
                      )
                 )
             else:
@@ -927,7 +937,17 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
                     bad_grab_region_path, 
                     (
                         strata[strata['region'].isin(bad_df['region'])].drop('shape', axis = 'columns', errors='ignore')
-                        .assign(SHAPE = strata['shape'].apply(lambda x: Geometry(shapely.geometry.mapping(wkb.loads(binascii.unhexlify(x))))))
+                        .assign(
+                            SHAPE = strata['shape'].apply(
+                                lambda x: 
+                                Geometry(
+                                    {
+                                        "spatialReference": {"wkid": 4326}, 
+                                        "rings": Geometry.from_shapely( wkb.loads(binascii.unhexlify(x)) ).rings 
+                                    }
+                                )
+                            )
+                        )
                     )
                 )
             else:
