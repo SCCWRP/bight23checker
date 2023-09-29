@@ -162,6 +162,7 @@ require([
         {return response.json()
     }).then(function (data) {
         
+
         const points = data['points']
         const polylines = data['polylines']
         const grab_polygons = data['grab_polygons']
@@ -169,6 +170,11 @@ require([
         const strataLayerId = data['strata_layer_id']
         const targets = data['targets']
         
+        // New 9/28/2023 - adding bad distances
+        const badDistancePoints = data['bad_distance_points']
+        const badDistanceLines = data['bad_distance_polylines']
+
+
         console.log(points)
         console.log(polylines)
         console.log(grab_polygons)
@@ -409,6 +415,51 @@ require([
                     geometry: polyline,
                     symbol: simpleLineSymbol,
                     attributes: polylines[i].properties,
+                    popupTemplate: popUp
+                });
+                graphicsLayer.add(polylineGraphic);
+            }
+        }
+        
+        if (badDistancePoints !== "None" ) {
+            let popUp = {
+                title: "{stationid}",
+                content: `
+                    <p>{error_message}</p>
+                    <p>Distance to target measured as: {distance_to_target} meters</p>
+                `
+            }
+            for (let i = 0; i < badDistancePoints.length; i++){
+
+                console.log('point')
+                console.log(badDistancePoints[i])
+                
+                
+                let actualLatLongPointGraphic = new Graphic({
+                    geometry: badDistancePoints[i].geometry,
+                    symbol: simpleMarkerSymbol,
+                    attributes: badDistancePoints[i].properties,
+                    popupTemplate: popUp
+                });
+
+                graphicsLayer.add(actualLatLongPointGraphic);
+            }
+        }
+        
+        if (badDistanceLines !== "None" ) {
+            let popUp = {
+                title: "{stationid}",
+                content: `
+                    <p>{error_message}</p>
+                    <p>Distance to target measured as: {distance_to_target} meters</p>
+                `
+            }
+            for (let i = 0; i < badDistanceLines.length; i++){
+                
+                let polylineGraphic  = new Graphic({
+                    geometry: badDistanceLines[i].geometry,
+                    symbol: simpleLineSymbol,
+                    attributes: badDistanceLines[i].properties,
                     popupTemplate: popUp
                 });
                 graphicsLayer.add(polylineGraphic);

@@ -12,11 +12,14 @@ from .functions import checkData, haversine_np, check_distance, check_time, chec
 import pandas as pd
 import numpy as np
 from arcgis.geometry import Point as arcgisPoint
-from arcgis.geometry import Geometry
+from arcgis.geometry import Geometry, Polyline
 from shapely import wkb
 import shapely
 
 
+# Apologies in advance to whomever takes over this
+# The spatial checks had features keep getting added just before data started coming in, and even slightly after
+# so the code (mainly the spatial map element) became disorganized - Robert 9/28/2023
 def fieldchecks(occupation, eng, trawl = None, grab = None):
     #return {'errors': [], 'warnings': []}
     current_function_name = str(currentframe().f_code.co_name)
@@ -64,8 +67,12 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     # Initiates the parts needed for strata check
     strata = pd.read_sql("SELECT * FROM strataregion", eng)
 
-    # Convert geometry from WKB to polygon objects
-    # strata['SHAPE'] = strata['shape'].apply( lambda x:  wkb.loads(binascii.unhexlify(x)) )
+    # I noticed that if the grab distance to target is too far, it doesnt get placed on the map
+    # the points consist of occupations and grabs, whereas the lines are only trawls
+    # The goal is to include spatial dataframes in their own geojson files to send to the browser 
+    #   so it can plot them on the map for the user to view
+    bad_point_distances = pd.DataFrame()
+    bad_line_distances = pd.DataFrame()
     
 
     # ------- LOGIC CHECKS ------- #
@@ -377,21 +384,33 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     print("Raises warning for distances calculated above > 100m:")
     print(sofat[sofat['dists'] > 100])
 
-    occupation_args.update({
-        "badrows": sofat[
-            sofat.apply(
-                lambda row: row['dists'] > (200 if 'channel islands' in str(row['region']).strip().lower() else 100)
-                ,
-                axis = 1
-            )
-        ] \
-        .tmp_row \
-        .tolist(),
-        "badcolumn": 'StationID',
-        "error_type": 'Undefined Warning',
-        "error_message": 'Distance from Occupation Latitude/Longitude in submission to Target Latitude/Longitude in field assignment table is greater than 100 meters. (up tp 200m is ok for channel islands stations)'
-    })
-    warnings = [*warnings, checkData(**occupation_args)]
+    bad_sofat_dists_df = sofat[
+        sofat.apply(
+            lambda row: row['dists'] > (200 if 'channel islands' in str(row['region']).strip().lower() else 100),
+            axis = 1
+        )
+    ]
+
+    if not bad_sofat_dists_df.empty:
+        # append to bad_point distances
+        bad_point_distances = pd.concat(
+            [
+                bad_point_distances, 
+                bad_sofat_dists_df[['stationid','dists']].assign(
+                    error_message = "Distance from Occupation Latitude/Longitude in submission to Target Latitude/Longitude in field assignment table is greater than 100 meters. (up tp 200m is ok for channel islands stations)",
+                    SHAPE = bad_sofat_dists_df.apply(lambda x: arcgisPoint({"x": x['occupationlongitude'], "y": x['occupationlatitude'], "spatialReference": {"wkid": 4326}}), axis=1)  
+                ).rename(columns={'dists':'distance_to_target'})
+            ]
+        )
+
+
+        occupation_args.update({
+            "badrows":  bad_sofat_dists_df.tmp_row.tolist(),
+            "badcolumn": 'StationID',
+            "error_type": 'Undefined Warning',
+            "error_message": 'Distance from Occupation Latitude/Longitude in submission to Target Latitude/Longitude in field assignment table is greater than 100 meters. (up tp 200m is ok for channel islands stations)'
+        })
+        warnings = [*warnings, checkData(**occupation_args)]
     
 
     # Matthew M- If StationOccupation/Station Fail != "None or No Fail/Temporary" then Abandoned should be set to "Yes"
@@ -622,8 +641,6 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         # Now time to check the distance of the trawl line to the target station
         # the calculate_distance function returns the value in meters
         checkdf['dist'] = checkdf.apply(calculate_distance, axis=1)
-        print("trawl check df")
-        print(checkdf[['stationid','dist','region','tmp_row']])
 
         checkdf['max_allowable_distance'] = checkdf.region.apply(
             lambda x: 
@@ -635,6 +652,25 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         
         # get the bad records that didnt pass
         checkdf = checkdf[~checkdf.passed]
+
+
+        if not checkdf.empty:
+            # append to bad_line distances to put on the map later
+            bad_line_distances = pd.concat(
+                [
+                    bad_line_distances, 
+                    checkdf[['stationid','dist']].assign(
+                        error_message = "Distance from Occupation Latitude/Longitude in submission to Target Latitude/Longitude in field assignment table is greater than 100 meters. (up tp 200m is ok for channel islands stations)",
+                        SHAPE = checkdf.apply(
+                            lambda row: Polyline({
+                                "paths": [[[row['startlongitude'], row['startlatitude']], [row['endlongitude'], row['endlatitude']]]],
+                                "spatialReference": {"wkid": 4326}
+                            }),
+                            axis=1
+                        )
+                    ).rename(columns={'dist':'distance_to_target'}) 
+                ]
+            )
 
         # get the bad rows
         checkdf = checkdf.groupby(['region','max_allowable_distance']).agg({
@@ -738,14 +774,24 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
                 "error_message" : f'This station has lat/longs outside of the region/stratum where the target lat/longs are (See Map tab for more details)'
             })
             warnings = [*warnings, checkData(**trawl_args)]
+
+
     else:
         # catch the case where the submission is only grab - trawl file should NOT be there...
         trawlpath = os.path.join(session['submission_dir'], "bad_trawl.json")
         bad_trawl_bight_region_path = os.path.join(session['submission_dir'], "bad_trawl_bight_regions.json")
+
+        # This should also be removed if it exists, but there is a grab only file dropped
+        badlinepath = os.path.join(session['submission_dir'], "bad_line_distances.json")
+
         if os.path.exists(trawlpath):
             os.remove(trawlpath)
         if os.path.exists(bad_trawl_bight_region_path):
             os.remove(bad_trawl_bight_region_path)
+        if os.path.exists(badlinepath):
+            os.remove(badlinepath)
+
+    
 
     # ------- END Trawl Checks ------- #
 
@@ -786,22 +832,36 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         coords['targetlongitude'] = coords['targetlongitude'].apply(lambda x: float(x))
         grab['grabdistancetonominaltarget']=haversine_np(coords['glon'],coords['glat'],coords['targetlongitude'],coords['targetlatitude'])
         grab['grabdistancetonominaltarget'] = grab['grabdistancetonominaltarget'].replace(np.nan,-88)
-        print(grab.loc[grab.grabdistancetonominaltarget > 100])
-        grab_args.update({
-            "badrows": grab[
-                    grab.merge(db, how = 'left', on = 'stationid').apply(
-                        lambda row:
-                        (row['grabdistancetonominaltarget'] > 200) if 'channel islands' in str(row['region']).strip().lower() else (row['grabdistancetonominaltarget'] > 100),
-                        axis = 1
-                    ) 
-                ] \
-                .tmp_row \
-                .tolist(),
-            "badcolumn": 'Latitude,Longitude',
-            "error_type": "Undefined Warning",
-            "error_message" : 'Grab Distance to Nominal Target > 100m (200m for channel islands)'
-        })
-        warnings = [*warnings, checkData(**grab_args)]
+        
+        badgrabs = grab[
+            grab.merge(db, how = 'left', on = 'stationid').apply(
+                lambda row:
+                (row['grabdistancetonominaltarget'] > 200) if 'channel islands' in str(row['region']).strip().lower() else (row['grabdistancetonominaltarget'] > 100),
+                axis = 1
+            ) 
+        ]
+
+        print("badgrabs")
+        print(badgrabs)
+        
+        if len(badgrabs) > 0:
+            # append to bad_point distances
+            bad_point_distances = pd.concat(
+                [
+                    bad_point_distances, 
+                    badgrabs[['stationid', 'grabdistancetonominaltarget']].assign(
+                        error_message = "Grab Distance to Nominal Target > 100m (200m for channel islands)",
+                        SHAPE = badgrabs.apply(lambda x: arcgisPoint({"x": x['longitude'], "y": x['latitude'], "spatialReference": {"wkid": 4326}}), axis=1)  
+                    ).rename(columns = {'grabdistancetonominaltarget':'distance_to_target'})
+                ]
+            )
+            grab_args.update({
+                "badrows":  badgrabs.tmp_row.tolist(),
+                "badcolumn": 'Latitude,Longitude',
+                "error_type": "Undefined Warning",
+                "error_message" : 'Grab Distance to Nominal Target > 100m (200m for channel islands)'
+            })
+            warnings = [*warnings, checkData(**grab_args)]
 
 
         # eric - check that Grab/Depth is more than 10% off of StationOccupation/Depth - warning only  - Will need to check database for StationOccupation whether user has provided or not. Same as trawl check.
@@ -974,10 +1034,39 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         # catch the case where the submission is only trawl - grab file should NOT be there...
         grabpath = os.path.join(session['submission_dir'], "bad_grab.json")
         bad_grab_region_path = os.path.join(session['submission_dir'], "bad_grab_bight_regions.json")
+
+        # this should also be removed if it exists, but it is a trawl only submission
+        badpointpath = os.path.join(session['submission_dir'], "bad_point_distances.json")
+
         if os.path.exists(grabpath):
             os.remove(grabpath)
         if os.path.exists(bad_grab_region_path):
             os.remove(bad_grab_region_path)
+        if os.path.exists(badpointpath):
+            os.remove(badpointpath)
+
+
+    # export bad line distances geojson
+    # Also export the geojson to report the polyline being too far from the target
+    badlinepath = os.path.join(session['submission_dir'], "bad_line_distances.json")
+    if len(bad_line_distances) > 0:
+        export_sdf_to_json(
+            badlinepath, bad_line_distances
+        )
+    else:
+        if os.path.exists(badlinepath):
+            os.remove(badlinepath)
+    
+    # export bad point distances geojson
+    badpointpath = os.path.join(session['submission_dir'], "bad_point_distances.json")
+    if len(bad_point_distances) > 0:
+        export_sdf_to_json(
+            badpointpath, bad_point_distances
+        )
+    else:
+        if os.path.exists(badpointpath):
+            os.remove(badpointpath)
+
 
     # export geojson with target latlongs
     targets = occupation[['stationid']].merge(field_assignment_table[['stationid','latitude','longitude']], on = 'stationid', how = 'inner') \

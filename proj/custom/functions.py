@@ -352,78 +352,80 @@ def export_sdf_to_json(path, sdf):
     print(path)
     print('sdf')
     print(sdf)
-    if "paths" in sdf['SHAPE'].iloc[0].keys():
-        # data = [
-        #     {
-        #         "type":"polyline",
-        #         "paths" : item.get('paths')[0]
-        #     }
-        #     for item in sdf['SHAPE']
-        # ]
-        data = [
-            {
-                "type" : "Feature",
-                "geometry" : {
-                    "type":"polyline",
-                    "paths" : row.SHAPE.get('paths')
-                },
-                "properties" : {
-                    k:str(v) for k,v in row.items() if k not in ('strata_polygon', 'SHAPE')
+    if not sdf.empty:
+        if "paths" in sdf['SHAPE'].iloc[0].keys():
+            # data = [
+            #     {
+            #         "type":"polyline",
+            #         "paths" : item.get('paths')[0]
+            #     }
+            #     for item in sdf['SHAPE']
+            # ]
+            data = [
+                {
+                    "type" : "Feature",
+                    "geometry" : {
+                        "type":"polyline",
+                        "paths" : row.SHAPE.get('paths')
+                    },
+                    "properties" : {
+                        k:str(v) for k,v in row.items() if k not in ('strata_polygon', 'SHAPE')
+                    }
                 }
-            }
 
-            for _, row in sdf.iterrows()
-        ]        
-    elif "rings" in sdf['SHAPE'].iloc[0].keys():
+                for _, row in sdf.iterrows()
+            ]        
+        elif "rings" in sdf['SHAPE'].iloc[0].keys():
 
-        # data = [
-        #     {
-        #         "type":"polygon",
-        #         "rings" : item.get('rings')[0]
-        #     }
-        #     for item in sdf['SHAPE']
-        # ]        
-        data = [
-            {
-                "type" : "Feature",
-                "geometry" : {
-                    "type":"polygon",
-                    "rings" : row.SHAPE.get('rings')
-                },
-                "properties" : {
-                    k:str(v) for k,v in row.items() if k not in ('strata_polygon', 'SHAPE')
+            # data = [
+            #     {
+            #         "type":"polygon",
+            #         "rings" : item.get('rings')[0]
+            #     }
+            #     for item in sdf['SHAPE']
+            # ]        
+            data = [
+                {
+                    "type" : "Feature",
+                    "geometry" : {
+                        "type":"polygon",
+                        "rings" : row.SHAPE.get('rings')
+                    },
+                    "properties" : {
+                        k:str(v) for k,v in row.items() if k not in ('strata_polygon', 'SHAPE')
+                    }
                 }
-            }
 
-            for _, row in sdf.iterrows()
-        ]        
+                for _, row in sdf.iterrows()
+            ]        
+        else:
+            # data = [
+            #     {
+            #         "type":"point",
+            #         "longitude": item["x"],
+            #         "latitude": item["y"]
+            #     }
+            #     for item in sdf.get("SHAPE").tolist()
+            # ]
+            data = [
+                {
+                    "type" : "Feature",
+                    "geometry" : {
+                        "type":"point",
+                        "longitude": row.SHAPE.get("x"),
+                        "latitude": row.SHAPE.get("y")
+                    },
+                    "properties" : {
+                        k:str(v) for k,v in row.items() if k not in ('strata_polygon', 'SHAPE')
+                    }
+                }
+
+                for _, row in sdf.iterrows()
+            ]        
     else:
-        # data = [
-        #     {
-        #         "type":"point",
-        #         "longitude": item["x"],
-        #         "latitude": item["y"]
-        #     }
-        #     for item in sdf.get("SHAPE").tolist()
-        # ]
-        data = [
-            {
-                "type" : "Feature",
-                "geometry" : {
-                    "type":"point",
-                    "longitude": row.SHAPE.get("x"),
-                    "latitude": row.SHAPE.get("y")
-                },
-                "properties" : {
-                    k:str(v) for k,v in row.items() if k not in ('strata_polygon', 'SHAPE')
-                }
-            }
-
-            for _, row in sdf.iterrows()
-        ]        
-    
+        data = []    
     with open(path, "w", encoding="utf-8") as geojson_file:
-       json.dump(data, geojson_file)
+        json.dump(data, geojson_file)
 
 # For benthic, we probably have to tack on a column that just contains values that say "Infauna" and then use that as the parameter column
 # For chemistry, we have to tack on the analyteclass column from lu_analytes and then use that as the parameter column

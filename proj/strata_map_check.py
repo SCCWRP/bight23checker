@@ -26,12 +26,18 @@ def send_geojson():
 
     arcgis_api_key = os.environ.get('ARCGIS_API_KEY')
     
+
     path_to_grab_json = os.path.join(os.getcwd(), "files", str(session.get('submissionid')), "bad_grab.json")
     path_to_trawl_json = os.path.join(os.getcwd(), "files", str(session.get('submissionid')), "bad_trawl.json")
     path_to_trawl_strata_json = os.path.join(os.getcwd(), "files", str(session.get('submissionid')), "bad_trawl_bight_regions.json")
     path_to_grab_strata_json = os.path.join(os.getcwd(), "files", str(session.get('submissionid')), "bad_grab_bight_regions.json")
     path_to_target_json = os.path.join(os.getcwd(), "files", str(session.get('submissionid')), "target_stations.json")
     
+    path_to_bad_point_distance = os.path.join(os.getcwd(), "files", str(session.get('submissionid')), "bad_point_distances.json")
+    path_to_bad_line_distance = os.path.join(os.getcwd(), "files", str(session.get('submissionid')), "bad_line_distances.json")
+    
+
+
     if os.path.exists(path_to_grab_json):
         with open(path_to_grab_json, 'r') as f:
             points = json.load(f)
@@ -62,5 +68,30 @@ def send_geojson():
             targets = json.load(f)
     else:
         targets = "None"
+    
+    
+    if os.path.exists(path_to_bad_point_distance):
+        with open(path_to_bad_point_distance, 'r') as f:
+            bad_distance_points = json.load(f)
+    else:
+        bad_distance_points = "None"
+    
+    if os.path.exists(path_to_bad_line_distance):
+        with open(path_to_bad_line_distance, 'r') as f:
+            bad_distance_polylines = json.load(f)
+    else:
+        bad_distance_polylines = "None"
 
-    return jsonify(targets = targets, points=points, polylines=polylines, trawl_polygons=trawl_polygons, grab_polygons=grab_polygons, arcgis_api_key=arcgis_api_key, strata_layer_id = os.environ.get('BIGHT18_STRATA_LAYER_ID'))
+
+
+    return jsonify(
+        targets = targets, 
+        points=points, 
+        polylines=polylines, 
+        trawl_polygons=trawl_polygons, 
+        grab_polygons=grab_polygons, 
+        arcgis_api_key=arcgis_api_key, 
+        bad_distance_points = bad_distance_points,
+        bad_distance_polylines = bad_distance_polylines,
+        strata_layer_id = os.environ.get('BIGHT18_STRATA_LAYER_ID')
+    )
