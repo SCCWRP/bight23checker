@@ -1035,15 +1035,11 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         grabpath = os.path.join(session['submission_dir'], "bad_grab.json")
         bad_grab_region_path = os.path.join(session['submission_dir'], "bad_grab_bight_regions.json")
 
-        # this should also be removed if it exists, but it is a trawl only submission
-        badpointpath = os.path.join(session['submission_dir'], "bad_point_distances.json")
-
         if os.path.exists(grabpath):
             os.remove(grabpath)
         if os.path.exists(bad_grab_region_path):
             os.remove(bad_grab_region_path)
-        if os.path.exists(badpointpath):
-            os.remove(badpointpath)
+
 
 
     # export bad line distances geojson
@@ -1057,6 +1053,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
         if os.path.exists(badlinepath):
             os.remove(badlinepath)
     
+    # Somehow we need to distinguish bad grabs from bad occupations.... i didnt think of that....
     # export bad point distances geojson
     badpointpath = os.path.join(session['submission_dir'], "bad_point_distances.json")
     if len(bad_point_distances) > 0:

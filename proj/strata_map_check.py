@@ -13,8 +13,17 @@ def getmap():
 
     grab_json_path = os.path.join(os.getcwd(), "files", str(submissionid), "bad_grab.json")
     trawl_json_path = os.path.join(os.getcwd(), "files", str(submissionid), "bad_trawl.json")
+    bad_line_distance_path = os.path.join(os.getcwd(), "files", str(submissionid), "bad_line_distances.json")
+    bad_point_distance_path = os.path.join(os.getcwd(), "files", str(submissionid), "bad_point_distances.json")
 
-    if any([os.path.exists(grab_json_path), os.path.exists(trawl_json_path)]):
+    if any(
+        [
+            os.path.exists(grab_json_path), 
+            os.path.exists(trawl_json_path), 
+            os.path.exists(bad_line_distance_path), 
+            os.path.exists(bad_point_distance_path), 
+        ]
+    ):
         return render_template(f'map_template.html', submissionid=session['submissionid'])
     else:
         return "Map not generated because there are no spatial errors. Ignore this tab"
