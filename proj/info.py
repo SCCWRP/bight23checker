@@ -17,15 +17,17 @@ url = os.environ.get("SHAREPOINT_SITE_URL")
 teamname = 'Bight2023IM'
 instructions_filename = os.environ.get('INSTRUCTIONS_FILENAME')
 
-authcookie = Office365(url, username=teams_username, password=teams_password).GetCookies()
-site = Site(os.path.join(url, 'sites', teamname), version=Version.v2016, authcookie=authcookie)
 
-folder = site.Folder(sitefolder)
 
 # attnpts = attention points
 @info.route('/info', strict_slashes = False)
 def attnpts():
     datatype = request.args.get('dtype')
+
+    # Get new authcookie upon request
+    authcookie = Office365(url, username=teams_username, password=teams_password).GetCookies()
+    site = Site(os.path.join(url, 'sites', teamname), version=Version.v2016, authcookie=authcookie)
+    folder = site.Folder(sitefolder)
         
     comments_ = folder.get_file(instructions_filename)
     commentbytes = BytesIO(comments_)

@@ -363,8 +363,10 @@ def template():
                 dv.add(cell)
                 print("data validation description added to cell")
 
+   
+        
     wb.save(excel_file)
-    wb.close()
+    # wb.close()
     ############################################################################################################################
     ############################################################################################################################
     return send_file(f"{os.getcwd()}/export/data_templates/{file_prefix}-TEMPLATE.xlsx", as_attachment=True, download_name=f'{file_prefix}-TEMPLATE.xlsx')
