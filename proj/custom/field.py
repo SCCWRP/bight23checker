@@ -509,7 +509,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             "badrows": badrows,
             "badcolumn": 'stationid',
             "error_type": "Lookup Error",
-            "error_message" : f'These stations do not have geometry field assignment table, contact b23-im@sccwrp.org for assistance'
+            "error_message" : f'These stations do not have geometry in the field assignment table, contact b23-im@sccwrp.org for assistance'
         })
         errs = [*errs, checkData(**occupation_args)]
         HAS_REGION_GEOMETRY = False

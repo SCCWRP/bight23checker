@@ -306,6 +306,10 @@ def toxicity(all_dfs):
         })
         errs = [*errs, checkData(**toxbatch_args)] 
 
+
+    #######################################################################
+    # ------------ Check for previously submitted field data ------------ #
+    #######################################################################
     print("# Eric - A toxicity submission (batch, results, wq) requires that the field data be submitted first. ")
     print("# To check all unique Result/StationID records should have a corresponding record in Field/Grab/StationID (make sure it wasn't abandoned also). This should be an error.")
     
@@ -323,7 +327,22 @@ def toxicity(all_dfs):
         "error_type": "Undefined Error",
         "error_message": "A toxicity submission requires that the field data be submitted first. Your station does not match the grab event table."
     })
-    errs = [*errs, checkData(**toxresults_args)] 
+
+    
+    # Changed to a warning on 10/10/2023 per Darrin's request
+    # Submitted data will have field info missing from the tox summary
+    # We will delete those submissions, make this an error again, and have them resubmit
+    
+    # errs = [*errs, checkData(**toxresults_args)]
+    warnings = [*warnings, checkData(**toxresults_args)] 
+
+    ###########################################################################
+    # ------------ END Check for previously submitted field data ------------ #
+    ###########################################################################
+
+
+
+
 
     # 4. LABREP IN RESULTS TAB NEEDS TO BE CONTIGUOUS.
     # MIGHT NEED TO ADD FIELDREPLICATE TO GROUP RESULTS
@@ -1116,6 +1135,7 @@ def toxicity(all_dfs):
 
         # Drop the columns that are in the dataframe, but not in the database table
         #toxsummary.drop(list(set(toxsummary.columns) - set(analysis_table_cols)), axis = 1, inplace = True)
+
 
         fielddata = pd.read_sql(
             """
