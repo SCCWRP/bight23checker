@@ -473,7 +473,14 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
 
     # Check if stationids are in field_assignment_table
     merged = pd.merge(
-        occupation, 
+        pd.concat( 
+            [
+                occupation[['stationid']], 
+                trawl[['stationid']] if trawl is not None else pd.DataFrame(), 
+                grab[['stationid']] if grab is not None else pd.DataFrame()
+            ] , 
+            ignore_index = True
+        ),
         field_assignment_table.filter(items=['stationid','stratum','region']).drop_duplicates(), 
         how='left', 
         on=['stationid'],
@@ -490,6 +497,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             "error_message" : f'These stations are not in the field assignment table, contact b23-im@sccwrp.org for assistance'
         })
         errs = [*errs, checkData(**occupation_args)]
+        HAS_REGION_GEOMETRY = False
     else:
         HAS_REGION_GEOMETRY = True
 
@@ -501,6 +509,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             "error_message" : f'These stations do not have geometry field assignment table, contact b23-im@sccwrp.org for assistance'
         })
         errs = [*errs, checkData(**occupation_args)]
+        HAS_REGION_GEOMETRY = False
     else:
         HAS_REGION_GEOMETRY = True
 
