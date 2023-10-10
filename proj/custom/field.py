@@ -403,6 +403,9 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
             ]
         )
 
+        bad_point_distances.distance_to_target = bad_point_distances.distance_to_target.apply(
+            lambda x: np.round(x, 2)
+        )
 
         occupation_args.update({
             "badrows":  bad_sofat_dists_df.tmp_row.tolist(),
@@ -681,6 +684,10 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
                 ]
             )
 
+            bad_line_distances.distance_to_target = bad_line_distances.distance_to_target.apply(
+                lambda x: np.round(x, 2)
+            )
+
         # get the bad rows
         checkdf = checkdf.groupby(['region','max_allowable_distance']).agg({
             'tmp_row':list
@@ -864,6 +871,11 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
                     ).rename(columns = {'grabdistancetonominaltarget':'distance_to_target'})
                 ]
             )
+
+            bad_point_distances.distance_to_target = bad_point_distances.distance_to_target.apply(
+                lambda x: np.round(x, 2)
+            )
+
             grab_args.update({
                 "badrows":  badgrabs.tmp_row.tolist(),
                 "badcolumn": 'Latitude,Longitude',
