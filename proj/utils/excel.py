@@ -77,6 +77,7 @@ def mark_workbook(all_dfs, excel_path, errs, warnings):
             colindex = coord.get('column_index')
             wb[sheet][f"{chr(65 +  (floor(colindex/26) - 1)  ) if colindex >= 26 else ''}{chr(65 + (colindex % 26))}{int(coord.get('row_index'))}"].fill = yellowFill 
             wb[sheet][f"{chr(65 +  (floor(colindex/26) - 1)  ) if colindex >= 26 else ''}{chr(65 + (colindex % 26))}{int(coord.get('row_index'))}"].comment = Comment(coord.get('message'), "Checker")
+        
         for coord in errs_cells.get(sheet) if errs_cells.get(sheet) is not None else []:
             
             # the workbook sheet or whatever its called accesses the cells of the excel file not with the numeric indexing like pandas but rather that letter indexing thing
