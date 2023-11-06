@@ -349,8 +349,7 @@ def main():
             # print(e)
             raise Exception(e)
         
-        print("custom_output: ")
-        print(custom_output)
+
         #example
         #map_output = current_app.datasets.get(match_dataset).get('map_function')(all_dfs)
 

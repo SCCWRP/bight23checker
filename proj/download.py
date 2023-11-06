@@ -35,7 +35,7 @@ def template_file():
         # add another folder within /export folder for returning data to user (either in browser or via excel file)
         # probably better to not store all these queries in an excel file for storage purposes - use timestamp if this is an issue
         # name after agency and table for now
-        export_name = f'{agencycode}-export.xlsx'
+        export_name = f"""{str(agencycode).replace('/','-')}-export.xlsx"""
         export_file = os.path.join(os.getcwd(), "export", "data_query", export_name)
         export_writer = pd.ExcelWriter(export_file, engine='xlsxwriter')
         
@@ -107,8 +107,6 @@ def template_file():
                                 WHERE samplingorganization = '{agency}';
                             """, eng)
         print("working checkpoint")
-        print("occupation_df: ")
-        print(occupation_df)
 
         # call to database to get trawl data
         trawl_df = pd.read_sql(f""" SELECT 
@@ -146,9 +144,7 @@ def template_file():
                                     WHERE
                                         trawlsamplingorganization = '{agency}';
                                 """, eng)
-        print("trawl_df:")
-        print(trawl_df)
-        print(type(trawl_df))
+        # print("trawl_df")
 
         # call to database to get grab data
         grab_df = pd.read_sql(f"""SELECT
@@ -184,18 +180,18 @@ def template_file():
                                 FROM mobile_grab
                                 WHERE grabsamplingorganization = '{agency}';
                                 """, eng)
-        print("grab_df: ")
-        print(grab_df)
-        print(type(grab_df))
-
-    
-    with export_writer:
-        occupation_df.to_excel(export_writer, sheet_name = "occupation", index = False)
-        trawl_df.to_excel(export_writer, sheet_name = "trawl", index = False)
-        grab_df.to_excel(export_writer, sheet_name = "grab", index = False)
     
 
-    return render_template('export.html', export_name=export_name, agency=agency)
+    
+        with export_writer:
+            occupation_df.to_excel(export_writer, sheet_name = "occupation", index = False)
+            trawl_df.to_excel(export_writer, sheet_name = "trawl", index = False)
+            grab_df.to_excel(export_writer, sheet_name = "grab", index = False)
+        
+
+        return render_template('export.html', export_name=export_name, agency=agency)
+    
+    return "No agency provided"
 
 
 # idea is to serve export.html above, then have this route serve the exported file

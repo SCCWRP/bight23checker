@@ -26,13 +26,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     print("current_function_name")
     print(current_function_name)
 
-    print("occupation")
-    print(occupation)
-    print("grab")
-    print(grab)
-    print("trawl")
-    print(trawl)
-    
+
     # define errors and warnings list
     # These will be returned from the function at the end
     errs = []
@@ -355,7 +349,6 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
 
     # Raises Error for Unmatched StationIDs & Distances More than 100M from FAT Target
     print("Raises error for unmatched stationids & distances more than 100m from fat target:")
-    print(sofat[sofat['targetlatitude'].isnull()])
     occupation_args.update({
         "badrows": sofat[sofat['targetlatitude'].isnull()].tmp_row.tolist(),
         "badcolumn": 'StationID',
@@ -379,10 +372,9 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     # plus this check is just a warning
     sofat['dists'] = haversine_np(sofat['occupationlongitude'],sofat['occupationlatitude'],sofat['targetlongitude'],sofat['targetlatitude'])
 
-    print(sofat['dists'])
     # Raises Warning for Distances calculated above > 100M
-    print("Raises warning for distances calculated above > 100m:")
-    print(sofat[sofat['dists'] > 100])
+    print("Raises warning for distances calculated above > 100m")
+
 
     bad_sofat_dists_df = sofat[
         sofat.apply(
@@ -424,9 +416,7 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     lu_sf1.columns = results.keys()
     lu_sf1.columns = [x.lower() for x in lu_sf1.columns]
     lu_sf1=lu_sf1.stationfail[lu_sf1.stationfail.str.contains('None or No Failure|Temporary|Temporarily ', case=False, na=False)]
-    print("lu_sf1")
-    print(lu_sf1)
-    print(occupation[(~occupation.stationfail.isin(lu_sf1.tolist())) & ~occupation['abandoned'].isin(['Yes', 'yes'])])
+    
     occupation_args.update({
         "badrows": occupation[(~occupation.stationfail.isin(lu_sf1.tolist())) & ~occupation['abandoned'].isin(['Yes', 'yes'])].tmp_row.tolist(),
         "badcolumn": 'StationFail',
@@ -438,7 +428,6 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
     #2nd case check If StationOccupation/Station Fail = "None or No Fail/Temporary" then Abandoned should be set to "No"
     #- Message should read "Abandoned should be set to "No" when Station Fail is None or No Failure or Temporary"
     print("If StationOccupation/Station Fail = None or No Fail/Temporary then Abandoned should be set to No")
-    print(occupation[(occupation.stationfail.isin(lu_sf1.tolist())) & occupation['abandoned'].isin(['Yes', 'yes'])])
     occupation_args.update({
         "badrows": occupation[(occupation.stationfail.isin(lu_sf1.tolist())) & occupation['abandoned'].isin(['Yes', 'yes'])].tmp_row.tolist(),
         "badcolumn": 'StationFail',
@@ -449,7 +438,6 @@ def fieldchecks(occupation, eng, trawl = None, grab = None):
 
     # StationOccupation check SalinityUnits must be either 'ppt' or 'psu'
     print("# StationOccupation check SalinityUnits must be either 'ppt' or 'psu'")
-    print(occupation[~occupation.salinityunits.isin(['ppt', 'psu'])])
     occupation_args.update({
         "badrows": occupation[~occupation.salinityunits.isin(['ppt', 'psu'])].tmp_row.tolist(),
         "badcolumn": 'SalinityUnits',
