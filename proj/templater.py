@@ -3,7 +3,7 @@
 #below is from microplastics
 #from flask import send_from_directory, render_template, request, redirect, Response, jsonify, send_file, json, current_app
 #below is from empa main.py
-from flask import request, current_app, Blueprint, g, send_file
+from flask import request, current_app, Blueprint, g, send_file, make_response, flash, render_template
 from sqlalchemy import Table, MetaData
 import pandas as pd
 from pandas import DataFrame
@@ -20,8 +20,17 @@ templater = Blueprint('templater', __name__)
 def template():
     system_fields = current_app.system_fields
     datatype = request.args.get("datatype")
+
     if datatype not in current_app.datasets.keys():
-        return f"{datatype} not found"
+        if datatype is not None:
+            flash(f"Datatype {datatype} not found")
+        return render_template(
+            "templates.jinja2",
+            datasets = current_app.datasets,
+            project_name = current_app.project_name,
+            background_image = current_app.config.get("BACKGROUND_IMAGE")
+        )
+    
     tbls = current_app.datasets.get(datatype)['tables']
     file_prefix = datatype.upper()
     database_name = str(g.eng).replace(")","").split("/")[-1]
@@ -369,8 +378,15 @@ def template():
     # wb.close()
     ############################################################################################################################
     ############################################################################################################################
-    return send_file(f"{os.getcwd()}/export/data_templates/{file_prefix}-TEMPLATE.xlsx", as_attachment=True, download_name=f'{file_prefix}-TEMPLATE.xlsx')
+    
+    # Make a response object to set a custom cookie
+    resp = make_response(send_file(f"{os.getcwd()}/export/data_templates/{file_prefix}-TEMPLATE.xlsx", as_attachment=True, download_name=f'{file_prefix}-TEMPLATE.xlsx'))
 
+    # Set a cookie to let browser know that the file has been sent
+    resp.set_cookie('template_file_sent', 'true', max_age=1)
 
+    print("End Templater")
+
+    return resp
 
 
