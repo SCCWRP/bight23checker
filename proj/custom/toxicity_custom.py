@@ -332,9 +332,9 @@ def toxicity(all_dfs):
     # Changed to a warning on 10/10/2023 per Darrin's request
     # Submitted data will have field info missing from the tox summary
     # We will delete those submissions, make this an error again, and have them resubmit
-    
-    # errs = [*errs, checkData(**toxresults_args)]
-    warnings = [*warnings, checkData(**toxresults_args)] 
+
+    # Changed back to an error on 12/5/2023 per Darrin's request - Most field data has been submitted by this point
+    errs = [*errs, checkData(**toxresults_args)]
 
     ###########################################################################
     # ------------ END Check for previously submitted field data ------------ #
