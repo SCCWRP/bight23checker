@@ -20,7 +20,7 @@
 <thead><tr><th>Email</th><th>Agency</th><th>Submission ID</th><th>Datatype</th><th>Submit</th><th>Created Date</th><th>Log File</th></tr></thead>
 <tbody>
 	{% for s in session_json %}
-		{% set submit_file = 'https://nexus.sccwrp.org/bight23checker/download/' + s.submissionid|string + '/' + s.original_filename %}
+		{% set submit_file = request.script_root + '/download/' + s.submissionid|string + '/' + s.original_filename %}
 		<tr>
 		<td>{{ s.login_email }}</td><td>{{ s.login_agency }}</td><td>{{ s.submissionid }}</td><td>{{ s.datatype }}</td><td>{{ s.submit }}</td><td>{{ s.created_date }}</td><td><a href="{{ submit_file }}"> {{ s.original_filename }} </a></td>
 		</tr>
