@@ -28,11 +28,6 @@ def report():
         
         # Write report_df to export folder so we can download it
         report_df_for_download = deepcopy(report_df)
-        
-        # Only do this since Darrin requested it
-        if datatype == 'field':
-            report_df_for_download = report_df_for_download[report_df_for_download['parameter'] == 'sediment']
-        
         report_df_for_download = report_df_for_download.assign(
             stations = report_df_for_download.stations.apply(lambda x: [x.strip() for x in x.split(",")])    
         )
