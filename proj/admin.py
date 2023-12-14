@@ -200,7 +200,10 @@ def savetabledescription():
         with connection.cursor() as cursor:
             command = sql.SQL(
                 """
-                UPDATE table_descriptions SET tabledescription = {tabledescription} WHERE tablename = {tablename};
+                INSERT INTO table_descriptions (tablename, tabledescription) 
+                    VALUES ({tablename}, {tabledescription}) 
+                    ON CONFLICT ON CONSTRAINT table_descriptions_pkey 
+                    DO UPDATE SET tabledescription = EXCLUDED.tabledescription;
                 """
             ).format(
                 tablename = sql.Literal(tablename),
