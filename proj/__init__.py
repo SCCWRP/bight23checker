@@ -103,6 +103,55 @@ app.global_login_form = CONFIG.get('GLOBAL_LOGIN_FORM') # may be a nonetype obje
 
 print("Be sure not to prefix the login fields with 'login' in the datasets.json config file")
 
+
+# Add system fields to system fields table
+try:
+    print("Create temporary db connection")
+    tmpeng = connect_db()
+    print("Done creating temporary db connection")
+
+    print("Creating system fields table")
+    tmpeng.execute(
+        """
+        CREATE TABLE IF NOT EXISTS "sde"."system_fields" (
+            "fieldname" varchar(255) COLLATE "pg_catalog"."default" NOT NULL PRIMARY KEY
+        );
+        """
+    )
+    print("Done creating system fields table")
+    system_fields_tuple_string = "('{}')" \
+        .format(
+            "'), ('".join([str(x).strip().replace(';','').replace("'","").replace('"','') for x in app.system_fields])
+        )
+    system_fields_delete_tuple_string = "('{}')" \
+        .format(
+            "', '".join([str(x).strip().replace(';','').replace("'","").replace('"','') for x in app.system_fields])
+        )
+
+    system_fields_command = f"""
+        INSERT INTO sde.system_fields (fieldname) VALUES {system_fields_tuple_string} 
+        ON CONFLICT ON CONSTRAINT system_fields_pkey DO NOTHING
+    """
+    print("Inserting system fields")
+    print(system_fields_command)
+    tmpeng.execute(system_fields_command)
+    print("DONE inserting system fields")
+
+    print("Remove fields that are no longer there")
+    tmpeng.execute(f"DELETE FROM system_fields WHERE fieldname NOT IN {system_fields_delete_tuple_string}")
+    print("Done removing fields that are no longer there")
+
+    print("Dispose temprary engine/connection")
+    tmpeng.dispose()
+    print("Done disposing temprary engine/connection")
+
+
+except Exception as e:
+    print("WARNING: Unable to create and insert system fields into the system fields table")
+    print("Here is the error message")
+    print(e)
+
+
 # This we can use for adding the login columns
 
 # It will be better in the future to simply store these in the environment separately
