@@ -312,7 +312,9 @@ def fish(all_dfs):
         "error_type": "Range Error",
         "error_message": f"The size class for these fish are above the maximum recorded. Please verify the species and size class are correct. Check <a href=/{current_app.script_root}/scraper?action=help&layer=lu_fishspeciesdepthrange target=_blank>lu_fishspeciesdepthrange</a> for more information."
     })
-    errs = [*errs, checkData(**trawlfishabundance_args)]
+    
+    # changed to a warning on Dec 15 2023 per request from Dario
+    warnings = [*warnings, checkData(**trawlfishabundance_args)]
 
     # ---------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
