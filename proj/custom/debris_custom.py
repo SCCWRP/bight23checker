@@ -168,8 +168,9 @@ def debris(all_dfs):
     startdate = datetime.datetime(2023,7,1) 
     enddate = datetime.datetime(2023,9,30)
     badrows = trawldebris[
-        (trawldebris.sampledate<startdate) | 
-        (trawldebris.sampledate>enddate)
+        # The sampledate should never be null - if it somehow magically slipped past core checks, it would flag as an error here
+        (trawldebris.sampledate.apply(lambda x: ( pd.Timestamp(x)  < startdate ) if pd.notnull(x) else True)) | 
+        (trawldebris.sampledate.apply(lambda x: ( pd.Timestamp(x)  > enddate ) if pd.notnull(x) else True))
     ].tmp_row.tolist()
     trawldebris_args = {
         "dataframe": trawldebris,
