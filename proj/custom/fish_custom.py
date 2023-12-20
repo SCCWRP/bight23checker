@@ -429,7 +429,7 @@ def fish(all_dfs):
         "error_type": "Undefined Error",
         "error_message": 'if using < qualifier, biomass value should be 0.01. Units are always kg.'
     })
-    errs = [*errs, checkData(**trawlfishbiomass_args)]
+    warnings = [*warnings, checkData(**trawlfishbiomass_args)]
 
     
     # 7b
