@@ -257,7 +257,12 @@ def fish(all_dfs):
     # User must not enter the anomaly "None" along with another anomaly
     # Logic of the code is, if the string "None" is in the anomaly column, then the value in that column needs to be equal to "None"
     # Otherwise it means they entered another value in addition to "None" and that is not allowed
-    badrows = trawlfishabundance[trawlfishabundance.anomaly.str.contains("none", case = False) & (trawlfishabundance.anomaly.str.lower() != 'none')].tmp_row.tolist()
+    # badrows = trawlfishabundance[trawlfishabundance.anomaly.str.contains("none", case = False) & (trawlfishabundance.anomaly.str.lower() != 'none')].tmp_row.tolist()
+    badrows = trawlfishabundance[
+        trawlfishabundance.anomaly.str.contains("none", case=False) & 
+        trawlfishabundance.anomaly.str.contains(",")
+    ].tmp_row.tolist()
+
     trawlfishabundance_args.update({
         "badrows": badrows,
         "badcolumn": "Anomaly",
