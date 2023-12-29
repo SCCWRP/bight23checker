@@ -250,11 +250,8 @@ def main():
             
             converters = fetch_meta(sheet, g.eng, return_converters = True)
             string_converters = converters.get("string_converters")
-            timestamp_converters = converters.get("timestamp_converters")
             
             assert string_converters is not None, f"String converters not returned for {sheet} in fetch_meta function"
-            assert timestamp_converters is not None, f"Timestamp converters not returned for {sheet} in fetch_meta function"
-
 
             # This should never raise an exception - at least converting the columns to str datatypes should never cause a problem
             tmpdf = pd.read_excel(
@@ -265,22 +262,6 @@ def main():
                 na_values = [''],
                 converters = string_converters
             )
-
-            # Converting to timestamps may cause a critical error if the user enters a non-valid timestamp literal
-            # for this reason, wrap in a try except block
-            # If the timestamp literal is not valid, Core checks should catch it and flag it.
-            try:
-                # Filter the timestamp_converters to include only keys that are columns in tmpdf
-
-                valid_timestamp_converters = {col: 'datetime64[ns]' for col in timestamp_converters.keys() if col in tmpdf.columns}
-
-                # Now use the filtered dictionary to safely convert types
-                tmpdf = tmpdf.astype(valid_timestamp_converters)
-
-            except ValueError as value_err:
-                print("Exception occurred trying to convert the timestamp datatype columns")
-                print(value_err)
-                print("This should be caught by Core Checks - if not, we have a bigger problem in Core Checks")
 
 
             all_dfs.update({
@@ -352,6 +333,25 @@ def main():
     # This makes the assumption that all values in that column are numeric, which is checked and enforced by Core Checks
 
     if errs == []: 
+
+        # convert timestamp columns to datetime64[ns] based on the database            
+        for tblname in all_dfs.keys():
+            
+            converters = fetch_meta(tblname, g.eng, return_converters = True)
+            timestamp_converters = converters.get("timestamp_converters")
+            
+            assert timestamp_converters is not None, f"Timestamp converters not returned for {tblname} in fetch_meta function"
+
+            # We actually do not want to catch the exception, but rather have the app crash so we can be notified
+            # That is better that bad data going in, or a critical upon final submit.
+            # Filter the timestamp_converters to include only keys that are columns in tmpdf
+            valid_timestamp_converters = {col: 'datetime64[ns]' for col in timestamp_converters.keys() if col in all_dfs[tblname].columns}
+
+            # Now use the filtered dictionary to safely convert types
+            all_dfs[tblname] = all_dfs[tblname].astype(valid_timestamp_converters)
+
+
+
         print("Custom Checks")
         print(f"Datatype: {match_dataset}")
         print(f"{match_dataset} function:")
