@@ -2,6 +2,7 @@ from flask import Blueprint, current_app, session, jsonify, g
 from .utils.db import GeoDBDataFrame, next_objectid, registration_id
 from .utils.mail import data_receipt
 from .utils.exceptions import default_exception_handler
+from .core.functions import fetch_meta
 
 import subprocess as sp
 
@@ -32,29 +33,39 @@ def load():
 
     eng = g.eng
     
-    converters = current_app.config.get('DTYPE_CONVERTERS')
-    converters = {k: eval(v) for k,v in converters.items()} if converters is not None else None
+    all_dfs = dict()
 
-    all_dfs = {
+    for sheet in pd.ExcelFile(excel_path).sheet_names:
+        if ((sheet not in current_app.tabs_to_ignore) and (not sheet.startswith('lu_'))):
+            
+            converters = fetch_meta(sheet, g.eng, return_converters = True)
+            string_converters = converters.get("string_converters")
+            timestamp_converters = converters.get("timestamp_converters")
+            
+            assert string_converters is not None, f"String converters not returned for {sheet} in fetch_meta function"
+            assert timestamp_converters is not None, f"Timestamp converters not returned for {sheet} in fetch_meta function"
 
-        # Some projects may have descriptions in the first row, which are not the column headers
-        # This is the only reason why the skiprows argument is used.
-        # For projects that do not set up their data templates in this way, that arg should be removed
 
-        # Note also that only empty cells will be regarded as missing values
-        sheet: pd.read_excel(
-            excel_path, 
-            sheet_name = sheet, 
-            keep_default_na=False,
-            skiprows = current_app.excel_offset, 
-            na_values = [''], 
-            converters = converters
-        )
-        
-        for sheet in pd.ExcelFile(excel_path).sheet_names
-        
-        if ((sheet not in current_app.tabs_to_ignore) and (not sheet.startswith('lu_')))
-    }
+            # This should never raise an exception - at least converting the columns to str datatypes should never cause a problem
+            tmpdf = pd.read_excel(
+                excel_path, 
+                sheet_name = sheet,
+                keep_default_na=False,
+                skiprows = current_app.excel_offset,
+                na_values = [''],
+                converters = string_converters
+            )
+
+            # Converting to timestamps may cause a critical error if the user enters a non-valid timestamp literal
+            # We do not want to catch the exception here anymore, because if it fails to convert to timestamp, its not going to load to the database anyways
+            # This way we will be alerted with a hopefully cleaner error message than the one coming from sqlalchemy
+            valid_timestamp_converters = {col: 'datetime64[ns]' for col in timestamp_converters.keys() if col in tmpdf.columns}
+
+            # Now use the filtered dictionary to safely convert types
+            tmpdf = tmpdf.astype(valid_timestamp_converters)
+
+            all_dfs[sheet] = tmpdf
+
 
     valid_tables = pd.read_sql(
             # percent signs are escaped by doubling them, not with a backslash

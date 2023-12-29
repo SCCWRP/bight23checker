@@ -198,7 +198,7 @@ def check_length(x, maxlength):
 
 
 
-def fetch_meta(tablename, eng):
+def fetch_meta(tablename, eng, return_converters = False, string_converter_dict_name = "string_converters", timestamp_converter_dict_name = "timestamp_converters"):
 
     meta = pd.read_sql(
             f"""
@@ -230,6 +230,20 @@ def fetch_meta(tablename, eng):
             else float if x == 'numeric' 
             else None
         )  
+
+    assert isinstance(return_converters, bool), f"Value of return_converters arg is not a boolean. It is of type {type(return_converters)}. The value was: {return_converters}"
+    if return_converters:
+
+        # Converting numeric columns likely will not provide benefit - problematic columns are varchars and timestamps
+        # Lets make sure these are converted correctly
+        strings = meta[meta.udt_name == 'varchar']
+        dates = meta[meta.udt_name == 'timestamp']
+        
+        # convenient dictionaries
+        strings  = strings[['column_name','dtype']].set_index('column_name')['dtype'].to_dict()
+        dates    = dates[[ 'column_name', 'dtype']].set_index('column_name')['dtype'].to_dict()
+
+        return {string_converter_dict_name: strings, timestamp_converter_dict_name: dates}
 
     return meta
 
