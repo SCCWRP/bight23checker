@@ -600,15 +600,38 @@ def toxicity(all_dfs):
         # locate any records with a greater than 28 period
         print(df28.loc[df28['checkdate'].dt.days > 28])
 
+        # Jan 2, 2024
+        # Darrin said some samples (stations) had split samples (Not sure what that means) that would be tested after the 28 day holding time
+        # He said he didnt care about those meeting the 28 day requirement
+        # Stations which are excepted, and have QA sampletypecodes will not have this check applied to them
+        
+        # Basically we aren't going to flag them since we are expecting them to test within the normal holding time
+        #    and they werent assigned the sample anyways in the first place
+        
+        holding_time_exception_stations = ['B23-12060','B23-12065']
+        holding_time_error_rows = df28.loc[ (df28['checkdate'].dt.days > 28) & ((df28.sampletypecode != 'QA') | (~df28.stationid.isin(holding_time_exception_stations)) ) ].tmp_row.tolist()
+        holding_time_warning_rows = df28.loc[ (df28['checkdate'].dt.days > 28) & ((df28.sampletypecode == 'QA') & (df28.stationid.isin(holding_time_exception_stations)) ) ].tmp_row.tolist()
 
+        # Warn them if its a QA sampletypecode for one of the excepted stations
         toxresults_args.update({
-            "badrows": df28.loc[df28['checkdate'].dt.days > 28].tmp_row.tolist(),
+            "badrows": holding_time_warning_rows,
+            "badcolumn": "sampletypecode",
+            "error_type": "Undefined Warning",
+            "error_message": "Samples should be tested within a 28 day holding time."
+        })
+        warnings = [*warnings, checkData(**toxresults_args)] 
+        
+        # Prevent data submission if they do not meet the exception requirements
+        toxresults_args.update({
+            "badrows": holding_time_error_rows,
             "badcolumn": "sampletypecode",
             "error_type": "Undefined Error",
             "error_message": "Samples must be tested within a 28 day holding time."
         })
         errs = [*errs, checkData(**toxresults_args)] 
         
+
+
         toxresults_args.update({
             "badrows": df28.loc[df28['checkdate'].dt.days < 0].tmp_row.tolist(),
             "badcolumn": "sampletypecode",
