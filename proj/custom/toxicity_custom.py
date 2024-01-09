@@ -359,7 +359,8 @@ def toxicity(all_dfs):
         'concentrationunits',
         'endpoint',
         'sampletypecode',
-        'samplecollectdate'
+        'samplecollectdate',
+        'fieldreplicate'
     ]
     #dflabrep = toxresults.groupby(grouping_cols)
     #dflabrep = toxresults.groupby(grouping_cols)['labrep', 'tmp_row'].apply(lambda x: tuple([x.labrep.tolist(), x.tmp_row.tolist()]))
