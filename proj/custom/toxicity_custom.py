@@ -2,7 +2,7 @@
 
 from inspect import currentframe
 from flask import current_app, g, session
-from .functions import checkData, multivalue_lookup_check, sample_assignment_check
+from .functions import checkData, multivalue_lookup_check, sample_assignment_check, mismatch
 import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine
@@ -78,9 +78,11 @@ def toxicity(all_dfs):
     # EACH TAB MUST HAVE A CORRESPONDING RELATED RECORD IN ALL THE OTHER TABS - JOIN TABLES BASED ON TOXBATCH AND LAB
     
     # batch
+    # Get rows in Batch but not in Results
     # Relating on toxbatch, lab, matrix, and species ensures that they dont put the wrong species with a toxbatch identifier
     # This relationship between tables was verified by Darrin on 7/19/2023
-    badrows = toxbatch[~toxbatch[['toxbatch','lab','matrix','species']].isin(toxresults[['toxbatch','lab','matrix','species']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    # badrows = toxbatch[~toxbatch[['toxbatch','lab','matrix','species']].isin(toxresults[['toxbatch','lab','matrix','species']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    badrows = mismatch(toxbatch, toxresults, ['toxbatch','lab','matrix','species'])
     toxbatch_args.update({
         "badrows": badrows,
         "badcolumn": "toxbatch,lab",
@@ -90,8 +92,10 @@ def toxicity(all_dfs):
     errs = [*errs, checkData(**toxbatch_args)]
     
     # Batch and WQ are related based on toxbatch and lab
+    # Get rows in Batch but not in WQ
     # This relationship between tables was verified by Darrin on 7/19/2023
-    badrows = toxbatch[~toxbatch[['toxbatch','lab']].isin(toxwq[['toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    # badrows = toxbatch[~toxbatch[['toxbatch','lab']].isin(toxwq[['toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    badrows = mismatch(toxbatch, toxwq, ['toxbatch','lab'])
     toxbatch_args.update({
         "badrows": badrows,
         "badcolumn": "toxbatch,lab",
@@ -103,9 +107,11 @@ def toxicity(all_dfs):
     
     # result
     # Result and batch are related on toxbatch, lab, matrix and species
+    # Get rows in Results but not in Batch
     # Relating on toxbatch, lab, matrix, and species ensures that they dont put the wrong species with a toxbatch identifier
     # This relationship between tables was verified by Darrin on 7/19/2023
-    badrows = toxresults[~toxresults[['toxbatch','lab','matrix','species']].isin(toxbatch[['toxbatch','lab','matrix','species']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    # badrows = toxresults[~toxresults[['toxbatch','lab','matrix','species']].isin(toxbatch[['toxbatch','lab','matrix','species']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    badrows = mismatch(toxresults, toxbatch, ['toxbatch','lab','matrix','species'])
     toxresults_args.update({
         "badrows": badrows,
         "badcolumn": "toxbatch,lab,matrix,species",
@@ -115,8 +121,10 @@ def toxicity(all_dfs):
     errs = [*errs, checkData(**toxresults_args)]
 
     # Result and wq are related on stationid, toxbatch, lab
+    # Get rows in Results but not in WQ
     # This relationship between tables was verified by Darrin on 7/19/2023
-    badrows = toxresults[~toxresults[['stationid','toxbatch','lab']].isin(toxwq[['stationid','toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    # badrows = toxresults[~toxresults[['stationid','toxbatch','lab']].isin(toxwq[['stationid','toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    badrows = mismatch(toxresults, toxwq, ['stationid','toxbatch','lab'])
     toxresults_args.update({
         "badrows": badrows,
         "badcolumn": "stationid,toxbatch,lab",
@@ -127,8 +135,10 @@ def toxicity(all_dfs):
 
     # wq
     # Batch and WQ are related based on toxbatch and lab
+    # Get rows in WQ but not in Batch
     # This relationship between tables was verified by Darrin on 7/19/2023
-    badrows = toxwq[~toxwq[['toxbatch','lab']].isin(toxbatch[['toxbatch',    'lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    # badrows = toxwq[~toxwq[['toxbatch','lab']].isin(toxbatch[['toxbatch',    'lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    badrows = mismatch(toxwq, toxbatch, ['toxbatch','lab'])
     toxwq_args.update({
         "badrows": badrows,
         "badcolumn": "toxbatch,lab",
@@ -138,8 +148,10 @@ def toxicity(all_dfs):
     errs = [*errs, checkData(**toxwq_args)]
     
     # Result and wq are related on stationid, toxbatch, lab
+    # Get rows in WQ but not in Results
     # This relationship between tables was verified by Darrin on 7/19/2023
-    badrows = toxwq[~toxwq[['stationid','toxbatch','lab']].isin(toxresults[['stationid','toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    # badrows = toxwq[~toxwq[['stationid','toxbatch','lab']].isin(toxresults[['stationid','toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    badrows = mismatch(toxwq, toxresults, ['stationid','toxbatch','lab'])
     toxwq_args.update({
         "badrows": badrows,
         "badcolumn": "stationid,toxbatch,lab",
@@ -1163,7 +1175,7 @@ def toxicity(all_dfs):
 
         fielddata = pd.read_sql(
             """
-                SELECT 
+                SELECT DISTINCT
                     tbl_stationoccupation.stationid,
                     tbl_stationoccupation.occupationlatitude as latitude,
                     tbl_stationoccupation.occupationlongitude as longitude,tbl_stationoccupation.occupationdepth as stationwaterdepth,
@@ -1215,7 +1227,7 @@ def toxicity(all_dfs):
         #     print(toxsummary[c])
 
         ################################################
-        #WARNING: CHECK AND SEE IF DATAFRAME NAME AND TBLNAME IS CORRECT
+        # WARNING: CHECK AND SEE IF DATAFRAME NAME AND TBLNAME IS CORRECT
         ################################################
 
         
