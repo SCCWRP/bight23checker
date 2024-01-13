@@ -218,10 +218,11 @@ def toxicity(all_dfs):
     })
     errs = [*errs, checkData(**toxresults_args)] 
 
-    ## A MINIMUM NUMBER OF 10 REPLICATES ARE REQUIRED FOR SPECIES NEANTHES ARENACEODENTATA ##
-    print("## A MINIMUM NUMBER OF 10 REPLICATES ARE REQUIRED FOR SPECIES NEANTHES ARENACEODENTATA ##")
 
     # This was only used in Bight23 Toxicity intercalibration
+    ## A MINIMUM NUMBER OF 10 REPLICATES ARE REQUIRED FOR SPECIES NEANTHES ARENACEODENTATA ##
+    # print("## A MINIMUM NUMBER OF 10 REPLICATES ARE REQUIRED FOR SPECIES NEANTHES ARENACEODENTATA ##")
+    
     # badrows = dfrep[
     #     (dfrep['sampletypecode'].isin(['CNEG','CNSL','Grab'])) & 
     #     (dfrep['species'].isin(['Neanthes arenaceodentata'])) & 
@@ -411,14 +412,14 @@ def toxicity(all_dfs):
         ## BATCH CHECKS ##
         print("Starting Toxicity Batch Information Checks")
         # 1. EACH BATCH WITH A MATRIX OF BS MUST INCLUDE A CORRESPONDING RESULT CNEG SAMPLE
-        print("## EACH BATCH WITH A MATRIX OF BS MUST INCLUDE A CORRESPONDING RESULT CNEG SAMPLE ##")
+        print("## EACH BATCH WITH A MATRIX OF 'Whole Sediment' or 'Sediment Water Interface' MUST INCLUDE A CORRESPONDING RESULT CNEG SAMPLE ##")
         # first get unique cneg records from result dataframe
         bsresult = toxresults[['toxbatch','sampletypecode']].where(toxresults['sampletypecode'] == 'CNEG')
         bsresult = bsresult.dropna() 
         bsresult['unique'] = np.nan
         bsresult = bsresult.groupby(['toxbatch','sampletypecode'])['unique'].nunique().reset_index()
         # second get unique batch records with a matrix of bs
-        bsbatch = toxbatch[['toxbatch','matrix','tmp_row']].where(toxbatch['matrix'].isin(["Whole Sediment","BS"]))
+        bsbatch = toxbatch[['toxbatch','matrix','tmp_row']].where(toxbatch['matrix'].isin(["Whole Sediment", "Sediment Water Interface"]))
         bsbatch = bsbatch.dropna()
         bsbatch['unique'] = np.nan
         bsbatch = bsbatch.groupby(['toxbatch','matrix','tmp_row'])['unique'].nunique().reset_index()
@@ -432,7 +433,7 @@ def toxicity(all_dfs):
             "badrows": badrows,
             "badcolumn": "matrix",
             "error_type": "Logic Error",
-            "error_message": "Each batch with a matrix of Whole Sediment must include a corresponding toxresults CNEG sample."
+            "error_message": "Each batch with a matrix of 'Whole Sediment' or 'Sediment Water Interface' must include a corresponding toxresults CNEG sample."
         })
         errs = [*errs, checkData(**toxbatch_args)]  
 
