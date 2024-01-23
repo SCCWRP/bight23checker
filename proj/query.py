@@ -208,12 +208,21 @@ def qrydata():
     excel_blob = BytesIO()
     
     with pd.ExcelWriter(excel_blob) as writer:
-        alltables = [*datasets.get(dataset).get("tables", []), *datasets.get(dataset).get("analysis_tables", [])]
+        
+        alltables = [
+            *datasets.get(dataset).get("tables", []), 
+            *datasets.get(dataset).get("analysis_tables", []), 
+            *datasets.get(dataset).get("additional_tables", []) 
+        ]
+        
         for tbl in alltables:
             print(f"QUERYING DATA FOR {tbl}")
             tmpdf = pd.read_sql(f"SELECT * FROM {tbl};", g.eng)
             colorder = pd.read_sql(f"SELECT column_name FROM column_order WHERE table_name = '{tbl}' ORDER BY custom_column_position;", g.eng).column_name.tolist()
-            tmpdf = tmpdf[colorder]
+            
+            if len(colorder) > 0:
+                tmpdf = tmpdf[colorder]
+                
             tmpdf.to_excel(writer, sheet_name = tbl, index = False)
         
     excel_blob.seek(0)
