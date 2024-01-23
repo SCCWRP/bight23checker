@@ -96,7 +96,7 @@ def chemistry_intercal(all_dfs):
 
     # Check - Result column should be a positive number (except -88) for SampleType == 'Result' (Error)
     print("""# Check - Result column should be a positive number (except -88) for SampleType == 'Result' (Error)""")
-    badrows = results[(results.sampletype == 'Result') & (results.result != -88) & (results.result <= 0)].tmp_row.tolist()
+    badrows = results[(results.sampletype == 'Result') & (results.result.apply(lambda x: float(x)) != -88) & (results.result.apply(lambda x: float(x)) <= 0)].tmp_row.tolist()
     results_args.update({
         "badrows": badrows,
         "badcolumn": "Result",
@@ -108,7 +108,7 @@ def chemistry_intercal(all_dfs):
     # Check - The MDL should never be greater than the RL (Error)
     print('# Check - The MDL should never be greater than the RL (Error)')
     results_args.update({
-        "badrows": results[results.mdl > results.rl].tmp_row.tolist(),
+        "badrows": results[results.mdl.apply(lambda x: float(x)) > results.rl.apply(lambda x: float(x))].tmp_row.tolist(),
         "badcolumn": "MDL",
         "error_type": "Value Error",
         "error_message": "The MDL should never be greater than the RL"
@@ -118,7 +118,7 @@ def chemistry_intercal(all_dfs):
     # Check - The MDL should not be equal to the RL (Warning)
     print('# Check - The MDL should not be equal to the RL (Warning)')
     results_args.update({
-        "badrows": results[results.mdl == results.rl].tmp_row.tolist(),
+        "badrows": results[results.mdl.apply(lambda x: float(x)) == results.rl.apply(lambda x: float(x))].tmp_row.tolist(),
         "badcolumn": "MDL",
         "error_type": "Value Error",
         "error_message": "The MDL should not be equal the RL in most cases"
@@ -128,7 +128,7 @@ def chemistry_intercal(all_dfs):
     # Check - The MDL should never be a negative number (Error)
     print('# Check - The MDL should never be a negative number (Error)')
     results_args.update({
-        "badrows": results[(results.mdl < 0) & (results.mdl != -88)].tmp_row.tolist(),
+        "badrows": results[(results.mdl.apply(lambda x: float(x)) < 0) & (results.mdl.apply(lambda x: float(x)) != -88)].tmp_row.tolist(),
         "badcolumn": "MDL",
         "error_type": "Value Error",
         "error_message": "The MDL should not be negative (except for -88 to denote a missing value)"
@@ -151,7 +151,7 @@ def chemistry_intercal(all_dfs):
     print('# Check - if the qualifier is "estimated" or "below reporting level" then the result must be between the mdl and rl (inclusive) (Error)')
     results_args.update({
         "badrows": results[
-                (results.qualifier.isin(["estimated", "below reporting level"])) & ((results.result < results.mdl) | (results.result > results.rl))
+                (results.qualifier.isin(["estimated", "below reporting level"])) & ((results.result.apply(lambda x: float(x)) < results.mdl.apply(lambda x: float(x))) | (results.result.apply(lambda x: float(x)) > results.rl.apply(lambda x: float(x))))
             ].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
@@ -164,7 +164,7 @@ def chemistry_intercal(all_dfs):
     results_args.update({
         "badrows": results[
                 (results.qualifier.isin(["estimated", "below reporting level", "below method detection limit", "estimated"])) 
-                & (results.result > results.rl)
+                & (results.result.apply(lambda x: float(x)) > results.rl.apply(lambda x: float(x)))
             ].tmp_row.tolist(),
         "badcolumn": "Qualifier",
         "error_type": "Value Error",
@@ -175,7 +175,7 @@ def chemistry_intercal(all_dfs):
     # Check - if the qualifier is "none" then the result must be greater than the RL (Error)
     print('# Check - if the qualifier is "none" then the result must be greater than the RL (Error)')
     results_args.update({
-        "badrows": results[(results.qualifier == 'none') & (results.result < results.rl)].tmp_row.tolist(),
+        "badrows": results[(results.qualifier == 'none') & (results.result.apply(lambda x: float(x)) < results.rl.apply(lambda x: float(x)))].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
         "error_message": "if the qualifier is 'none' then the result must be greater than or equal to the RL (See the <a href=/bight23checker/scraper?action=help&layer=lu_chemqualifiercodes target=_blank>qualifier lookup list</a> for reference)"
@@ -218,7 +218,7 @@ def chemistry_intercal(all_dfs):
     print('# mb_mask = Method (Lab) blank mask')
     mb_mask = (results.sampletype == 'Lab blank') 
     results_args.update({
-        "badrows": results[mb_mask & ((results.result < results.mdl) & (results.result != -88))].tmp_row.tolist(),
+        "badrows": results[mb_mask & ((results.result.apply(lambda x: float(x)) < results.mdl.apply(lambda x: float(x))) & (results.result.apply(lambda x: float(x)) != -88))].tmp_row.tolist(),
         "badcolumn": "Result",
         "error_type": "Value Error",
         "error_message": "For Lab blank sampletypes, if Result is less than MDL, it must be -88"
@@ -228,7 +228,7 @@ def chemistry_intercal(all_dfs):
     # Check - If SampleType=Lab blank and Result=-88, then qualifier must be below MDL or none.
     print('# Check - If SampleType=Lab blank and Result=-88, then qualifier must be below MDL or none.')
     results_args.update({
-        "badrows": results[(mb_mask & (results.result == -88)) & (~results.qualifier.isin(['below method detection limit','none'])) ].tmp_row.tolist(),
+        "badrows": results[(mb_mask & (results.result.apply(lambda x: float(x)) == -88)) & (~results.qualifier.isin(['below method detection limit','none'])) ].tmp_row.tolist(),
         "badcolumn": "Qualifier",
         "error_type": "Value Error",
         "error_message": "If SampleType=Lab blank and Result=-88, then qualifier must be 'below method detection limit' or 'none'"
