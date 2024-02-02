@@ -66,15 +66,27 @@ def chemistry(all_dfs):
         "is_core_error": False,
         "error_message": ""
     }
+    
+    # Check to see if GrainSize was submitted along with Sediment Results
+    grain_analytes = pd.read_sql("SELECT analyte FROM lu_analytes WHERE analyteclass = 'GrainSize';", eng).analyte.tolist()
+    GRAIN_BOOL_SERIES = results.analytename.isin(grain_analytes)
+    
 
     # ----- LOGIC CHECKS ----- # 
     print('# ----- LOGIC CHECKS ----- # ')
 
-    # chem submission must have a corresponding grabevent record
+    # chem submission must have a corresponding grabevent record (Where sediment chemistry/grainsize was collected)
     print('# chem submission must have a corresponding grabevent record')
 
     matchcols = ['stationid','sampledate']
-    grabevent = pd.read_sql("SELECT stationid, sampledate FROM tbl_grabevent;", eng)
+    grabevent = pd.read_sql(
+        f"SELECT DISTINCT stationid, sampledate FROM tbl_grabevent WHERE UPPER({ 'grainsize' if all(GRAIN_BOOL_SERIES) else 'sedimentchemistry' }) = 'YES';", eng
+    )
+    
+    print("""results[results.stationid.str.lower() != '0000']""")
+    print(results[results.stationid.str.lower() != '0000'])
+    print("grabevent")
+    print(grabevent)
     
     results_args.update({
         "badrows": mismatch(results[results.stationid.str.lower() != '0000'], grabevent, matchcols),
@@ -113,18 +125,14 @@ def chemistry(all_dfs):
     errs.append(checkData(**results_args))
 
 
-    # Check to see if GrainSize was submitted along with Sediment Results
-    grain_analytes = pd.read_sql("SELECT analyte FROM lu_analytes WHERE analyteclass = 'GrainSize';", eng).analyte.tolist()
-    grain_bool = results.analytename.isin(grain_analytes)
-
     # if there is a mixture of analyteclasses (GrainSize and non-GrainSize) the data should be flagged
-    if not ((all(grain_bool)) or (all(~grain_bool))):
-        n_grain = sum(grain_bool)
-        n_nongrain = sum(~grain_bool)
+    if not ((all(GRAIN_BOOL_SERIES)) or (all(~GRAIN_BOOL_SERIES))):
+        n_grain = sum(GRAIN_BOOL_SERIES)
+        n_nongrain = sum(~GRAIN_BOOL_SERIES)
 
         # If there are less grainsize records, flag them as being the bad rows. Otherwise flag the non grainsize rows
         results_args.update({
-            "badrows": results[(grain_bool) if (n_grain < n_nongrain) else (~grain_bool)].tmp_row.tolist(),
+            "badrows": results[(GRAIN_BOOL_SERIES) if (n_grain < n_nongrain) else (~GRAIN_BOOL_SERIES)].tmp_row.tolist(),
             "badcolumn": "AnalyteName",
             "error_type": "Logic Error",
             "error_message": "You are attempting to submit grainsize analytes along with other sediment chemistry analytes. Sediment Chemistry Results must be submitted separately from Grainsize data"
@@ -219,7 +227,7 @@ def chemistry(all_dfs):
 
         
     # ----- CUSTOM CHECKS - GRAINSIZE RESULTS ----- #
-    if all(grain_bool):
+    if all(GRAIN_BOOL_SERIES):
         print('# ----- CUSTOM CHECKS - GRAINSIZE RESULTS ----- #')
         # Check - Units must be %
         results_args.update({
