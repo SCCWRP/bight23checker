@@ -58,8 +58,12 @@ def lookuplists():
                         if layer.endswith("sample_assignment") and (datatype is not None):
                             scrape_qry += f" WHERE UPPER(datatype) = '{str(datatype).upper()}'"
 
-                        if primary_key:
+                        elif primary_key:
                             scrape_qry += f" ORDER BY {primary_key[0]} ASC;"
+                            
+                        
+                        if layer.endswith("sample_assignment"):
+                            scrape_qry += f" ORDER BY stationid, datatype, parameter;"
                         
                         scraper_results = pd.read_sql(scrape_qry, eng)
                         
