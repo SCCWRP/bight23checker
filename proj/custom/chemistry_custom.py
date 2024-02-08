@@ -1019,9 +1019,8 @@ def chemistry(all_dfs):
 
 
     # If there are errors, dont waste time with the QA plan checks
-    # For testing, let us not enforce this, or we will waste a lot of time cleaning data
-    # if errs != []:
-    #     return {'errors': errs, 'warnings': warnings}
+    if errs != []:
+        return {'errors': errs, 'warnings': warnings}
 
 
 
