@@ -87,11 +87,13 @@ def main():
 
     # build all_dfs where we will store their data
     print("building 'all_dfs' dictionary")
+    print("getting ignored tabs")
     ignored_tabs = [
         *current_app.tabs_to_ignore, 
         *(current_app.config.get("EXCEL_TABS_CREATED_BY_CHECKER") if current_app.config.get("EXCEL_TABS_CREATED_BY_CHECKER") else []) 
     ]
-
+    
+    print("Done getting ignored tabs")
     # Old method of setting conversion in the config - plan is to deprecate this
     # conversion should not happen until after match_tables anyways
     # converters = current_app.config.get('DTYPE_CONVERTERS')

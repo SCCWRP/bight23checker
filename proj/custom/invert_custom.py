@@ -392,7 +392,7 @@ def invert(all_dfs):
     print("If it was submitted as 0 it should rather be submitted as <0.01kg")
     # If it was submitted as 0 it should rather be submitted as <0.01kg
     trawlinvertebratebiomass_args.update({
-        "badrows": trawlinvertebratebiomass[trawlinvertebratebiomass.biomass < 0.01].tmp_row.tolist(),
+        "badrows": trawlinvertebratebiomass[ (trawlinvertebratebiomass.biomass < 0.01) & (trawlinvertebratebiomass.biomass != -88) ].tmp_row.tolist(),
         "badcolumn": "Biomass",
         "error_type": "Value Error",
         "error_message": 'Any weight less than 0.01kg should be submitted as <0.01kg (0.01 in the biomass column, "<" in the biomassqualifier column)'
@@ -406,7 +406,8 @@ def invert(all_dfs):
     print(trawlinvertebratebiomass[(trawlinvertebratebiomass['biomass'] < .01)&~(trawlinvertebratebiomass['biomassqualifier'].isin(['<']))])
     
     badrows = trawlinvertebratebiomass[
-        (trawlinvertebratebiomass['biomass'] < .01) 
+        (trawlinvertebratebiomass['biomass'] < .01) &
+        (trawlinvertebratebiomass['biomass'] != -88)
     ].tmp_row.tolist()
     
     trawlinvertebratebiomass_args.update({
@@ -421,13 +422,13 @@ def invert(all_dfs):
     print('Biomass - Filter qualifiers to make sure that all < have corresponding values of 0.01')
     badrows = trawlinvertebratebiomass[
         (trawlinvertebratebiomass.biomassqualifier == '<') & 
-        (trawlinvertebratebiomass.biomass != 0.01)
+        (~trawlinvertebratebiomass.biomass.isin([0.01, 0.1]))
     ].tmp_row.tolist()
     trawlinvertebratebiomass_args.update({
         "badrows": badrows,
         "badcolumn": "biomass",
         "error_type": "Undefined Error",
-        "error_message": 'Less than qualifiers (<) must have corresponding biomass value of 0.01kg.'
+        "error_message": 'Less than qualifiers (<) must have corresponding biomass value of 0.01kg or 0.1kg.'
     })
     errs = [*errs, checkData(**trawlinvertebratebiomass_args)] 
 
