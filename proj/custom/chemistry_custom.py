@@ -229,6 +229,20 @@ def chemistry(all_dfs):
     # ----- CUSTOM CHECKS - GRAINSIZE RESULTS ----- #
     if all(GRAIN_BOOL_SERIES):
         print('# ----- CUSTOM CHECKS - GRAINSIZE RESULTS ----- #')
+        
+        # Check - Result column should be a positive number (except -88) for all SampleTypes (Error)
+        print("""# Check - Result column should be a positive number (except -88) for all SampleTypes (Error)""")
+        badrows = results[(results.result != -88) & (results.result <= 0)].tmp_row.tolist()
+        results_args.update({
+            "badrows": badrows,
+            "badcolumn": "Result",
+            "error_type": "Value Error",
+            "error_message": "The Result column should be a positive number (unless it is -88)"
+        })
+        errs.append(checkData(**results_args))
+        
+        
+        errs.append(checkData(**results_args))
         # Check - Units must be %
         results_args.update({
             "badrows": results[results.units != '%'].tmp_row.tolist(),
@@ -239,7 +253,7 @@ def chemistry(all_dfs):
         errs.append(checkData(**results_args))
         
         # Check - for each grouping of stationid, fieldduplicate, labreplicate, the sum of the results should be between 99.8 and 100.2
-        tmp = results.groupby(['stationid','fieldduplicate','labreplicate']).apply(lambda df: df.result.sum())
+        tmp = results.groupby(['stationid','fieldduplicate','labreplicate']).apply(lambda df: df.result.fillna(0).replace(-88, 0).sum())
         if tmp.empty:
             return {'errors': errs, 'warnings': warnings}
 
