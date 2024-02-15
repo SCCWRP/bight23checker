@@ -99,6 +99,7 @@ def convert_dtype(t, x):
 
 @lru_cache(maxsize=128, typed=True)
 def check_precision(x, precision):
+
     try:
         int(x)
     except Exception as e:
@@ -111,7 +112,16 @@ def check_precision(x, precision):
     if pd.isnull(precision):
         return True
 
+    try:
+        if not isinstance(x, (int, float)):
+            x = float(str(x))
+    except Exception as e:
+        # If an exception occurs here, their data must be really messed up and we'll have to trust that checkDataTypes will flag it
+        return True
+    
+
     x = abs(x)
+    
     if 0 < x < 1:
         # if x is a fraction, it doesnt matter. it should be able to go into a numeric field regardless
         return True
@@ -157,6 +167,14 @@ def check_scale(x, scale):
         return True
     if pd.isnull(scale):
         return True
+    
+    try:
+        if not isinstance(x, (int, float)):
+            x = float(str(x))
+    except Exception as e:
+        # If an exception occurs here, their data must be really messed up and we'll have to trust that checkDataTypes will flag it
+        return True
+    
     x = abs(x)
     if 'e-' in str(x):
         # The idea is if the number comes in in scientific notation

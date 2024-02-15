@@ -67,7 +67,7 @@ def checkPrecision(dataframe, tablename, eng, meta, *args, output = None, **kwar
             (col in meta[meta.udt_name == 'numeric'].column_name.values)
             and (col not in current_app.system_fields)
         ):
-
+            
             prec = int(
                 meta.iloc[
                     meta[
