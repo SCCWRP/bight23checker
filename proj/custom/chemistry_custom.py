@@ -622,7 +622,7 @@ def chemistry(all_dfs):
         "badrows": results[results.mdl > results.rl].tmp_row.tolist(),
         "badcolumn": "MDL",
         "error_type": "Value Error",
-        "error_message": "The MDL should never be greater than the RL"
+        "error_message": "The MDL should not be greater than the RL in most cases"
     })
     warnings.append(checkData(**results_args))
     
