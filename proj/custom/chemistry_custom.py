@@ -397,6 +397,19 @@ def chemistry(all_dfs):
         # I cannot think of a single case where results here would be empty, but i always put that
         
         checkdf = results[(results.matrix == 'sediment') & (results.stationid != '0000')]
+        checkdf = checkdf[['stationid','sampledate','analytename','lab','tmp_row']]
+        
+        # Looking to see if the lab has submitted moisture before for that stationcode/sampledate
+        # Let them off the hook if they submitted in a previous submission
+        dbmoisture = pd.read_sql(
+            "SELECT stationid, sampledate, analytename, lab, -99 AS tmp_row FROM tbl_chemresults WHERE analytename = 'Moisture' ", 
+            eng
+        )
+        checkdf = pd.concat(
+            [checkdf, dbmoisture[dbmoisture.lab.isin(checkdf.lab.unique())]], 
+            ignore_index = True
+        )
+        
         if not checkdf.empty:
             checkdf = checkdf.groupby(['stationid','sampledate']).agg({
                     # True if Moisture is in there, False otherwise
