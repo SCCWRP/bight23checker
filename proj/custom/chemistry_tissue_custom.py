@@ -188,16 +188,16 @@ def chemistry_tissue(all_dfs):
     # ----- CUSTOM CHECKS - TISSUE RESULTS ----- #
     print('# ----- CUSTOM CHECKS - TISSUE RESULTS ----- #')
 
-    # Check for duplicates on bioaccumulationsampleid, sampledate, analysisbatchid, sampletype, matrix, analytename, fieldduplicate, labreplicate, SAMPLEID
+    # Check for duplicates on bioaccumulationsampleid, sampledate, analysisbatchid, sampletype, matrix, analytename, labreplicate, SAMPLEID
     # Cant be done in Core since there is no sampleid column that we are having them submit, but rather it is a field we create internally based off the labsampleid column
-    dupcols = ['bioaccumulationsampleid', 'sampledate', 'analysisbatchid', 'sampletype', 'matrix', 'analytename', 'fieldduplicate', 'labreplicate', 'sampleid']
+    dupcols = ['bioaccumulationsampleid', 'sampledate', 'analysisbatchid', 'sampletype', 'matrix', 'analytename', 'labreplicate', 'sampleid']
     
     # Technically doing sort_values is unnecessary and irrelevant, 
     #   but if you were to test the code and examine, you would see that it would put the duplicated records next to each other
     #   duplicated() needs keep=False argument to flag all duplicated rows instead of marking last occurrence 
     results_args.update({
         "badrows": results.sort_values(dupcols)[results.duplicated(dupcols, keep=False)].tmp_row.tolist(),
-        "badcolumn" : 'BioaccumulationSampleID,SampleDate,AnalysisBatchID,SampleType,Matrix,AnalyteName,FieldDuplicate,LabReplicate,LabSampleID',
+        "badcolumn" : 'BioaccumulationSampleID,SampleDate,AnalysisBatchID,SampleType,Matrix,AnalyteName,LabReplicate,LabSampleID',
         "error_type": "Value Error",
         "error_message" : "These appear to be duplicated records that need to be distinguished with the labreplicate field (labrep 1, and labrep 2)"
     })
