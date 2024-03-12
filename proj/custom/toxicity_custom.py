@@ -696,6 +696,50 @@ def toxicity(all_dfs):
             "error_message": "Endpoint Percent Normal-alive is species specific to either Mytilus galloprovincialis or Strongylocentrotus purpuratus."
         })
         errs = [*errs, checkData(**toxresults_args)] 
+        
+        
+        # 6. WHEN SAMPLETYPE CODE IS 'CNEG' OR 'CNSL' RESULT SHOULD BE DIFFERENT FOR EACH TOXBATCH GROUP
+        print(" WHEN SAMPLETYPE CODE IS 'CNEG' OR 'CNSL' RESULT SHOULD BE DIFFERENT FOR EACH TOXBATCH GROUP ")
+        #filter sampletypecode and matrix
+        filtered_result = toxresults[toxresults['sampletypecode'].isin(['CNEG']) & ~toxresults['matrix'].isin(['Reference Toxicant'])]
+        filtered_batch =  toxbatch[~toxbatch['matrix'].isin(['Reference Toxicant'])]
+        #Merge the two dataframes on toxbatch and matrix to get specific columns from toxbatch
+        merged_df = pd.merge(filtered_result, filtered_batch[['toxbatch', 'teststartdate', 'matrix']], on=['matrix','toxbatch'], how='inner')
+        print(merged_df)
+        #group by 'toxbatch', 'stationid','teststartdate','lab','species' then make a list of all the 
+        # results in each group and another list for the origianl index
+        grouped = merged_df.groupby(['toxbatch', 'stationid','teststartdate','lab','species']).agg({
+            'result': pd.Series.tolist,
+            'tmp_row':pd.Series.tolist}).\
+                reset_index(). \
+                    sort_values('result')
+        print(grouped)
+        #change the result column to string so we can group the same ones togther later
+        grouped['result'] = grouped['result'].astype(str)
+        #find duplicated result lists
+        grouped = grouped[grouped['result'].duplicated(keep=False)]
+        #change result column to str so that we can group the indices together based on results   
+        grouped['result'] = grouped['result'].astype(str)
+        #perform a groupby on result and then make add the indices list together to become one list, and make a list of the toxbatches
+        duplicate_result_df = grouped[grouped['result'].duplicated(keep=False)]
+        print(duplicate_result_df)
+        badresults = duplicate_result_df.groupby(['teststartdate','species','result']).agg({
+            'tmp_row':pd.Series.sum,
+            'toxbatch':pd.Series.tolist}).\
+                reset_index()
+        print(f"badresults: {badresults}")
+        #looping through badresults to get the rows that have two or more toxbatches in the list indicating that they have duplicated results
+        for i,row in badresults.iterrows():
+            if len(row['toxbatch'])>1:
+                print(row['toxbatch'])
+                toxresults_args.update({
+                "badrows": row.tmp_row,
+                "badcolumn": "result,toxbatch",
+                "error_type": "Undefined Warning",
+                "error_message": f"The batches {', '.join(row.toxbatch)} have  the same result values."
+                })
+                errs = [*errs, checkData(**toxresults_args)]
+
         ## END RESULT CHECKS ##
 
         ## START WQ CHECKS ##
