@@ -2,7 +2,7 @@ from .chemistry_custom import chemistry
 from .chemistry_tissue_custom import chemistry_tissue
 from .chemistry_intercal_custom import chemistry_intercal
 from .toxicity_custom import toxicity
-from .infauna_initial_custom import infauna_initial
+from .infauna_custom import infauna
 from .infauna_reid_custom import infauna_reid
 from .infauna_final_custom import infauna_final
 from .field_trawl_custom import field_trawl

@@ -201,4 +201,15 @@ def data_query(export_name):
     return send_from_directory(os.path.join(os.getcwd(), "export", "data_query"), export_name, as_attachment=True)
 
 
+@download.route('/download')
+def download_excel():
 
+    datatype = request.args.get('datatype', 'default')  
+    valid_datatypes = ['field', 'chemistry', 'infauna', 'toxicity']
+    if datatype not in valid_datatypes:
+        return "Invalid data type", 400 
+    
+    filename = f"report-{datatype}.xlsx"
+    file_path = os.path.join(os.getcwd(),"export", filename)
+    
+    return send_file(file_path, as_attachment = True, download_name = filename)

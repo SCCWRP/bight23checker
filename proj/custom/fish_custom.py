@@ -257,7 +257,12 @@ def fish(all_dfs):
     # User must not enter the anomaly "None" along with another anomaly
     # Logic of the code is, if the string "None" is in the anomaly column, then the value in that column needs to be equal to "None"
     # Otherwise it means they entered another value in addition to "None" and that is not allowed
-    badrows = trawlfishabundance[trawlfishabundance.anomaly.str.contains("none", case = False) & (trawlfishabundance.anomaly.str.lower() != 'none')].tmp_row.tolist()
+    # badrows = trawlfishabundance[trawlfishabundance.anomaly.str.contains("none", case = False) & (trawlfishabundance.anomaly.str.lower() != 'none')].tmp_row.tolist()
+    badrows = trawlfishabundance[
+        trawlfishabundance.anomaly.str.contains("none", case=False) & 
+        trawlfishabundance.anomaly.str.contains(",")
+    ].tmp_row.tolist()
+
     trawlfishabundance_args.update({
         "badrows": badrows,
         "badcolumn": "Anomaly",
@@ -312,7 +317,9 @@ def fish(all_dfs):
         "error_type": "Range Error",
         "error_message": f"The size class for these fish are above the maximum recorded. Please verify the species and size class are correct. Check <a href=/{current_app.script_root}/scraper?action=help&layer=lu_fishspeciesdepthrange target=_blank>lu_fishspeciesdepthrange</a> for more information."
     })
-    errs = [*errs, checkData(**trawlfishabundance_args)]
+    
+    # changed to a warning on Dec 15 2023 per request from Dario
+    warnings = [*warnings, checkData(**trawlfishabundance_args)]
 
     # ---------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
@@ -396,36 +403,41 @@ def fish(all_dfs):
     print("If it was submitted as 0 it should rather be submitted as <0.01kg")
     # If it was submitted as 0 it should rather be submitted as <0.01kg
     trawlfishbiomass_args.update({
-        "badrows": trawlfishbiomass[trawlfishbiomass.biomass < 0.01].tmp_row.tolist(),
+        "badrows": trawlfishbiomass[ (trawlfishbiomass.biomass < 0.01) & (trawlfishbiomass.biomass != -88) ].tmp_row.tolist(),
         "badcolumn": "Biomass",
         "error_type": "Undefined Error",
         "error_message": 'Any weight less than 0.01kg should be submitted as <0.01kg (0.01 in the biomass column, "<" in the biomassqualifier column)'
     })
     errs = [*errs, checkData(**trawlfishbiomass_args)]
 
-    # 5b
-    print("Fish Custom Checks")
-    print("If biomass was measured with greater resolution than what is required in the IM plan ( only one decimal place is allowed), data should be rounded to the nearest 0.1")
-    # If biomass was measured with greater resolution than what is required in the IM plan ( only one decimal place is allowed), data should be rounded to the nearest 0.1
-    trawlfishbiomass['biomass'] = [round(trawlfishbiomass['biomass'][x], 2) for x in trawlfishbiomass.index]
-    trawlfishbiomass_args.update({
-        "badrows": trawlfishbiomass[(trawlfishbiomass['biomass'] < .01) & ~(trawlfishbiomass['biomassqualifier'].isin(['<']))].tmp_row.tolist(),
-        "badcolumn": "Biomass,BiomassQualifier",
-        "error_type": "Undefined Error",
-        "error_message": """Biomass values that were less than 0.01 kg (e.g. 0.004 kg) should have been submitted as <0.01 kg (.01 in biomass column, and 'less than' in the biomass qualifier column"""
-    })
-    errs = [*errs, checkData(**trawlfishbiomass_args)]
+
+    # NOTE 1/2/2024
+    # 5b commented out because it is redundant with 4b
+    # with new addition of allowing -88's, it is actually an incorrect check that will wrongly bar submissions
+    # # 5b
+    # print("Fish Custom Checks")
+    # print("If biomass was measured with greater resolution than what is required in the IM plan ( only one decimal place is allowed), data should be rounded to the nearest 0.01")
+    # # If biomass was measured with greater resolution than what is required in the IM plan ( only one decimal place is allowed), data should be rounded to the nearest 0.01
+    # trawlfishbiomass['biomass'] = [round(trawlfishbiomass['biomass'][x], 2) for x in trawlfishbiomass.index]
+    # trawlfishbiomass_args.update({
+    #     "badrows": trawlfishbiomass[(trawlfishbiomass['biomass'] < .01 ) & ~(trawlfishbiomass['biomassqualifier'].isin(['<']))].tmp_row.tolist(),
+    #     "badcolumn": "Biomass,BiomassQualifier",
+    #     "error_type": "Undefined Error",
+    #     "error_message": """Biomass values that were less than 0.01 kg (e.g. 0.004 kg) should have been submitted as <0.01 kg (.01 in biomass column, and 'less than' in the biomass qualifier column"""
+    # })
+    # errs = [*errs, checkData(**trawlfishbiomass_args)]
+
     
 
     # 6b
     print("Fish Custom Checks")
-    print("if using < qualifier, biomass value should be 0.01.")
-    # if using < qualifier, biomass value should be 0.01.
+    print("if using < qualifier, biomass value should be 0.01 or 0.1.")
+    # if using < qualifier, biomass value should be 0.01 or 0.1 .
     trawlfishbiomass_args.update({
-        "badrows": trawlfishbiomass[(trawlfishbiomass['biomassqualifier'].isin(['<']))&~(trawlfishbiomass['biomass'] == 0.01)].tmp_row.tolist(),
+        "badrows": trawlfishbiomass[(trawlfishbiomass['biomassqualifier'].isin(['<']))& ~(trawlfishbiomass['biomass'].isin([0.01, 0.1]) )].tmp_row.tolist(),
         "badcolumn": "Biomass,BiomassQualifier",
         "error_type": "Undefined Error",
-        "error_message": 'if using < qualifier, biomass value should be 0.01. Units are always kg.'
+        "error_message": 'if using < qualifier, biomass value should be 0.01 or 0.1. Units are always kg.'
     })
     errs = [*errs, checkData(**trawlfishbiomass_args)]
 
@@ -457,6 +469,18 @@ def fish(all_dfs):
     })
     errs = [*errs, checkData(**trawlfishbiomass_args)]
 
+
+    # 9b
+    print("Fish Custom Checks")
+    print("If biomass is -88, a comment is required")
+    # If biomass is -88, a comment is required
+    trawlfishbiomass_args.update({
+        "badrows": trawlfishbiomass[ (trawlfishbiomass.biomass == -88) & (trawlfishbiomass.comments.fillna('') == '') ].tmp_row.tolist(),
+        "badcolumn": "Biomass, Comments",
+        "error_type": "Undefined Error",
+        "error_message": 'If biomass is -88, a comment is required'
+    })
+    errs = [*errs, checkData(**trawlfishbiomass_args)]
 
     # End of fish checks
     print('End of fish checks')

@@ -2,7 +2,7 @@
 
 from inspect import currentframe
 from flask import current_app, g, session
-from .functions import checkData, multivalue_lookup_check, sample_assignment_check
+from .functions import checkData, multivalue_lookup_check, sample_assignment_check, mismatch
 import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine
@@ -78,9 +78,11 @@ def toxicity(all_dfs):
     # EACH TAB MUST HAVE A CORRESPONDING RELATED RECORD IN ALL THE OTHER TABS - JOIN TABLES BASED ON TOXBATCH AND LAB
     
     # batch
+    # Get rows in Batch but not in Results
     # Relating on toxbatch, lab, matrix, and species ensures that they dont put the wrong species with a toxbatch identifier
     # This relationship between tables was verified by Darrin on 7/19/2023
-    badrows = toxbatch[~toxbatch[['toxbatch','lab','matrix','species']].isin(toxresults[['toxbatch','lab','matrix','species']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    # badrows = toxbatch[~toxbatch[['toxbatch','lab','matrix','species']].isin(toxresults[['toxbatch','lab','matrix','species']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    badrows = mismatch(toxbatch, toxresults, ['toxbatch','lab','matrix','species'])
     toxbatch_args.update({
         "badrows": badrows,
         "badcolumn": "toxbatch,lab",
@@ -90,8 +92,10 @@ def toxicity(all_dfs):
     errs = [*errs, checkData(**toxbatch_args)]
     
     # Batch and WQ are related based on toxbatch and lab
+    # Get rows in Batch but not in WQ
     # This relationship between tables was verified by Darrin on 7/19/2023
-    badrows = toxbatch[~toxbatch[['toxbatch','lab']].isin(toxwq[['toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    # badrows = toxbatch[~toxbatch[['toxbatch','lab']].isin(toxwq[['toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    badrows = mismatch(toxbatch, toxwq, ['toxbatch','lab'])
     toxbatch_args.update({
         "badrows": badrows,
         "badcolumn": "toxbatch,lab",
@@ -103,9 +107,11 @@ def toxicity(all_dfs):
     
     # result
     # Result and batch are related on toxbatch, lab, matrix and species
+    # Get rows in Results but not in Batch
     # Relating on toxbatch, lab, matrix, and species ensures that they dont put the wrong species with a toxbatch identifier
     # This relationship between tables was verified by Darrin on 7/19/2023
-    badrows = toxresults[~toxresults[['toxbatch','lab','matrix','species']].isin(toxbatch[['toxbatch','lab','matrix','species']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    # badrows = toxresults[~toxresults[['toxbatch','lab','matrix','species']].isin(toxbatch[['toxbatch','lab','matrix','species']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    badrows = mismatch(toxresults, toxbatch, ['toxbatch','lab','matrix','species'])
     toxresults_args.update({
         "badrows": badrows,
         "badcolumn": "toxbatch,lab,matrix,species",
@@ -115,8 +121,10 @@ def toxicity(all_dfs):
     errs = [*errs, checkData(**toxresults_args)]
 
     # Result and wq are related on stationid, toxbatch, lab
+    # Get rows in Results but not in WQ
     # This relationship between tables was verified by Darrin on 7/19/2023
-    badrows = toxresults[~toxresults[['stationid','toxbatch','lab']].isin(toxwq[['stationid','toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    # badrows = toxresults[~toxresults[['stationid','toxbatch','lab']].isin(toxwq[['stationid','toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    badrows = mismatch(toxresults, toxwq, ['stationid','toxbatch','lab'])
     toxresults_args.update({
         "badrows": badrows,
         "badcolumn": "stationid,toxbatch,lab",
@@ -127,8 +135,10 @@ def toxicity(all_dfs):
 
     # wq
     # Batch and WQ are related based on toxbatch and lab
+    # Get rows in WQ but not in Batch
     # This relationship between tables was verified by Darrin on 7/19/2023
-    badrows = toxwq[~toxwq[['toxbatch','lab']].isin(toxbatch[['toxbatch',    'lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    # badrows = toxwq[~toxwq[['toxbatch','lab']].isin(toxbatch[['toxbatch',    'lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    badrows = mismatch(toxwq, toxbatch, ['toxbatch','lab'])
     toxwq_args.update({
         "badrows": badrows,
         "badcolumn": "toxbatch,lab",
@@ -138,8 +148,10 @@ def toxicity(all_dfs):
     errs = [*errs, checkData(**toxwq_args)]
     
     # Result and wq are related on stationid, toxbatch, lab
+    # Get rows in WQ but not in Results
     # This relationship between tables was verified by Darrin on 7/19/2023
-    badrows = toxwq[~toxwq[['stationid','toxbatch','lab']].isin(toxresults[['stationid','toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    # badrows = toxwq[~toxwq[['stationid','toxbatch','lab']].isin(toxresults[['stationid','toxbatch','lab']].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    badrows = mismatch(toxwq, toxresults, ['stationid','toxbatch','lab'])
     toxwq_args.update({
         "badrows": badrows,
         "badcolumn": "stationid,toxbatch,lab",
@@ -206,10 +218,11 @@ def toxicity(all_dfs):
     })
     errs = [*errs, checkData(**toxresults_args)] 
 
-    ## A MINIMUM NUMBER OF 10 REPLICATES ARE REQUIRED FOR SPECIES NEANTHES ARENACEODENTATA ##
-    print("## A MINIMUM NUMBER OF 10 REPLICATES ARE REQUIRED FOR SPECIES NEANTHES ARENACEODENTATA ##")
 
     # This was only used in Bight23 Toxicity intercalibration
+    ## A MINIMUM NUMBER OF 10 REPLICATES ARE REQUIRED FOR SPECIES NEANTHES ARENACEODENTATA ##
+    # print("## A MINIMUM NUMBER OF 10 REPLICATES ARE REQUIRED FOR SPECIES NEANTHES ARENACEODENTATA ##")
+    
     # badrows = dfrep[
     #     (dfrep['sampletypecode'].isin(['CNEG','CNSL','Grab'])) & 
     #     (dfrep['species'].isin(['Neanthes arenaceodentata'])) & 
@@ -332,9 +345,9 @@ def toxicity(all_dfs):
     # Changed to a warning on 10/10/2023 per Darrin's request
     # Submitted data will have field info missing from the tox summary
     # We will delete those submissions, make this an error again, and have them resubmit
-    
-    # errs = [*errs, checkData(**toxresults_args)]
-    warnings = [*warnings, checkData(**toxresults_args)] 
+
+    # Changed back to an error on 12/5/2023 per Darrin's request - Most field data has been submitted by this point
+    errs = [*errs, checkData(**toxresults_args)]
 
     ###########################################################################
     # ------------ END Check for previously submitted field data ------------ #
@@ -359,7 +372,8 @@ def toxicity(all_dfs):
         'concentrationunits',
         'endpoint',
         'sampletypecode',
-        'samplecollectdate'
+        'samplecollectdate',
+        'fieldreplicate'
     ]
     #dflabrep = toxresults.groupby(grouping_cols)
     #dflabrep = toxresults.groupby(grouping_cols)['labrep', 'tmp_row'].apply(lambda x: tuple([x.labrep.tolist(), x.tmp_row.tolist()]))
@@ -398,14 +412,14 @@ def toxicity(all_dfs):
         ## BATCH CHECKS ##
         print("Starting Toxicity Batch Information Checks")
         # 1. EACH BATCH WITH A MATRIX OF BS MUST INCLUDE A CORRESPONDING RESULT CNEG SAMPLE
-        print("## EACH BATCH WITH A MATRIX OF BS MUST INCLUDE A CORRESPONDING RESULT CNEG SAMPLE ##")
+        print("## EACH BATCH WITH A MATRIX OF 'Whole Sediment' or 'Sediment Water Interface' MUST INCLUDE A CORRESPONDING RESULT CNEG SAMPLE ##")
         # first get unique cneg records from result dataframe
         bsresult = toxresults[['toxbatch','sampletypecode']].where(toxresults['sampletypecode'] == 'CNEG')
         bsresult = bsresult.dropna() 
         bsresult['unique'] = np.nan
         bsresult = bsresult.groupby(['toxbatch','sampletypecode'])['unique'].nunique().reset_index()
         # second get unique batch records with a matrix of bs
-        bsbatch = toxbatch[['toxbatch','matrix','tmp_row']].where(toxbatch['matrix'].isin(["Whole Sediment","BS"]))
+        bsbatch = toxbatch[['toxbatch','matrix','tmp_row']].where(toxbatch['matrix'].isin(["Whole Sediment", "Sediment Water Interface"]))
         bsbatch = bsbatch.dropna()
         bsbatch['unique'] = np.nan
         bsbatch = bsbatch.groupby(['toxbatch','matrix','tmp_row'])['unique'].nunique().reset_index()
@@ -419,7 +433,7 @@ def toxicity(all_dfs):
             "badrows": badrows,
             "badcolumn": "matrix",
             "error_type": "Logic Error",
-            "error_message": "Each batch with a matrix of Whole Sediment must include a corresponding toxresults CNEG sample."
+            "error_message": "Each batch with a matrix of 'Whole Sediment' or 'Sediment Water Interface' must include a corresponding toxresults CNEG sample."
         })
         errs = [*errs, checkData(**toxbatch_args)]  
 
@@ -600,15 +614,38 @@ def toxicity(all_dfs):
         # locate any records with a greater than 28 period
         print(df28.loc[df28['checkdate'].dt.days > 28])
 
+        # Jan 2, 2024
+        # Darrin said some samples (stations) had split samples (Not sure what that means) that would be tested after the 28 day holding time
+        # He said he didnt care about those meeting the 28 day requirement
+        # Stations which are excepted, and have QA sampletypecodes will not have this check applied to them
+        
+        # Basically we aren't going to flag them since we are expecting them to test within the normal holding time
+        #    and they werent assigned the sample anyways in the first place
+        
+        holding_time_exception_stations = ['B23-12060','B23-12065']
+        holding_time_error_rows = df28.loc[ (df28['checkdate'].dt.days > 28) & ((df28.sampletypecode != 'QA') | (~df28.stationid.isin(holding_time_exception_stations)) ) ].tmp_row.tolist()
+        holding_time_warning_rows = df28.loc[ (df28['checkdate'].dt.days > 28) & ((df28.sampletypecode == 'QA') & (df28.stationid.isin(holding_time_exception_stations)) ) ].tmp_row.tolist()
 
+        # Warn them if its a QA sampletypecode for one of the excepted stations
         toxresults_args.update({
-            "badrows": df28.loc[df28['checkdate'].dt.days > 28].tmp_row.tolist(),
+            "badrows": holding_time_warning_rows,
+            "badcolumn": "sampletypecode",
+            "error_type": "Undefined Warning",
+            "error_message": "Samples should be tested within a 28 day holding time."
+        })
+        warnings = [*warnings, checkData(**toxresults_args)] 
+        
+        # Prevent data submission if they do not meet the exception requirements
+        toxresults_args.update({
+            "badrows": holding_time_error_rows,
             "badcolumn": "sampletypecode",
             "error_type": "Undefined Error",
             "error_message": "Samples must be tested within a 28 day holding time."
         })
         errs = [*errs, checkData(**toxresults_args)] 
         
+
+
         toxresults_args.update({
             "badrows": df28.loc[df28['checkdate'].dt.days < 0].tmp_row.tolist(),
             "badcolumn": "sampletypecode",
@@ -1183,7 +1220,7 @@ def toxicity(all_dfs):
 
         fielddata = pd.read_sql(
             """
-                SELECT 
+                SELECT DISTINCT
                     tbl_stationoccupation.stationid,
                     tbl_stationoccupation.occupationlatitude as latitude,
                     tbl_stationoccupation.occupationlongitude as longitude,tbl_stationoccupation.occupationdepth as stationwaterdepth,
@@ -1235,7 +1272,7 @@ def toxicity(all_dfs):
         #     print(toxsummary[c])
 
         ################################################
-        #WARNING: CHECK AND SEE IF DATAFRAME NAME AND TBLNAME IS CORRECT
+        # WARNING: CHECK AND SEE IF DATAFRAME NAME AND TBLNAME IS CORRECT
         ################################################
 
         

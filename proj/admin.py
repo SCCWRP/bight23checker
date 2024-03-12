@@ -3,8 +3,11 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from io import BytesIO
 from flask import Blueprint, g, current_app, render_template, redirect, url_for, session, request, jsonify, send_file
+
 import psycopg2
 from psycopg2 import sql
+from sqlalchemy import text
+from sqlalchemy.exc import ProgrammingError
 
 from .utils.db import metadata_summary
 
@@ -60,7 +63,8 @@ def schema():
             return f"Datatype {datatype} not found"
 
         # dictionary to return
-        return_object = {}
+        tbl_column_info = {}
+        table_descriptions = {}
         
         tables = current_app.datasets.get(datatype).get("tables")
         for tbl in tables:
@@ -78,14 +82,27 @@ def schema():
 
             df.fillna('', inplace = True)
 
-            return_object[tbl] = df.to_dict('records')
+
+            try:
+                # Prepare and execute the query
+                sql_query = text("SELECT tabledescription FROM table_descriptions WHERE tablename = :tbl") 
+                tbldesc_query_result = pd.read_sql(sql_query, eng, params={"tbl": tbl}).tabledescription.values
+                tbldesc = tbldesc_query_result[0] if len(tbldesc_query_result) > 0 else ''
+            except ProgrammingError as e:
+                print(f"An error occurred: {e}")
+                raise Exception(f"Error occurred getting table description for {tbl}: Most likely the table_descriptions table doesnt exist.\n{e}")
+
+            # This ensures that the keys of each dictionary always match - this will be useful for the jinja template
+            tbl_column_info[tbl] = df.to_dict('records')
+            table_descriptions[tbl] = tbldesc
+
         
         if download:
             excel_blob = BytesIO()
 
             with pd.ExcelWriter(excel_blob) as writer:
-                for key in return_object.keys():
-                    df_to_download = pd.DataFrame.from_dict(return_object[key])
+                for key in tbl_column_info.keys():
+                    df_to_download = pd.DataFrame.from_dict(tbl_column_info[key])
                     df_to_download['lookuplist_table_name'] = df_to_download['lookuplist_table_name'].apply(
                         lambda x: "https://{}/{}/scraper?action=help&layer={}".format(
                             request.host,
@@ -106,7 +123,7 @@ def schema():
             )
 
         # Return the datatype query string arg - the template will need access to that
-        return render_template('schema.jinja2', metadata=return_object, datatype=datatype, authorized=authorized)
+        return render_template('schema.jinja2', metadata=tbl_column_info, datatype=datatype, table_descriptions=table_descriptions, authorized=authorized)
         
     # only executes if "datatypes" not given
     datatypes_list = current_app.datasets.keys()
@@ -155,6 +172,49 @@ def savechanges():
 
         
         return jsonify(message=f"successfully updated comment on the column {column_name} in the table {tablename}")
+
+    return ''
+
+
+@admin.route('/save-description', methods = ['POST'])
+def savetabledescription():
+    authorized = session.get("AUTHORIZED_FOR_ADMIN_FUNCTIONS")
+    
+    if authorized:
+        data = request.get_json()
+
+        tablename = str(data.get("tablename")).strip()
+        
+        tabledescription = str(data.get("tabledescription")).strip()
+
+        # connect with psycopg2
+        connection = psycopg2.connect(
+            host=os.environ.get("DB_HOST"),
+            database=os.environ.get("DB_NAME"),
+            user=os.environ.get("DB_USER"),
+            password=os.environ.get("PGPASSWORD"),
+        )
+
+        connection.set_session(autocommit=True)
+
+        with connection.cursor() as cursor:
+            command = sql.SQL(
+                """
+                INSERT INTO table_descriptions (tablename, tabledescription) 
+                    VALUES ({tablename}, {tabledescription}) 
+                    ON CONFLICT ON CONSTRAINT table_descriptions_pkey 
+                    DO UPDATE SET tabledescription = EXCLUDED.tabledescription;
+                """
+            ).format(
+                tablename = sql.Literal(tablename),
+                tabledescription = sql.Literal(tabledescription)
+            )
+            
+            cursor.execute(command)
+
+        connection.close()
+
+        return jsonify(message=f"successfully updated description for the table {tablename}")
 
     return ''
 

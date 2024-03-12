@@ -87,13 +87,18 @@ def main():
 
     # build all_dfs where we will store their data
     print("building 'all_dfs' dictionary")
+    print("getting ignored tabs")
     ignored_tabs = [
         *current_app.tabs_to_ignore, 
         *(current_app.config.get("EXCEL_TABS_CREATED_BY_CHECKER") if current_app.config.get("EXCEL_TABS_CREATED_BY_CHECKER") else []) 
     ]
+    
+    print("Done getting ignored tabs")
+    # Old method of setting conversion in the config - plan is to deprecate this
+    # conversion should not happen until after match_tables anyways
+    # converters = current_app.config.get('DTYPE_CONVERTERS')
+    # converters = {k: eval(v) for k,v in converters.items()} if converters is not None else None
 
-    converters = current_app.config.get('DTYPE_CONVERTERS')
-    converters = {k: eval(v) for k,v in converters.items()} if converters is not None else None
     all_dfs = {
 
         # Some projects may have descriptions in the first row, which are not the column headers
@@ -102,13 +107,13 @@ def main():
 
         # Note also that only empty cells will be regarded as missing values
         
+        # converters should not be applied at this stage - should be applied after match tables
         sheet: pd.read_excel(
             excel_path, 
             sheet_name = sheet,
             skiprows = current_app.excel_offset,
             keep_default_na=False,
-            na_values = [''],
-            converters = converters
+            na_values = ['']
         )
         
         for sheet in pd.ExcelFile(excel_path).sheet_names
@@ -150,16 +155,9 @@ def main():
     # if the tab didnt match any table it will not alter that item in the all_dfs dictionary
     print("Running match tables routine")
     match_dataset, match_report, all_dfs = match(all_dfs)
-    
-    print("match(all_dfs)")
-    #print(match(all_dfs))
 
-    #NOTE if all tabs in all_dfs matched a database table, but there is still no match_dataset
-    # then the problem probably lies in __init__.py
-
-    # need an assert statement
-    # an assert statement makes sense because in this would be an issue on our side rather than the user's
-
+    # NOTE if all tabs in all_dfs matched a database table, but there is still no match_dataset
+    #    then the problem is the app is not properly configured
 
     print("DONE - Running match tables routine")
 
@@ -249,17 +247,28 @@ def main():
     
     # Yes this is weird but if we write the all_dfs back to the excel file, and read it back in,
     # this ensures 100% that the data is loaded exactly in the same state as it was in when it was checked
-    all_dfs = {
-        sheet: pd.read_excel(
-            excel_path, 
-            sheet_name = sheet,
-            keep_default_na=False,
-            skiprows = current_app.excel_offset,
-            na_values = ['']
-        )
-        for sheet in pd.ExcelFile(excel_path).sheet_names
-        if ((sheet not in current_app.tabs_to_ignore) and (not sheet.startswith('lu_')))
-    }
+    for sheet in pd.ExcelFile(excel_path).sheet_names:
+        if ((sheet not in current_app.tabs_to_ignore) and (not sheet.startswith('lu_'))):
+            
+            converters = fetch_meta(sheet, g.eng, return_converters = True)
+            string_converters = converters.get("string_converters")
+            
+            assert string_converters is not None, f"String converters not returned for {sheet} in fetch_meta function"
+
+            # This should never raise an exception - at least converting the columns to str datatypes should never cause a problem
+            tmpdf = pd.read_excel(
+                excel_path, 
+                sheet_name = sheet,
+                keep_default_na=False,
+                skiprows = current_app.excel_offset,
+                na_values = [''],
+                converters = string_converters
+            )
+
+
+            all_dfs.update({
+                sheet: tmpdf
+            })
 
     
     # ----------------------------------------- #
@@ -326,6 +335,25 @@ def main():
     # This makes the assumption that all values in that column are numeric, which is checked and enforced by Core Checks
 
     if errs == []: 
+
+        # convert timestamp columns to datetime64[ns] based on the database            
+        for tblname in all_dfs.keys():
+            
+            converters = fetch_meta(tblname, g.eng, return_converters = True)
+            timestamp_converters = converters.get("timestamp_converters")
+            
+            assert timestamp_converters is not None, f"Timestamp converters not returned for {tblname} in fetch_meta function"
+
+            # We actually do not want to catch the exception, but rather have the app crash so we can be notified
+            # That is better that bad data going in, or a critical upon final submit.
+            # Filter the timestamp_converters to include only keys that are columns in tmpdf
+            valid_timestamp_converters = {col: 'datetime64[ns]' for col in timestamp_converters.keys() if col in all_dfs[tblname].columns}
+
+            # Now use the filtered dictionary to safely convert types
+            all_dfs[tblname] = all_dfs[tblname].astype(valid_timestamp_converters)
+
+
+
         print("Custom Checks")
         print(f"Datatype: {match_dataset}")
         print(f"{match_dataset} function:")

@@ -163,13 +163,14 @@ def debris(all_dfs):
     }
     errs = [*errs, checkData(**trawldebris_args)] 
     
-    #Jordan - SampleDate - Check that the sample date falls between 7/1/2018 and 9/30/2018
-    print('SampleDate - Check that the sample date falls between 7/1/2018 and 9/30/2018')
-    startdate = datetime.datetime(2018,7,1) 
-    enddate = datetime.datetime(2018,9,30)
+    #Jordan - SampleDate - Check that the sample date falls between 7/1/2023 and 9/30/2023
+    print('SampleDate - Check that the sample date falls between 7/1/2023 and 9/30/2023')
+    startdate = datetime.datetime(2023,7,1) 
+    enddate = datetime.datetime(2023,9,30)
     badrows = trawldebris[
-        (trawldebris.sampledate<startdate) | 
-        (trawldebris.sampledate>enddate)
+        # The sampledate should never be null - if it somehow magically slipped past core checks, it would flag as an error here
+        (trawldebris.sampledate.apply(lambda x: ( pd.Timestamp(x)  < startdate ) if pd.notnull(x) else True)) | 
+        (trawldebris.sampledate.apply(lambda x: ( pd.Timestamp(x)  > enddate ) if pd.notnull(x) else True))
     ].tmp_row.tolist()
     trawldebris_args = {
         "dataframe": trawldebris,
@@ -178,7 +179,7 @@ def debris(all_dfs):
         "badcolumn": "sampledate",
         "error_type": "Undefined Error",
         "is_core_error": False,
-        "error_message": "SampleDate must be between 7-1-2023 and 9-30-2024"
+        "error_message": "SampleDate must be between 7-1-2023 and 9-30-2023"
     }
     errs = [*errs, checkData(**trawldebris_args)] 
     

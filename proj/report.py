@@ -1,5 +1,6 @@
 import os
 import time
+from copy import deepcopy
 from flask import send_file, Blueprint, jsonify, request, g, current_app, render_template, send_from_directory, make_response
 import pandas as pd
 from pandas import read_sql, DataFrame
@@ -23,14 +24,26 @@ def report():
             datatype=datatype
         )
     if datatype in valid_datatypes:
-        report_df = pd.read_sql(
-            f'SELECT * FROM vw_tac_{datatype}_completion_status', g.eng)
+        report_df = pd.read_sql(f'SELECT * FROM vw_tac_{datatype}_completion_status', g.eng)
+        
+        # Write report_df to export folder so we can download it
+        report_df_for_download = deepcopy(report_df)
+        report_df_for_download = report_df_for_download.assign(
+            stations = report_df_for_download.stations.apply(lambda x: [x.strip() for x in x.split(",")])    
+        )
+        print(report_df_for_download)
+        report_df_for_download = report_df_for_download.explode('stations')
+        report_df_for_download.to_excel(os.path.join(os.getcwd(), "export", f"report-{datatype}.xlsx"), index=False)
+        #####
+
         report_df.set_index(
             ['submissionstatus', 'lab', 'parameter'], inplace=True)
     else:
         report_df = pd.DataFrame(
             columns=['submissionstatus', 'lab', 'parameter', 'stations'])
         report_df.set_index(['submissionstatus', 'lab'], inplace=True)
+
+
 
     return render_template(
         'report.html',

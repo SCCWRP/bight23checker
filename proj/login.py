@@ -24,8 +24,17 @@ def index():
 
         return render_template('index.html', login_info = login_info)
 
+
     session['submissionid'] = int(time.time())
     session['submission_dir'] = os.path.join(os.getcwd(), "files", str(session['submissionid']))
+    
+    # If a request was made to the route within the same second, this will happen
+    # It will try to create an existing submission directory
+    # it is likely that bots sending many requests triggered this error - maybe in an attempted DDOS attack
+    if os.path.exists(session['submission_dir']):
+        return render_template('error429.jinja2', maintainers = ','.join(current_app.maintainers)), 429
+
+
     os.mkdir(session['submission_dir'])
 
     assert \

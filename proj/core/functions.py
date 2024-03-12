@@ -99,6 +99,7 @@ def convert_dtype(t, x):
 
 @lru_cache(maxsize=128, typed=True)
 def check_precision(x, precision):
+
     try:
         int(x)
     except Exception as e:
@@ -111,7 +112,16 @@ def check_precision(x, precision):
     if pd.isnull(precision):
         return True
 
+    try:
+        if not isinstance(x, (int, float)):
+            x = float(str(x))
+    except Exception as e:
+        # If an exception occurs here, their data must be really messed up and we'll have to trust that checkDataTypes will flag it
+        return True
+    
+
     x = abs(x)
+    
     if 0 < x < 1:
         # if x is a fraction, it doesnt matter. it should be able to go into a numeric field regardless
         return True
@@ -157,6 +167,14 @@ def check_scale(x, scale):
         return True
     if pd.isnull(scale):
         return True
+    
+    try:
+        if not isinstance(x, (int, float)):
+            x = float(str(x))
+    except Exception as e:
+        # If an exception occurs here, their data must be really messed up and we'll have to trust that checkDataTypes will flag it
+        return True
+    
     x = abs(x)
     if 'e-' in str(x):
         # The idea is if the number comes in in scientific notation
@@ -198,7 +216,7 @@ def check_length(x, maxlength):
 
 
 
-def fetch_meta(tablename, eng):
+def fetch_meta(tablename, eng, return_converters = False, string_converter_dict_name = "string_converters", timestamp_converter_dict_name = "timestamp_converters"):
 
     meta = pd.read_sql(
             f"""
@@ -230,6 +248,20 @@ def fetch_meta(tablename, eng):
             else float if x == 'numeric' 
             else None
         )  
+
+    assert isinstance(return_converters, bool), f"Value of return_converters arg is not a boolean. It is of type {type(return_converters)}. The value was: {return_converters}"
+    if return_converters:
+
+        # Converting numeric columns likely will not provide benefit - problematic columns are varchars and timestamps
+        # Lets make sure these are converted correctly
+        strings = meta[meta.udt_name == 'varchar']
+        dates = meta[meta.udt_name == 'timestamp']
+        
+        # convenient dictionaries
+        strings  = strings[['column_name','dtype']].set_index('column_name')['dtype'].to_dict()
+        dates    = dates[[ 'column_name', 'dtype']].set_index('column_name')['dtype'].to_dict()
+
+        return {string_converter_dict_name: strings, timestamp_converter_dict_name: dates}
 
     return meta
 
