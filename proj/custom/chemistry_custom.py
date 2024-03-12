@@ -143,7 +143,7 @@ def chemistry(all_dfs):
         return {'errors': errs, 'warnings': warnings}
 
     # Sample Assignment check - make sure they were assigned the analyteclasses that they are submitting
-    badrows = sample_assignment_check(eng = eng, df = results, parameter_column = 'analyteclass')
+    badrows = sample_assignment_check(eng = eng, df = results, parameter_column = 'analyteclass', excepted_params = ['Moisture'])
     
     results_args.update({
         "badrows": badrows,
