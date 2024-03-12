@@ -3,10 +3,9 @@
 from inspect import currentframe
 from flask import current_app, g
 from datetime import timedelta
-from .functions import checkData, checkLogic, sample_assignment_check
+from .functions import checkData
 from .chem_functions_custom import *
 import pandas as pd
-import re
 
 def chemistry_tissue(all_dfs):
     
