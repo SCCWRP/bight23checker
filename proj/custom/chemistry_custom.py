@@ -895,7 +895,7 @@ def chemistry(all_dfs):
         "error_type": "Sample Past Holding Time",
         "error_message": f"Here, the analysisdate is more than a year after the sampledate, which is invalid for analyteclasses {','.join(holding_time_classes)}"
     })
-    errs.append(checkData(**results_args))
+    warnings.append(checkData(**results_args))
 
     # NOTE The Holding time for Mercury is 6 months, so a separate check will be written here specifically for Mercury
     print('# NOTE The Holding time for Mercury is 6 months, so a separate check will be written here specifically for Mercury')
@@ -908,7 +908,7 @@ def chemistry(all_dfs):
         "error_type": "Sample Past Holding Time",
         "error_message": f"Here, the analysisdate is more than 6 months after the sampledate, which is past the holding time for Mercury"
     })
-    errs.append(checkData(**results_args))
+    warnings.append(checkData(**results_args))
     # ---------------------------------------------------------------------------------------------------------------------------------#
     # ---------------------------------------------------------------------------------------------------------------------------------#
     print('# ---------------------------------------------------------------------------------------------------------------------------------#')
