@@ -158,14 +158,14 @@ def ocean_acidification(all_dfs):
 
     # Check to see if there is only one Season and agency per submission.
     if len(ctd.agency.unique()) != 1:
-        errs = [*errs, checkData('tbl_oactd', ctd.tmp_row.tolist(), "Agency", "Undefined Error", "There may be only one Agency per submission.")]
+        warnings = [*warnings, checkData('tbl_oactd', ctd.tmp_row.tolist(), "Agency", "Undefined Warning", "There should normally be only one Agency per submission.")]
     if len(ctd.season.unique()) != 1:
-        errs = [*errs, checkData('tbl_oactd', ctd.tmp_row.tolist(), "Season", "Undefined Error", "There may be only one Season per submission.")]
+        warnings = [*warnings, checkData('tbl_oactd', ctd.tmp_row.tolist(), "Season", "Undefined Warning", "There should normally be only one Season per submission.")]
 
     if len(bottle.agency.unique()) != 1:
-        errs = [*errs, checkData('tbl_oabottle', bottle.tmp_row.tolist(), "Agency", "Undefined Error", "There may be only one Agency per submission.")]
+        warnings = [*warnings, checkData('tbl_oabottle', bottle.tmp_row.tolist(), "Agency", "Undefined Warning", "There should normally be only one Agency per submission.")]
     if len(bottle.season.unique()) != 1:
-        errs = [*errs, checkData('tbl_oabottle', bottle.tmp_row.tolist(), "Season", "Undefined Error", "There may be only one Season per submission.")]
+        warnings = [*warnings, checkData('tbl_oabottle', bottle.tmp_row.tolist(), "Season", "Undefined Warning", "There should normally be only one Season per submission.")]
 
 
 
@@ -176,6 +176,8 @@ def ocean_acidification(all_dfs):
     badrows = bottle[~bottle[matching_cols].isin(ctd[matching_cols].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
     errs = [*errs, checkData('tbl_oabottle', badrows, ",".join(matching_cols), "Undefined Error",  "Each Bottle record must have a corresponding CTD record. Records are matched on Season, Agency, SampleDate, Station, FieldRep and LabRep.")]
 
+    badrows = ctd[~ctd[matching_cols].isin(bottle[matching_cols].to_dict(orient='list')).all(axis=1)].tmp_row.tolist()
+    errs = [*errs, checkData('tbl_oactd', badrows, ",".join(matching_cols), "Undefined Error",  "Each ctd record must have a corresponding bottle record. Records are matched on Season, Agency, SampleDate, Station, FieldRep and LabRep.")]
 
 
     
@@ -246,19 +248,25 @@ def ocean_acidification(all_dfs):
     sub_bottle = bottle[['season', 'agency', 'sampledate', 'station', 'fieldrep', 'labrep', 'sampletime']]
     # merge records on assumed fields. (check assumption 1 above)
     times = sub_ctd.merge(sub_bottle, on = ['season', 'agency', 'sampledate', 'station', 'fieldrep', 'labrep'], how = 'inner')
+    datetime_format = "%H:%M:%S"
+
     # convert string of times into datetimes
     #times.sampletime_x = pd.to_datetime(times.sampletime_x)
     #times.sampletime_y = pd.to_datetime(times.sampletime_y)
 
     # convert string of times into times
-    times.sampletime_x = times.sampletime_x.astype(str).apply(lambda x: pd.Timestamp(x))
-    times.sampletime_y = times.sampletime_y.astype(str).apply(lambda x: pd.Timestamp(x))
+    #ayah change from pd.Timestamp
+    times.sampletime_x = times.sampletime_x.astype(str).apply(lambda x: datetime.strptime(x, datetime_format))
+    times.sampletime_y = times.sampletime_y.astype(str).apply(lambda x: datetime.strptime(x, datetime_format))
     
     # check that sampletimes are within allowable time difference. (check assumption 2 above)        
     invalids = times[(times.sampletime_x - times.sampletime_y) > timedelta(hours = 4)]
     print("invalids")
     print(invalids)
-    errs.append(checkData('tbl_oabottle', bottle.merge(invalids, on = ['season', 'agency', 'sampledate', 'station', 'fieldrep', 'labrep'], how = 'inner').tmp_row.unique().tolist(),'SampleTime','Logic Error','CTD SampleTime and Bottle SampleTime are outside allowable time difference.'))
+    errs.append(checkData(
+        'tbl_oabottle', 
+        bottle.merge(invalids, on = ['season', 'agency', 'sampledate', 'station', 'fieldrep', 'labrep'], how = 'inner').tmp_row.unique().tolist(),
+        'SampleTime','Logic Error','CTD SampleTime and Bottle SampleTime are outside allowable time difference.'))
 
     #######################
     # CTD EXTENDED CHECKS #
