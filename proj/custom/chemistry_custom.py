@@ -502,6 +502,10 @@ def chemistry(all_dfs):
             (results.qacode == 'Matrix spike done with the actual sediment sample as the matrix for spiking') 
             & 
             (~results.comments.fillna("").str.contains(r'B23-\d{5}', regex = True) )
+            &
+            # SONGS Unit 2 was a special station that was sampled, which does not fit the conventional Bight 23 station naming pattern
+            (~results.comments.fillna("").str.contains(r'B23-SONGS Unit 2', regex = True) )
+            
         ].tmp_row.tolist(),
         "badcolumn" : 'Comments',
         "error_type": "Value Error",
