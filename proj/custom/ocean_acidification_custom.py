@@ -261,12 +261,21 @@ def ocean_acidification(all_dfs):
     
     # check that sampletimes are within allowable time difference. (check assumption 2 above)        
     invalids = times[(times.sampletime_x - times.sampletime_y) > timedelta(hours = 4)]
+    grp_cols = ['season', 'agency', 'sampledate', 'station', 'fieldrep', 'labrep']
     print("invalids")
     print(invalids)
     errs.append(checkData(
         'tbl_oabottle', 
-        bottle.merge(invalids, on = ['season', 'agency', 'sampledate', 'station', 'fieldrep', 'labrep'], how = 'inner').tmp_row.unique().tolist(),
-        'SampleTime','Logic Error','CTD SampleTime and Bottle SampleTime are outside allowable time difference.'))
+        bottle.merge(invalids, on = grp_cols, how = 'inner').tmp_row.unique().tolist(),
+        'SampleTime','Logic Error',f'CTD SampleTime and Bottle SampleTime are outside allowable time difference based on these columns {",".join(grp_cols)} '))
+
+    errs.append(checkData(
+        'tbl_oactd', 
+        ctd.merge(invalids, on = ['season', 'agency', 'sampledate', 'station', 'fieldrep', 'labrep'], how = 'inner').tmp_row.unique().tolist(),
+        'SampleTime','Logic Error',f'CTD SampleTime and Bottle SampleTime are outside allowable time difference based on these columns {",".join(grp_cols)}'))   
+    
+    
+        
 
     #######################
     # CTD EXTENDED CHECKS #
@@ -299,7 +308,14 @@ def ocean_acidification(all_dfs):
     invalid_stations = dupes[(dupes.datetime_y - dupes.datetime_x).dt.total_seconds() < 0].station.tolist()
     print("Now checking for nonsequential replicates")
     print(sub_ctd[sub_ctd.station.isin(invalid_stations)].drop_duplicates())
-    errs.append(checkData('tbl_oactd', ctd[ctd.station.isin(invalid_stations)].drop_duplicates(subset = ['station','agency','fieldrep','sampletime']).tmp_row.tolist(),'SampleTime','Undefined Error', 'For a given station, replicate 2 records should only occur after replicate 1 records.'))
+    errs.append(checkData(
+        'tbl_oactd',
+         ctd[ctd.station.isin(invalid_stations)].drop_duplicates(subset = ['station','agency','fieldrep','sampletime']).tmp_row.tolist(),
+         'SampleTime',
+         'Undefined Error', 
+         'For a given station, replicate 2 records should only occur after replicate 1 records.'))
+        
+    
 
 
     # Range checks on Depth, Temperature, Salinity, Density, and pH

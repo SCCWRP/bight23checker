@@ -117,16 +117,18 @@ def infauna(all_dfs):
         "is_core_error": False,
         "error_message": "If Taxon = NoOrganismsPresent, Then abundance should equal 0."
     }
-    errs = [*errs, checkData(**infaunalabundance_args)]    
+    errs = [*errs, checkData(**infaunalabundance_args)]
     
     
-    #checkData(infaunalabundance[(infaunalabundance.taxon == 'NoOrganismsPresent')&(infaunalabundance.abundance != 0)].tmp_row.tolist(),'Abundance','Undefined Error','error','You recorded Taxon as NoOrganismsPresent. Abundance should equal 0.',infaunalabundance)
-    #2. Abundance cannot have -88, must be 1 or greater.
-    print("Abundance cannot have -88, must be 1 or greater.")
+    
+    print("## CUSTOM CHECKS ##")
+    #1. If abundance == 0, and taxon is not NoOrganismsPresent, then the qualifier should say 'colonial' or 'target analyte present but not counted'
+    print("Custom Check: If abundance == 0, and taxon is not NoOrganismsPresent, then the qualifier should say 'colonial' or 'target analyte present but not counted'")
     print("All records that do not pass this check:")
-    print(infaunalabundance[(infaunalabundance.abundance < 1)])
     badrows = infaunalabundance[
-        (infaunalabundance.abundance < 1)
+        (infaunalabundance.abundance == 0) & 
+        (infaunalabundance.taxon != 'NoOrganismsPresent') & 
+        (~infaunalabundance.qualifier.isin(['colonial','target analyte present but not counted']))
     ].tmp_row.tolist()
     infaunalabundance_args = {
         "dataframe": infaunalabundance,
@@ -135,7 +137,29 @@ def infauna(all_dfs):
         "badcolumn": "abundance",
         "error_type": "Undefined Error",
         "is_core_error": False,
-        "error_message": "Abundance should be 1 or greater."
+        "error_message": "If abundance == 0, and taxon is not NoOrganismsPresent, then the qualifier should say 'colonial' or 'target analyte present but not counted'"
+    }
+    errs = [*errs, checkData(**infaunalabundance_args)]
+    
+    
+    
+    
+    #checkData(infaunalabundance[(infaunalabundance.taxon == 'NoOrganismsPresent')&(infaunalabundance.abundance != 0)].tmp_row.tolist(),'Abundance','Undefined Error','error','You recorded Taxon as NoOrganismsPresent. Abundance should equal 0.',infaunalabundance)
+    #2. Abundance cannot have -88, must be 1 or greater.
+    print("Abundance cannot have -88, must be 0 or greater.")
+    print("All records that do not pass this check:")
+    print(infaunalabundance[(infaunalabundance.abundance < 0)])
+    badrows = infaunalabundance[
+        (infaunalabundance.abundance < 0)
+    ].tmp_row.tolist()
+    infaunalabundance_args = {
+        "dataframe": infaunalabundance,
+        "tablename": 'tbl_infaunalabundance',
+        "badrows": badrows,
+        "badcolumn": "abundance",
+        "error_type": "Undefined Error",
+        "is_core_error": False,
+        "error_message": "Abundance should be 0 or greater."
     }
     errs = [*errs, checkData(**infaunalabundance_args)]     
     

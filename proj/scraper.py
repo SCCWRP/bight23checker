@@ -15,7 +15,7 @@ def lookuplists():
             datatype = request.args.get('datatype')
 
             # layer should start with lu - if not return empty - this tool is only for lookup lists
-            if layer.startswith("lu_") or layer.startswith("xwalk_") or layer.endswith("_assignment"):
+            if layer.startswith("lu_") or layer.startswith("xwalk_") or layer.endswith("_assignment") or layer.endswith("_completion_status"):
 
                 # unfortunately readonly user doesnt have access to information_schema
                 eng = g.eng # postgresql

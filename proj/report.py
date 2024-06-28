@@ -1,22 +1,54 @@
 import os
 import time
+import pandas as pd
+import json
+import sqlite3
+
+from io import BytesIO
 from copy import deepcopy
 from flask import send_file, Blueprint, jsonify, request, g, current_app, render_template, send_from_directory, make_response
-import pandas as pd
 from pandas import read_sql, DataFrame
-import json
 from openpyxl import load_workbook
 from openpyxl.comments import Comment
 from openpyxl.styles import PatternFill
-import sqlite3
+
+from .utils.excel import format_existing_excel
 
 report_bp = Blueprint('report', __name__)
 
-
+# This view is pretty specific to the bight project
+# I am considering making a folder called custom blueprints
 @report_bp.route('/report', methods=['GET', 'POST'])
 def report():
-    valid_datatypes = ['field', 'chemistry', 'infauna', 'toxicity']
+    valid_datatypes = ['field', 'chemistry', 'infauna', 'toxicity', 'microplastics']
+    
+    # Give option for them to download specific data report views - which Dario requested in April 2024
+    # As we create more views, we can add more here
+    valid_views = ['vw_trawl_completion_status_simplified', 'vw_grab_completion_status_simplified']
+    specificview = request.args.get('view')
+    
+    if specificview is not None:
+        if specificview not in valid_views:
+            return jsonify({"error":"Bad Request", "message": f"{specificview} is not a valid name for a view"}), 400
+        
+        excel_blob = BytesIO()
+        data = pd.read_sql(f"SELECT * FROM {specificview}", g.eng)
+        with pd.ExcelWriter(excel_blob) as writer:
+            data.to_excel(writer, sheet_name = specificview[:31], index = False)
+        excel_blob.seek(0)
+        
+        # apply formatting
+        print("# apply formatting")
+        formatted_blob = format_existing_excel(excel_blob)
+        
+        # Make a response object to set a custom cookie
+        resp = make_response(send_file(formatted_blob, as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', download_name=f"""{specificview}.xlsx"""))
+
+        return resp
+
+
     datatype = request.args.get('datatype')
+
     if datatype is None:
         print("No datatype specified")
         return render_template(

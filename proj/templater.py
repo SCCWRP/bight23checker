@@ -15,6 +15,8 @@ from openpyxl.worksheet.datavalidation import DataValidation
 # skip the formatting
 
 templater = Blueprint('templater', __name__)
+
+@templater.route('/templates', methods = ['GET', 'POST']) # this will be added to the index.html file to dynamically call the lookup lists to each template
 @templater.route('/templater', methods = ['GET', 'POST']) # this will be added to the index.html file to dynamically call the lookup lists to each template
 # consider using the app.datasets dictionary to generalize the code better
 def template():
