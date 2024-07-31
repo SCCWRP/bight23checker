@@ -258,3 +258,83 @@ def download():
                     wb.save(export_file)
 
         return send_from_directory(os.path.join(os.getcwd(), "export", "warnings_report"), export_name, as_attachment=True)
+    
+
+
+@report_bp.route('/completeness-report', methods=['GET', 'POST'])
+def completeness_report():
+
+    # The sqlalchemy database connection object
+    eng = g.eng 
+
+    # Types of reports and their corresponding views
+    report_types = {
+        'toxicity': {
+            'stratum': 'vw_tox_stratum_completeness_report',
+            'agency' : 'vw_tox_agency_completeness_report'
+        },
+        'chemistry': {
+            'stratum': 'vw_chem_stratum_completeness_report',
+            'agency' : 'vw_chem_agency_completeness_report'
+        },
+        'benthic': {
+            'stratum': 'vw_benthic_infauna_stratum_completeness_report',
+            'agency' : 'vw_benthic_infauna_agency_completeness_report'
+        },
+        'trawl': {
+            'stratum': 'vw_trawl_data_stratum_completeness_report',
+            'agency' : 'vw_trawl_data_agency_completeness_report'
+        },
+        'microplastics': {
+            'stratum': 'vw_microplastics_stratum_completeness_report',
+            'agency' : 'vw_microplastics_agency_completeness_report'
+        },
+    }
+
+    report_type = request.args.get('report_type')
+
+
+    if report_type is None:
+        return render_template('completeness_report.jinja2', report_types = report_types.keys())
+    
+    
+    # Prepare a BytesIO object to write the report to
+    output = BytesIO()
+
+    if report_type.lower() == 'all':
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            for type_key, views in report_types.items():
+                for view_key, view_name in views.items():
+                    print(view_name)
+                    df = pd.read_sql(f"SELECT * FROM {view_name}", eng)
+                    df.to_excel(writer, sheet_name=f"{type_key}_{view_key}", index = False)
+            writer.save()
+
+        output.seek(0)  # Important: move back to the start of the BytesIO object
+        
+        # Format the excel file
+        output = format_existing_excel(output)
+
+        return send_file(output, as_attachment=True, download_name="completeness_reports.xlsx", mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+    
+    # If they made no request for "All" datatypes, then make sure they arent putting something funny - it should be one of the specific ones
+    if report_type not in report_types.keys():
+        return "Bad request", 400
+
+
+    # Generate specific report
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        view_names = report_types[report_type]
+        for key, view in view_names.items():
+            print(view)
+            df = pd.read_sql(f"SELECT * FROM {view}", eng)
+            df.to_excel(writer, sheet_name=f"{key}", index = False)
+        writer.save()
+
+    output.seek(0)  # Reset the buffer position to the beginning
+
+    # Format the excel file
+    output = format_existing_excel(output)
+
+    return send_file(output, as_attachment=True, download_name=f'{report_type}_completeness_report.xlsx', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

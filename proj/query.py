@@ -1,7 +1,7 @@
 import json, time, os
 import pandas as pd
 from io import BytesIO
-from flask import request, jsonify, Blueprint, current_app, send_from_directory, url_for, session, render_template, g, make_response, send_file
+from flask import request, jsonify, Blueprint, current_app, send_from_directory, url_for, session, render_template, g, make_response, send_file, flash
 from sqlalchemy import create_engine, text
 from zipfile import ZipFile
 from functools import wraps
@@ -197,6 +197,8 @@ def qrydata():
 
     datasets = current_app.datasets
     dataset = request.args.get("dataset")
+    analysis_tables = request.args.get("analysis_tables")
+    additional_tables = request.args.get("additional_tables")
     
     if dataset is None:
         return render_template('query.jinja2', datasets = datasets, authorized = authorized, project_name = current_app.project_name, background_image = current_app.config.get("BACKGROUND_IMAGE"))
@@ -211,8 +213,8 @@ def qrydata():
         
         alltables = [
             *datasets.get(dataset).get("tables", []), 
-            *datasets.get(dataset).get("analysis_tables", []), 
-            *datasets.get(dataset).get("additional_tables", []) 
+            *(datasets.get(dataset).get("analysis_tables", []) if analysis_tables is not None else []),
+            *(datasets.get(dataset).get("additional_tables", [])  if additional_tables is not None else [])
         ]
         
         for tbl in alltables:
