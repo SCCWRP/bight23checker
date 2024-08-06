@@ -104,17 +104,66 @@ def chemistry_tissue(all_dfs):
     })
     errs.append(checkData(**results_args))
 
+
+    # - - - - - - - - - - Sample Assignment Check - - - - - - - - - - #
+    print("# - - - - - - - - - - Sample Assignment Check - - - - - - - - - - #")
     # # commented out since tbl_chemresults_tissue DOES NOT have a stationid column - zaib 2june2023
     # # Sample Assignment check - make sure they were assigned the analyteclasses that they are submitting
     # badrows = sample_assignment_check(eng = eng, df = results, parameter_column = 'analyteclass')
-    
-    # results_args.update({
-    #     "badrows": badrows,
-    #     "badcolumn": "StationID,Lab,AnalyteName",
-    #     "error_type": "Logic Error",
-    #     "error_message": f"Your lab was not assigned to submit data for this analyteclass from this station (<a href=/{current_app.config.get('APP_SCRIPT_ROOT')}/scraper?action=help&layer=vw_sample_assignment&datatype=chemistry target=_blank>see sample assignments</a>)"
-    # })
-    # warnings.append(checkData(**results_args))
+    # 
+    # The above sample assignment check will not work for tissue chemistry
+    # The assignments are done via the bioaccumulation sampleid lookup list - Robert August 2, 2024
+
+    print("# Get sample assignments from lu_bioaccumulationsampleid")
+    # Get sample assignments from lu_bioaccumulationsampleid
+    sample_assignment = pd.read_sql("SELECT sampleid AS bioaccumulationsampleid, legacy_contaminant_lab, pfas_lab FROM lu_bioaccumulationsampleid", eng)
+
+    print("# tack on sample assignments")
+    # tack on sample assignments
+    tmp = results \
+        .merge(sample_assignment, on = 'bioaccumulationsampleid', how = 'left')
+
+    print("# Get where PFAS was messed up")
+    # Get where PFAS was messed up
+    # Exclude the 0000 QA sampleid placeholder
+    pfas_badrows = tmp[
+        (tmp.analyteclass.str.upper() == 'PFAS') & (tmp.pfas_lab.str.lower() != tmp.lab.str.lower())
+        & (tmp.bioaccumulationsampleid.astype(str) != '0000')
+    ].tmp_row.tolist()
+
+    print("# Get where any other contaminant was messed up")
+    # Get where any other contaminant was messed up
+    # Exclude the 0000 QA sampleid placeholder
+    legacy_contaminant_badrows = tmp[
+        (tmp.analyteclass.str.upper() != 'PFAS') & (tmp.legacy_contaminant_lab.str.lower() != tmp.lab.str.lower())
+        & (tmp.bioaccumulationsampleid.astype(str) != '0000')
+    ].tmp_row.tolist()
+
+    print("# Flag if they submitted PFAS but were not assigned")
+    # Flag if they submitted PFAS but were not assigned
+    results_args.update({
+        "badrows": pfas_badrows,
+        "badcolumn": "BioaccumulationSampleID,Lab,AnalyteName",
+        "error_type": "Logic Error",
+        "error_message": f"Your lab was not assigned to submit PFAS data from this sample ID (<a href=scraper?action=help&layer=lu_bioaccumulationsampleid target=_blank>see the sample assignments lookup list</a>)"
+    })
+    warnings.append(checkData(**results_args))
+
+    print("# Flag if they submitted Legacy Contaminants but were not assigned")
+    # Flag if they submitted Legacy Contaminants but were not assigned
+    results_args.update({
+        "badrows": legacy_contaminant_badrows,
+        "badcolumn": "BioaccumulationSampleID,Lab,AnalyteName",
+        "error_type": "Logic Error",
+        "error_message": f"Your lab was not assigned to submit legacy contaminant data (Non-PFAS) from this sample ID (<a href=scraper?action=help&layer=lu_bioaccumulationsampleid target=_blank>see the sample assignments lookup list</a>)"
+    })
+    warnings.append(checkData(**results_args))
+
+    print("# - - - - - - - - - - END Sample Assignment Check - - - - - - - - - - #")
+    # - - - - - - - - - - END Sample Assignment Check - - - - - - - - - - #
+
+
+
 
     # Check - A tissue chemistry submission cannot have records with a matrix of "sediment"
     results_args.update({
