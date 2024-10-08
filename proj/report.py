@@ -110,7 +110,7 @@ def report():
 #  <a href="/warnings-report?datatype=toxicity">Toxicity</a>
 # etc
 
-@report_bp.route('/warnings-report',  methods=['GET', 'POST'])
+@report_bp.route('/warnings-report', methods=['GET', 'POST'])
 def warnings_report():
 
     if request.method == 'POST':
