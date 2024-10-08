@@ -279,11 +279,11 @@ def chemistry_tissue(all_dfs):
     # Check - If the sampletype is "Lab blank", "Field blank", "Equipment blank", or "Blank spiked" then the matrix must be labwater or PFAS-free water
     results_args.update({
         "badrows": results[
-            (results.sampletype.isin(["Lab blank","Blank spiked"])) & (~results.matrix.isin(["labwater","PFAS-free water"]))
+            (results.sampletype.isin(["Lab blank","Blank spiked"])) & (~results.matrix.isin(["labwater","PFAS-free water","Ottawa sand"]))
         ].tmp_row.tolist(),
         "badcolumn" : "matrix",
         "error_type": "Value error",
-        "error_message" : "If the sampletype is Lab blank or Blank spiked, the matrix must be 'labwater' or 'PFAS-free water'"
+        "error_message" : "If the sampletype is Lab blank or Blank spiked, the matrix must be 'labwater', 'PFAS-free water', or 'Ottawa sand'"
     })
     errs.append(checkData(**results_args))
 
@@ -450,19 +450,37 @@ def chemistry_tissue(all_dfs):
     errs.append(checkData(**results_args))
 
     # Check - if the qualifier is "none" then the result must be greater than the RL (Error) Except lab blanks
-    print('# Check - if the qualifier is "none" or "equal to" then the result must be greater than the RL (Error) Except lab/field/equipment blanks')
+    print('# Check - if the qualifier is "none" then the result must be greater than the RL (Error) Except lab/field/equipment blanks')
     results_args.update({
         "badrows": results[
             (
-                (results.qualifier.isin(['none', 'equal to'])) & (~results.sampletype.isin(['Lab blank', 'Field blank', 'Equipment blank']) )
+                (results.qualifier.isin(['none'])) & (~results.sampletype.isin(['Lab blank', 'Field blank', 'Equipment blank']) )
             ) & 
             (results.result <= results.rl)
         ].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
-        "error_message": "if the qualifier is 'none' or 'equal to' then the result must be greater than the RL. (This does not apply to Lab blanks, Field blanks or Equipment blanks.)"
+        "error_message": "if the qualifier is 'none' then the result must be greater than the RL. (This does not apply to Lab blanks, Field blanks or Equipment blanks.)"
     })
     errs.append(checkData(**results_args))
+    
+    
+    # Check - if the qualifier is "equal to" then the result must be greater than the RL (Error) Except lab blanks
+    print('# Check - if the qualifier is "equal to" then the result must be greater than or equal to the RL (Error) Except lab/field/equipment blanks')
+    results_args.update({
+        "badrows": results[
+            (
+                (results.qualifier.isin(['equal to'])) & (~results.sampletype.isin(['Lab blank', 'Field blank', 'Equipment blank']) )
+            ) & 
+            (results.result < results.rl)
+        ].tmp_row.tolist(),
+        "badcolumn": "Qualifier, Result",
+        "error_type": "Value Error",
+        "error_message": "If the qualifier is 'equal to' then the result must be greater than or equal to the RL. (This does not apply to Lab blanks, Field blanks or Equipment blanks.)"
+    })
+    errs.append(checkData(**results_args))
+
+
 
     # Check - Comment is required if the qualifier says "analyst error" "contaminated" or "interference" (Error)
     print('# Check - Comment is required if the qualifier says "analyst error" "contaminated" or "interference" (Error)')
@@ -663,7 +681,7 @@ def chemistry_tissue(all_dfs):
     # -----------------------------------------------------------------------------------------------------------------------------------#
     # Units checks
     print("# units checks for Mussel tissue")
-    organic_tissue_mask = (results.analyteclass != 'Inorganics')
+    organic_tissue_mask = ((results.analyteclass != 'Inorganics') & (results.analytename != 'Lipids'))
     metals_tissue_mask = (results.analyteclass == 'Inorganics')
     
     # Non reference materials units must be ug/g ww for the tissue matrix (metals)

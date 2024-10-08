@@ -653,13 +653,23 @@ def chemistry(all_dfs):
     })
     warnings.append(checkData(**results_args))
     
-    # Check - The MDL should never be a negative number (Error)
-    print('# Check - The MDL should never be a negative number (Error)')
+    # Check - The MDL typically should not be missing (-88)
+    print('# Check - The MDL typically should not be missing (-88)')
     results_args.update({
-        "badrows": results[results.mdl < 0].tmp_row.tolist(),
+        "badrows": results[ results.mdl == -88 ].tmp_row.tolist(),
+        "badcolumn": "MDL",
+        "error_type": "Value Warning",
+        "error_message": "The MDL typically should not be missing (-88)"
+    })
+    warnings.append(checkData(**results_args))
+    
+    # Check - If the MDL is negative, it must be -88 (Error)
+    print('# Check - If the MDL is negative, it must be -88 (Error)')
+    results_args.update({
+        "badrows": results[ (results.mdl < 0) & (results.mdl != -88) ].tmp_row.tolist(),
         "badcolumn": "MDL",
         "error_type": "Value Error",
-        "error_message": "The MDL should not be negative"
+        "error_message": "If the MDL is negative, it must be -88"
     })
     errs.append(checkData(**results_args))
 
@@ -713,20 +723,41 @@ def chemistry(all_dfs):
     })
     errs.append(checkData(**results_args))
 
+
+
     # Check - if the qualifier is "none" then the result must be greater than the RL (Error) Except lab blanks
-    print('# Check - if the qualifier is "none" or "equal to" then the result must be greater than the RL (Error) Except lab/field/equipment blanks')
+    print('# Check - if the qualifier is "none" then the result must be greater than the RL (Error) Except lab/field/equipment blanks')
     results_args.update({
         "badrows": results[
             (
-                (results.qualifier.isin(['none', 'equal to'])) & (~results.sampletype.isin(['Lab blank', 'Field blank', 'Equipment blank']) )
+                (results.qualifier.isin(['none'])) & (~results.sampletype.isin(['Lab blank', 'Field blank', 'Equipment blank']) )
             ) & 
             (results.result <= results.rl)
         ].tmp_row.tolist(),
         "badcolumn": "Qualifier, Result",
         "error_type": "Value Error",
-        "error_message": "if the qualifier is 'none' or 'equal to' then the result must be greater than the RL (Except Lab, Field, Equipment blanks)"
+        "error_message": "if the qualifier is 'none' then the result must be greater than the RL. (This does not apply to Lab blanks, Field blanks or Equipment blanks.)"
     })
     errs.append(checkData(**results_args))
+    
+    
+    # Check - if the qualifier is "equal to" then the result must be greater than the RL (Error) Except lab blanks
+    print('# Check - if the qualifier is "equal to" then the result must be greater than or equal to the RL (Error) Except lab/field/equipment blanks')
+    results_args.update({
+        "badrows": results[
+            (
+                (results.qualifier.isin(['equal to'])) & (~results.sampletype.isin(['Lab blank', 'Field blank', 'Equipment blank']) )
+            ) & 
+            (results.result < results.rl)
+        ].tmp_row.tolist(),
+        "badcolumn": "Qualifier, Result",
+        "error_type": "Value Error",
+        "error_message": "If the qualifier is 'equal to' then the result must be greater than or equal to the RL. (This does not apply to Lab blanks, Field blanks or Equipment blanks.)"
+    })
+    errs.append(checkData(**results_args))
+
+
+
 
     # Check - Comment is required if the qualifier says "analyst error" "contaminated" or "interference" (Error)
     print('# Check - Comment is required if the qualifier says "analyst error" "contaminated" or "interference" (Error)')
