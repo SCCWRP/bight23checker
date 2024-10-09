@@ -540,14 +540,14 @@ def chemistry(all_dfs):
 
 
 
-    # Check - If the sampletype is "Lab blank", "Field blank", "Equipment blank", or "Blank spiked" then the matrix must be labwater or PFAS-free water
+    # Check - If the sampletype is "Lab blank", "Field blank", "Equipment blank", or "Blank spiked" then the matrix must be labwater or PFAS-free water, or Ottawa sand
     results_args.update({
         "badrows": results[
-            (results.sampletype.isin(["Lab blank","Blank spiked"])) & (~results.matrix.isin(["labwater","PFAS-free water"]))
+            (results.sampletype.isin(["Lab blank","Blank spiked"])) & (~results.matrix.isin(["labwater","PFAS-free water","Ottawa sand"]))
         ].tmp_row.tolist(),
         "badcolumn" : "matrix",
         "error_type": "Value error",
-        "error_message" : "If the sampletype is Lab blank or Blank spiked, the matrix must be 'labwater' or 'PFAS-free water'"
+        "error_message" : "If the sampletype is Lab blank or Blank spiked, the matrix must be 'Ottawa sand', 'labwater' or 'PFAS-free water'"
     })
     errs.append(checkData(**results_args))
 
@@ -1006,13 +1006,13 @@ def chemistry(all_dfs):
     # (for matrix = sediment)
     ng_over_g_analyteclasses = ['Chlorinated Hydrocarbons', 'PAH', 'PFAS', 'PBDE', 'PCB', 'Pyrethroid', 'TIREWEAR']
     ng_over_g_mask =  (results.analyteclass.isin(ng_over_g_analyteclasses))
-    unit_mask = (ng_over_g_mask & (~results.sampletype.str.contains('Reference', case = False))) & (results.units != 'ng/g dw')
+    unit_mask = (ng_over_g_mask & (~results.sampletype.str.contains('Reference', case = False)) & (~results.matrix.str.contains('water', case = False)) ) & (results.units != 'ng/g dw')
     
     results_args.update({
         "badrows": results[unit_mask].tmp_row.tolist(),
         "badcolumn": "Units",
         "error_type": "Value Error",
-        "error_message": f"For {','.join(ng_over_g_analyteclasses)} the units must be ng/g dw"
+        "error_message": f"For {','.join(ng_over_g_analyteclasses)} the units must be ng/g dw (Unless it is a reference material or a blank water matrix)"
     })
     errs.append(checkData(**results_args))
 

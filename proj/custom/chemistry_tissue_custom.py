@@ -605,6 +605,7 @@ def chemistry_tissue(all_dfs):
     print('# ---------------------------------------------------------------------------------------------------------------------------------#')
     # Check - Holding times for AnalyteClasses: 
     print('# Check - Holding times for AnalyteClasses: ')
+
     # FIPRONIL has been removed from thsi check (and should be from all checks)
     #  Inorganics, PAH, PCB, Chlorinated Hydrocarbons, PBDE, Pyrethroid, TOC/TN is 1 year (see notes)
     print('#  Inorganics, PAH, PCB, Chlorinated Hydrocarbons, PBDE, Pyrethroid, TOC/TN is 1 year (see notes)')
@@ -620,7 +621,22 @@ def chemistry_tissue(all_dfs):
         "error_type": "Sample Past Holding Time",
         "error_message": f"Here, the analysisdate is more than a year after the sampledate, which is invalid for analyteclasses {','.join(holding_time_classes)}"
     })
+    warnings.append(checkData(**results_args))
+    
+
+    results_args.update({
+        "badrows": results[
+                results.analyteclass.isin(holding_time_classes) 
+                & holding_time_mask 
+                & (results.qacode != 'Analyzed outside of holding time')
+            ].tmp_row.tolist(),
+        "badcolumn": "SampleDate, AnalysisDate",
+        "error_type": "Sample Past Holding Time",
+        "error_message": f"The AnalysisDate is more than a year after the SampleDate, which is invalid for analyteclasses {','.join(holding_time_classes)}. Please enter 'Analyzed outside of holding time' in the QACode column."
+    })
     errs.append(checkData(**results_args))
+
+
 
     # NOTE The Holding time for Mercury is 6 months, so a separate check will be written here specifically for Mercury
     print('# NOTE The Holding time for Mercury is 6 months, so a separate check will be written here specifically for Mercury')
@@ -633,7 +649,23 @@ def chemistry_tissue(all_dfs):
         "error_type": "Sample Past Holding Time",
         "error_message": f"Here, the analysisdate is more than 6 months after the sampledate, which is past the holding time for Mercury"
     })
+    warnings.append(checkData(**results_args))
+    
+    # Issue an error if the QACode is not "Analyzed outside of holding time" for Mercury samples that are past the holding time
+    results_args.update({
+        "badrows": results[
+            Hg_holding_time_mask &
+            (results.qacode != 'Analyzed outside of holding time')
+        ].tmp_row.tolist(),
+        "badcolumn": "SampleDate, AnalysisDate",
+        "error_type": "Sample Past Holding Time",
+        "error_message": f"The AnalysisDate is more than 6 months after the SampleDate, which is past the holding time for Mercury. Please enter 'Analyzed outside of holding time' in the QACode column."
+    })
     errs.append(checkData(**results_args))
+
+
+
+
     # ---------------------------------------------------------------------------------------------------------------------------------#
     # ---------------------------------------------------------------------------------------------------------------------------------#
     print('# ---------------------------------------------------------------------------------------------------------------------------------#')
@@ -757,7 +789,10 @@ def chemistry_tissue(all_dfs):
     if not results.empty:
         # I cannot think of a single case where results here would be empty, but i always put that
         
-        checkdf = results[(results.matrix == 'tissue') & (~results.bioaccumulationsampleid.isin(['LABQC','0000']))]
+
+        print("# Issue a warning for where they have organics without lipids, but they dont have lipids")
+        # Issue a warning for where they have organics without lipids, but they dont have lipids
+        checkdf = results[(results.matrix == 'tissue') & (results.analyteclass.str.lower() != 'inorganics') & (~results.bioaccumulationsampleid.isin(['LABQC','0000']))]
         if not checkdf.empty:
             checkdf = checkdf.groupby(['bioaccumulationsampleid']).agg({
                     # True if Lipids is in there, False otherwise
@@ -778,6 +813,35 @@ def chemistry_tissue(all_dfs):
                     })
                     errs.append(checkData(**results_args))
         
+        
+        
+        
+
+        print("# Issue a warning for where the analyteclass is inorganics, but they dont have lipids")
+        # Issue a warning for where the analyteclass is inorganics, but they dont have lipids
+        checkdf = results[(results.matrix == 'tissue') & (results.analyteclass.str.lower() == 'inorganics') & (~results.bioaccumulationsampleid.isin(['LABQC','0000']))]
+        if not checkdf.empty:
+            checkdf = checkdf.groupby(['bioaccumulationsampleid']).agg({
+                    # True if Lipids is in there, False otherwise
+                    'analytename' : (lambda grp: 'Lipids' in grp.unique()), 
+                    'tmp_row': list
+                }) \
+                .reset_index() \
+                .rename(columns = {'analytename': 'has_lipids'}) # rename to has_lipids since really that is what the column is representing after the groupby operation
+            
+            bad = checkdf[~checkdf.has_lipids]
+            if not bad.empty:
+                for _, row in bad.iterrows():
+                    results_args.update({
+                        "badrows": row.tmp_row,
+                        "badcolumn": "BioAccumulationSampleID,AnalyteName",
+                        "error_type": "Missing Data",
+                        "error_message": f"""For the bioaccumulation sampleid {row.bioaccumulationsampleid} it appears the percent Lipid content was not reported"""
+                    })
+                    warnings.append(checkData(**results_args))
+        
+
+        # Issue the actual error for where they have lipids, but the units are not % by weight
         results_args.update({
             "badrows": results[(results.analytename == 'Lipids') & (results.units != f'% by weight')].tmp_row.tolist(),
             "badcolumn": "BioAccumulationSampleID,AnalyteName",
