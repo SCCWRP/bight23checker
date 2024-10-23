@@ -3,7 +3,7 @@
 from inspect import currentframe
 from flask import current_app, g
 from datetime import timedelta
-from .functions import checkData, checkLogic, sample_assignment_check, mismatch
+from .functions import checkData, sample_assignment_check, mismatch
 from .chem_functions_custom import *
 import pandas as pd
 import re
@@ -252,37 +252,73 @@ def chemistry(all_dfs):
         })
         errs.append(checkData(**results_args))
         
-        # Check - for each grouping of stationid, fieldduplicate, labreplicate, the sum of the results should be between 99.8 and 100.2
+        # Check - for each grouping of stationid, fieldduplicate, labreplicate, the sum of the results should be between 99.1 and 100.9
         tmp = results.groupby(['stationid','fieldduplicate','labreplicate']).apply(lambda df: df.result.fillna(0).replace(-88, 0).sum())
         if tmp.empty:
             return {'errors': errs, 'warnings': warnings}
 
-        tmp = tmp.reset_index(name='resultsum')
-        tmp = tmp[(tmp.resultsum < 99.8) | (tmp.resultsum > 100.2)]
+        tmp_ = tmp.reset_index(name='resultsum')
         
-        if tmp.empty:
+        # tmp will be for the error, tmp2 will be for the enforcement of putting the QA flag
+        # Ken says that if the sum of the results is not between 99.8 and 100.2, they should be flagged with a QA code
+        tmp = tmp_[(tmp_.resultsum < 99.1) | (tmp_.resultsum > 100.9)]
+        tmp2 = tmp_[(tmp_.resultsum.between(99.1, 99.8, inclusive = 'left')) | (tmp_.resultsum.between(100.2, 100.9, inclusive = 'right') )]
+        
+        if tmp.empty and tmp2.empty:
             return {'errors': errs, 'warnings': warnings}
+        
+        if not tmp.empty:
 
-        checkdf = results.merge(tmp, on = ['stationid','fieldduplicate','labreplicate'], how = 'inner')
-        checkdf = checkdf \
-            .groupby(['stationid','fieldduplicate','labreplicate','resultsum']) \
-            .apply(lambda df: df.tmp_row.tolist()) \
-            .reset_index(name='badrows')
+            checkdf = results.merge(tmp, on = ['stationid','fieldduplicate','labreplicate'], how = 'inner')
+            checkdf = checkdf \
+                .groupby(['stationid','fieldduplicate','labreplicate','resultsum']) \
+                .apply(lambda df: df.tmp_row.tolist()) \
+                .reset_index(name='badrows')
 
-        tmp_argslist = checkdf.apply(
-            lambda row: 
-            {
-                "badrows": row.badrows,
-                "badcolumn": "Result",
-                "error_type": "Value Error",
-                "error_message": f"For this grouping of StationID: {row.stationid}, FieldDuplicate: {row.fieldduplicate}, and LabReplicate: {row.labreplicate}, the sum of the results was {row.resultsum}, which is outside of a range we would consider as normal (99.8 to 100.2)"
-            },
-            axis = 1
-        ).values
+            tmp_argslist = checkdf.apply(
+                lambda row: 
+                {
+                    "badrows": row.badrows,
+                    "badcolumn": "Result",
+                    "error_type": "Value Error",
+                    "error_message": f"For this grouping of StationID: {row.stationid}, FieldDuplicate: {row.fieldduplicate}, and LabReplicate: {row.labreplicate}, the sum of the results was {row.resultsum}, which is outside of an acceptable range (99.1 to 100.9)"
+                },
+                axis = 1
+            ).values
 
-        for argset in tmp_argslist:
-            results_args.update(argset)
-            errs.append(checkData(**results_args))
+            for argset in tmp_argslist:
+                results_args.update(argset)
+                errs.append(checkData(**results_args))
+        
+        
+        
+        if not tmp2.empty:
+
+            checkdf = results.merge(tmp2, on = ['stationid','fieldduplicate','labreplicate'], how = 'inner')
+            checkdf = checkdf[~checkdf.qacode.str.contains('Results outside of acceptance limits', case = False)]
+            
+            if not checkdf.empty:
+                checkdf = checkdf \
+                    .groupby(['stationid','fieldduplicate','labreplicate','resultsum']) \
+                    .apply(lambda df: df.tmp_row.tolist()) \
+                    .reset_index(name='badrows')
+
+                # Only want to give them an error if they didnt flag it with a QA code
+                tmp2_argslist = checkdf.apply(
+                    lambda row: 
+                    {
+                        "badrows": row.badrows, 
+                        "badcolumn": "Result",
+                        "error_type": "Value Error",
+                        "error_message": f"For this grouping of StationID: {row.stationid}, FieldDuplicate: {row.fieldduplicate}, and LabReplicate: {row.labreplicate}, the sum of the results was {row.resultsum}, which is outside of a range we would consider as normal (99.8 to 100.2). Please mark with an appropriate <a href=https://checker.sccwrp.org/bight23checker/scraper?action=help&layer=lu_chemqacodes target=_blank>QA Code</a> (One that indicates the results are outside of the acceptance limits)"
+                    },
+                    axis = 1
+                ).values
+
+                for argset in tmp2_argslist:
+                    results_args.update(argset)
+                    errs.append(checkData(**results_args))
+        
         
         print('# ----- END CUSTOM CHECKS - GRAINSIZE RESULTS ----- #')
         return {'errors': errs, 'warnings': warnings}
