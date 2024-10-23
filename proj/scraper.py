@@ -4,6 +4,7 @@ from .utils.mail import send_mail
 
 
 scraper = Blueprint('scraper', __name__)
+@scraper.route('/lookuplists', methods=['GET'])
 @scraper.route('/scraper', methods=['GET'])
 def lookuplists():
     print("start scraper")
@@ -103,3 +104,5 @@ def scraper_error_handler(error):
         server = current_app.config['MAIL_SERVER']
     )
     return "exception occurred trying to fetch lookup list"
+
+
