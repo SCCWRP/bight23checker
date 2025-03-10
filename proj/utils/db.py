@@ -60,6 +60,11 @@ class GeoDBDataFrame(DataFrame):
                                     # single quotes within a string are escaped by doubling them
                                     # not by using a backslash
                                     else "'{}'".format(str(val).strip().replace("'","''"))  
+                                    if not check_dtype(int, val)
+                                    
+                                    else "'{}'".format(
+                                        str( int(val) if ( int(val) - float(val) == 0 ) else val ).strip()
+                                    )
                                     for val in x
                                 ]
                             )
