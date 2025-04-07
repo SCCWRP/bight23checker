@@ -535,17 +535,19 @@ def chemistry_tissue(all_dfs):
         error_args = [*error_args, *chk_required_sampletypes(results, smpltyps, anltclass)]
         
         print("Check for sample duplicates or matrix spike duplicates")
-        if anltclass != 'Inorganics':
+        if anltclass == 'Inorganics':
+            print('Inorganics')
+            error_args = [*error_args, *check_dups(results, anltclass, 'Blank spiked')]
+        elif anltclass == 'PFAS':
+            error_args = [*error_args, *check_dups(results, anltclass, 'Matrix spike')]
+            error_args = [*error_args, *check_dups(results, anltclass, 'Blank spiked')]
+        elif anltclass == 'Lipids':
+            print("Lipids - nothing to do here.")
+        else:
             print('Non-Inorganics')
             # For Inorganics, they can have either or, so the way we deal with inorganics must be different
             # error_args = [*error_args, *check_dups(results, anltclass, 'Result')]
             error_args = [*error_args, *check_dups(results, anltclass, 'Matrix spike')]
-        elif anltclass == 'PFAS':
-            error_args = [*error_args, *check_dups(results, anltclass, 'Matrix spike')]
-            error_args = [*error_args, *check_dups(results, anltclass, 'Blank spiked')]
-        else:
-            print('Inorganics')
-            error_args = [*error_args, *check_dups(results, anltclass, 'Blank spiked')]
             
     requires_crm = ["Inorganics", "PCB", "Chlorinated Hydrocarbons"]
     error_args = [*error_args, *check_required_crm(results, requires_crm)]
@@ -792,7 +794,7 @@ def chemistry_tissue(all_dfs):
 
         print("# Issue a warning for where they have organics without lipids, but they dont have lipids")
         # Issue a warning for where they have organics without lipids, but they dont have lipids
-        checkdf = results[(results.matrix == 'tissue') & (results.analyteclass.str.lower() != 'inorganics') & (~results.bioaccumulationsampleid.isin(['LABQC','0000']))]
+        checkdf = results[(results.matrix == 'tissue') & (results.analyteclass.str.lower().isin(['inorganics','lipids'])) & (~results.bioaccumulationsampleid.isin(['LABQC','0000']))]
         if not checkdf.empty:
             checkdf = checkdf.groupby(['bioaccumulationsampleid']).agg({
                     # True if Lipids is in there, False otherwise
@@ -819,7 +821,7 @@ def chemistry_tissue(all_dfs):
 
         print("# Issue a warning for where the analyteclass is inorganics, but they dont have lipids")
         # Issue a warning for where the analyteclass is inorganics, but they dont have lipids
-        checkdf = results[(results.matrix == 'tissue') & (results.analyteclass.str.lower() == 'inorganics') & (~results.bioaccumulationsampleid.isin(['LABQC','0000']))]
+        checkdf = results[(results.matrix == 'tissue') & (results.analyteclass.str.lower().isin(['inorganics','lipids']) ) & (~results.bioaccumulationsampleid.isin(['LABQC','0000']))]
         if not checkdf.empty:
             checkdf = checkdf.groupby(['bioaccumulationsampleid']).agg({
                     # True if Lipids is in there, False otherwise
@@ -838,7 +840,9 @@ def chemistry_tissue(all_dfs):
                         "error_type": "Missing Data",
                         "error_message": f"""For the bioaccumulation sampleid {row.bioaccumulationsampleid} it appears the percent Lipid content was not reported"""
                     })
-                    warnings.append(checkData(**results_args))
+
+                    # April 7, 2025 - changed this to a error from a warning, because I checked the QA document and found that it is listed as an error regardless of the analyte class
+                    errs.append(checkData(**results_args))
         
 
         # Issue the actual error for where they have lipids, but the units are not % by weight
@@ -1037,7 +1041,7 @@ def chemistry_tissue(all_dfs):
 
 
     # ------- Table 6-3 - PCBs, Chlorinated Pesticides, and PFAS, tissue matrices (tissue and labwater) -------#
-    mask63 = results.analyteclass != 'Inorganics'
+    mask63 = ~results.analyteclass.isin(['Inorganics','Lipids'])
     results63 = results[mask63]
 
     if not results63.empty:
