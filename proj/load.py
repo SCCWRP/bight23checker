@@ -45,6 +45,11 @@ def load():
             assert string_converters is not None, f"String converters not returned for {sheet} in fetch_meta function"
             assert timestamp_converters is not None, f"Timestamp converters not returned for {sheet} in fetch_meta function"
 
+            print("string_converters")
+            print(string_converters)
+            print("timestamp_converters")
+            print(timestamp_converters)
+
 
             # This should never raise an exception - at least converting the columns to str datatypes should never cause a problem
             tmpdf = pd.read_excel(
@@ -55,6 +60,9 @@ def load():
                 na_values = [''],
                 converters = string_converters
             )
+
+            print("tmpdf")
+            print(tmpdf)
 
             # Converting to timestamps may cause a critical error if the user enters a non-valid timestamp literal
             # We do not want to catch the exception here anymore, because if it fails to convert to timestamp, its not going to load to the database anyways
@@ -133,6 +141,8 @@ def load():
 
         all_dfs[tbl] = GeoDBDataFrame(all_dfs[tbl])
 
+        
+
 
 
     # We have to make an exception for toxsummary, since the summary table gets added after the fact
@@ -180,6 +190,9 @@ def load():
             ALTER TABLE {tbl} ALTER COLUMN objectid SET DEFAULT next_rowid('sde','{tbl}');
             """
         )
+
+        print("all_dfs[tbl]")
+        print(all_dfs[tbl])
 
         all_dfs[tbl].to_geodb(tbl, g.eng)
 

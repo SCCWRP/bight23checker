@@ -63,7 +63,9 @@ class GeoDBDataFrame(DataFrame):
                                     if not check_dtype(int, val)
                                     
                                     else "'{}'".format(
-                                        str( int(val) if ( int(val) - float(val) == 0 ) else val ).strip()
+                                        "{}".format(str(val).strip().replace("'", "''").replace('.','')) 
+                                        if float(val) == 0 
+                                        else str( int(val) if ( int(val) - float(val) == 0 ) else val ).strip()
                                     )
                                     for val in x
                                 ]
