@@ -338,3 +338,19 @@ def completeness_report():
     output = format_existing_excel(output)
 
     return send_file(output, as_attachment=True, download_name=f'{report_type}_completeness_report.xlsx', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+
+
+# For Alondra
+@report_bp.route('/qa-assessment-report', methods=['GET', 'POST'])
+def qa_assessment():
+    eng = g.eng
+    test_cases = pd.read_sql("SELECT * FROM vw_qa_method_blank_table55_assessment_by_analyte", eng)
+    
+    return render_template('qa_assessment.jinja2', test_cases = test_cases)
+
+
+
+
+       

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QA Assessment Report Page</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-KyZXEAg3QhqLMpG8r+Knujsl5/5hb7O7C1C+6KGzT+gKfb9KeD5l5bFnf4G6/Jz6" crossorigin="anonymous">
+</head>
+
+<style>
+    /* Collapse the borders so the table has lines between cells but no boxes */
+    table {
+        border-collapse: collapse;
+        width: 100%;
+    }
+
+    th, td {
+        text-align: center; /* Center-align header and data cells */
+        vertical-align: middle; /* Ensure text is vertically centered */
+        border-left: 1px solid black; /* Border for left side of each cell */
+        border-right: 1px solid black; /* Border for right side of each cell */
+    }
+
+    /* Style for header cells */
+    thead th {
+        background-color: #f2f2f2; /* Light gray background for headers */
+        border-top: 1px solid black; /* Top border for header cells */
+        border-bottom: 1px solid black; /* Bottom border for header cells */
+    }
+
+    /* Border between the main header and sub-headers */
+    thead tr:nth-child(2) th {
+        border-top: 2px solid black; /* Border for sub-header */
+    }
+
+    /* Styling for data cells */
+    td {
+        border-top: 1px solid black; /* Border between rows */
+        border-bottom: 1px solid black; /* Border between rows */
+    }
+
+    /* Style for cells that span multiple columns */
+    thead th[colspan="2"] {
+        background-color: #d9d9d9; /* Darker background for multi-column header cells */
+    }
+
+    /* Ensure the first column data aligns with the sub-headers below */
+    td:first-child {
+        text-align: left; /* Left-align the first column data */
+    }
+
+    /* Additional styles for unbordered rows (for Frequency Success, Accuracy Success, etc.) */
+    .unbordered td {
+        border: none; /* Remove border from these rows */
+    }
+</style>
+
+<body>
+    <div class="container mt-5">
+        <h1 class="mb-4">QA Assessment Report</h1>
+
+        <!-- Table displaying the test cases -->
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <!-- Main Header for CHC -->
+                    <th rowspan="2" class="align-middle text-center">Quality Control Parameter</th>
+                    <th colspan="2" class="text-center">CHC</th>
+                </tr>
+                <tr>
+                    <!-- Subheaders under Method Blank -->
+                    <th class="text-center">DQO</th>
+                    <th class="text-center">Success</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Method Blank Row -->
+                <tr>
+                    <td rowspan="4" class="text-center">Method Blank</td> <!-- Spans 4 rows -->
+                    <td>Example DQO 1</td>
+                    <td>Example Success 1</td>
+                </tr>
+                <!-- Unbordered rows for Frequency Success, Accuracy Success, and Violated Batches -->
+                <tr class="unbordered">
+                    <td>Frequency Success</td> <!-- Under Method Blank in the first column -->
+                    <td></td>
+                </tr>
+                <tr class="unbordered">
+                    <td>Accuracy Success</td> <!-- Under Method Blank in the first column -->
+                    <td></td>
+                </tr>
+                <tr class="unbordered">
+                    <td>Violated Batches</td> <!-- Under Method Blank in the first column -->
+                    <td></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js" integrity="sha384-pzjw8f+ua7Kw1TIq0fgxC9Ckh1I7bHgRVuXYYb20TkCk3uNSG8gD7mi1dN97pfZ4" crossorigin="anonymous"></script>
+</body>
+
+</html>

@@ -34,7 +34,6 @@ def chk_required_sampletypes(df, sampletypes, analyteclass, additional_grouping_
     if tmpdf.empty:
         return []
 
-    print(tmpdf)
     tmpdf = tmpdf.groupby(grouping_columns).apply(
         lambda subdf:
         set(sampletypes) - set(subdf.sampletype.unique())

@@ -284,8 +284,6 @@ def check_strata_grab(grab, strata_lookup, field_assignment_table):
     
 
 
-    print("grab after merge")
-    print(grab)
     # Make the points based on long, lat columns of grab
     grab['grabpoint'] = grab.apply(
         lambda row: shapelyPoint(row['longitude'], row['latitude']), axis=1
@@ -326,8 +324,6 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
         on = ['region','stratum'],
         how = 'left'
     )
-    print("trawl")
-    print(trawl)
 
     # We essentially make it a critical error when the field assignment doesnt match the feature layer
     # The reason for this is that it essentially is a server side error rather than a user error
@@ -370,19 +366,11 @@ def check_strata_trawl(trawl, strata_lookup, field_assignment_table):
     # these objects are also not json serializable so it makes it difficult, so its better we just drop the columns
     trawl.drop(['region_polygon','trawl_line'], axis = 'columns', inplace = True, errors = 'ignore')
 
-    print('in the trawl strata check - trawl dataframe')
-
-    print(trawl)
-
     # Now we get the bad rows
     bad_df = trawl.assign(tmp_row=trawl.index).query("is_station_in_strata == False")    
     return bad_df
 
 def export_sdf_to_json(path, sdf):
-    print('path')
-    print(path)
-    print('sdf')
-    print(sdf)
     if not sdf.empty:
         if "paths" in sdf['SHAPE'].iloc[0].keys():
             # data = [

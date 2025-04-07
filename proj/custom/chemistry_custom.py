@@ -83,10 +83,7 @@ def chemistry(all_dfs):
         f"SELECT DISTINCT stationid, sampledate FROM tbl_grabevent WHERE UPPER({ 'grainsize' if all(GRAIN_BOOL_SERIES) else 'sedimentchemistry' }) = 'YES';", eng
     )
     
-    print("""results[results.stationid.str.lower() != '0000']""")
-    print(results[results.stationid.str.lower() != '0000'])
-    print("grabevent")
-    print(grabevent)
+
     
     results_args.update({
         "badrows": mismatch(results[results.stationid.str.lower() != '0000'], grabevent, matchcols),
@@ -186,7 +183,9 @@ def chemistry(all_dfs):
                         "error_type": "Missing Data",
                         "error_message": f"""The station {row.stationid} was assigned as PFAS field blank but it appears to be missing from your submission"""
                     })
-                    errs.append(checkData(**results_args))
+                    # Make a warning on Feb 26, 2025 to let Weck submit their data
+                    # errs.append(checkData(**results_args))
+                    warnings.append(checkData(**results_args))
 
 
         # Check - if a lab is submitting PFAS then they need to also submit the equipment blanks
@@ -199,7 +198,8 @@ def chemistry(all_dfs):
         
         # Filter down to the records where the lab is NOT in the list of labs that have already given equipment blanks
         # if equipblanks is an empty dataframe, disregard - doing equipblanks.lab will give an error in that case
-        checkdf = pfasresults[~pfasresults.lab.isin(equipblanks.lab.tolist())]
+        # only concerned with the original two PFAS analytes that were going to be analyzed
+        checkdf = pfasresults[ (pfasresults.analytename.isin(['PFOS','PFOA'])) & (~pfasresults.lab.isin(equipblanks.lab.tolist()))]
         
         if not checkdf.empty:
             checkdf = checkdf.groupby(['lab','analytename']).agg(
@@ -295,7 +295,12 @@ def chemistry(all_dfs):
         if not tmp2.empty:
 
             checkdf = results.merge(tmp2, on = ['stationid','fieldduplicate','labreplicate'], how = 'inner')
-            checkdf = checkdf[~checkdf.qacode.str.contains('Results outside of acceptance limits', case = False)]
+            checkdf = checkdf[
+                ~(
+                    checkdf.qacode.str.contains('Results outside of acceptance limits', case = False) | 
+                    checkdf.qacode.str.contains('RSD exceeds control limit', case = False)
+                )
+            ]
             
             if not checkdf.empty:
                 checkdf = checkdf \
@@ -354,7 +359,7 @@ def chemistry(all_dfs):
         errs_args = chkdf.apply(
             lambda row:
             {
-                "error_or_warning": "warning" if ('Reference' in str(row.sampletype)) else "error",
+                "error_or_warning": "warning", #if ('Reference' in str(row.sampletype)) else "error", # made a warning on Jan 27 2024 in order to let LACSD data through
                 "badrows": row.tmp_row,
                 "badcolumn" : "stationid",
                 "error_type": "Missing Data",
@@ -464,7 +469,9 @@ def chemistry(all_dfs):
                         "error_type": "Missing Data",
                         "error_message": f"""For the station {row.stationid} and sampledate {row.sampledate} it appears the sediment moisture was not reported"""
                     })
-                    errs.append(checkData(**results_args))
+                    # Make a warning on Feb 26 2025 to let Weck submit
+                    # errs.append(checkData(**results_args))
+                    warnings.append(checkData(**results_args))
 
 
 
@@ -478,7 +485,7 @@ def chemistry(all_dfs):
 
     # Check for duplicates on stationid, sampledate, analysisbatchid, sampletype, matrix, analytename, fieldduplicate, labreplicate, SAMPLEID
     # Cant be done in Core since there is no sampleid column that we are having them submit, but rather it is a field we create internally based off the labsampleid column
-    dupcols = ['analysisbatchid', 'sampletype', 'matrix', 'analytename', 'fieldduplicate', 'labreplicate', 'sampleid']
+    dupcols = ['stationid','analysisbatchid', 'sampletype', 'matrix', 'analytename', 'fieldduplicate', 'labreplicate', 'sampleid']
     
     # Technically doing sort_values is unnecessary and irrelevant, 
     #   but if you were to test the code and examine, you would see that it would put the duplicated records next to each other
@@ -907,7 +914,8 @@ def chemistry(all_dfs):
     
     for argset in error_args:
         results_args.update(argset)
-        errs.append(checkData(**results_args))
+        # errs.append(checkData(**results_args)) # as most data is in already, we'll make this a warning (1/29/2025)
+        warnings.append(checkData(**results_args))
 
     
     
@@ -1973,7 +1981,7 @@ def chemistry(all_dfs):
                     tmp = tmp.tolist()
                     for argset in tmp:
                         results_args.update(argset)
-                        errs.append(checkData(**results_args))
+                        warnings.append(checkData(**results_args))
 
         print("# --- END TABLE 5-5 Check #1 --- #")
         # --- END TABLE 5-5 Check #1 --- #
