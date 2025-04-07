@@ -90,8 +90,17 @@ def unifiedquery():
     export_link = os.path.join(hostname, url_for('unifiedquery.send_log', path=f'{TIMESTAMP}-export.csv'))
 
     # sql injection check three
-    valid_tables = {'chemistry': 'tbl_chemistry', 'benthicinfauna': 'tbl_benthicinfauna',
-                    'sqoscores': 'tbl_sqoscores', 'sqocondition': 'tbl_sqocondition', 'sqosummary': 'tbl_sqosummary'}
+    valid_tables = {
+      'benthicinfauna': 'tbl_benthicinfaunaunifiedpublish',
+      'chemistry': 'tbl_chemistryunifiedpublish',
+      'fishabundance': 'tbl_fishabundanceunifiedpublish',
+      'fishbiomass': 'tbl_fishbiomasspublish',
+      'invertabundance': 'tbl_invertabundanceunifiedpublish',
+      'invertbiomass': 'tbl_invertbiomasspublish',
+      'sqocondition': 'tbl_sqocondition',
+      'sqoscores': 'tbl_sqoscores',
+      'sqosummary': 'tbl_sqosummary'
+    }
     if request.args.get("callback"):
         test = request.args.get("callback", False)
         print(test)
