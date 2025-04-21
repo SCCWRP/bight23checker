@@ -258,12 +258,14 @@ def chemistry(all_dfs):
             return {'errors': errs, 'warnings': warnings}
 
         tmp_ = tmp.reset_index(name='resultsum')
+        tmp_ = tmp_[~tmp_.stationid.isin(['0','0000'])] # not checking QA data
         
         # tmp will be for the error, tmp2 will be for the enforcement of putting the QA flag
         # Ken says that if the sum of the results is not between 99.8 and 100.2, they should be flagged with a QA code
         tmp = tmp_[(tmp_.resultsum < 99.1) | (tmp_.resultsum > 100.9)]
         tmp2 = tmp_[(tmp_.resultsum.between(99.1, 99.8, inclusive = 'left')) | (tmp_.resultsum.between(100.2, 100.9, inclusive = 'right') )]
         
+
         if tmp.empty and tmp2.empty:
             return {'errors': errs, 'warnings': warnings}
         
@@ -533,7 +535,7 @@ def chemistry(all_dfs):
         "badrows": results[ (~results.stationid.isin(['0000'])) & (results.sampletype == 'Matrix spike') ].tmp_row.tolist(),
         "badcolumn" : 'SampleType,StationID',
         "error_type": "Value Error",
-        "error_message" : f"All QA sampletypes must have a stationid of 0000 (Including Matrix spikes). If this is a Matrix spike done with the actual sediment sample, you should use the appropriate <a href={current_app.script_root}/scraper?action=help&layer=lu_chemqacodes>QA Code</a> ('Matrix spike done with the actual sediment sample as the matrix for spiking')"
+        "error_message" : f"All QA sampletypes must have a stationid of 0000 (Including Matrix spikes). If this is a Matrix spike done with the actual sediment sample, you should use the appropriate <a target=_blank href=scraper?action=help&layer=lu_chemqacodes>QA Code</a> ('Matrix spike done with the actual sediment sample as the matrix for spiking')"
     })
     errs.append(checkData(**results_args))
     
