@@ -40,12 +40,15 @@ def chemistry_tissue(all_dfs):
     )
 
     # Calculate percent recovery
+    print("# Calculate percent recovery")
     results['percentrecovery'] = \
         results.apply(
             lambda x: 
+            pd.NA if x.truevalue == 0 else
             float(x.result)/float(x.truevalue)*100 if ('spike' in x.sampletype.lower())|('reference' in x.sampletype.lower()) else -88, 
             axis = 1
         )
+    print("# DONE Calculating percent recovery")
     
     # sampleid should just be everything before the last occurrence of a hyphen character in the labsampleid
     # if no hyphen, the sampleid is just the labsampleid
@@ -212,7 +215,7 @@ def chemistry_tissue(all_dfs):
         errs_args = chkdf.apply(
             lambda row:
             {
-                "error_or_warning": "warning" if ('Reference' in str(row.sampletype)) else "error",
+                "error_or_warning": "warning" if ( ('Reference' in str(row.sampletype)) or (row.analyteclass == 'PFAS') ) else "error",
                 "badrows": row.tmp_row,
                 "badcolumn" : "BioAccumulationSampleID,SampleType",
                 "error_type": "missing_data",
@@ -811,9 +814,9 @@ def chemistry_tissue(all_dfs):
                         "badrows": row.tmp_row,
                         "badcolumn": "BioAccumulationSampleID,AnalyteName",
                         "error_type": "Missing Data",
-                        "error_message": f"""For the bioaccumulation sampleid {row.bioaccumulationsampleid} it appears the percent Lipid content was not reported"""
+                        "error_message": f"""For the bioaccumulation sampleid {row.bioaccumulationsampleid} it appears the percent Lipid content was not reported. If Lipids were reported in a previous submission, you can ignore this warning"""
                     })
-                    errs.append(checkData(**results_args))
+                    warnings.append(checkData(**results_args))
         
         
         
@@ -838,11 +841,11 @@ def chemistry_tissue(all_dfs):
                         "badrows": row.tmp_row,
                         "badcolumn": "BioAccumulationSampleID,AnalyteName",
                         "error_type": "Missing Data",
-                        "error_message": f"""For the bioaccumulation sampleid {row.bioaccumulationsampleid} it appears the percent Lipid content was not reported"""
+                        "error_message": f"""For the bioaccumulation sampleid {row.bioaccumulationsampleid} it appears the percent Lipid content was not reported. If Lipids were reported in a previous submission, you can ignore this warning"""
                     })
 
                     # April 7, 2025 - changed this to a error from a warning, because I checked the QA document and found that it is listed as an error regardless of the analyte class
-                    errs.append(checkData(**results_args))
+                    warnings.append(checkData(**results_args))
         
 
         # Issue the actual error for where they have lipids, but the units are not % by weight
