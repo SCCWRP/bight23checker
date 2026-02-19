@@ -139,6 +139,38 @@ def infauna(all_dfs):
     }
     errs = [*errs, checkData(**infaunalabundance_args)]     
     
+    # Voucher / PersonalVoucher checks
+    print("Custom Check: If personalvoucher = 'Yes', then voucher must also = 'Yes'.")
+    badrows = infaunalabundance[
+        (infaunalabundance.personalvoucher == 'Yes') & (infaunalabundance.voucher != 'Yes')
+    ].tmp_row.tolist()
+    infaunalabundance_args = {
+        "dataframe": infaunalabundance,
+        "tablename": 'tbl_infaunalabundance',
+        "badrows": badrows,
+        "badcolumn": "personalvoucher",
+        "error_type": "Logic Error",
+        "is_core_error": False,
+        "error_message": "PersonalVoucher cannot be 'Yes' if Voucher is not 'Yes'."
+    }
+    errs = [*errs, checkData(**infaunalabundance_args)]
+
+    print("Custom Check: If voucher = 'Yes', then personalvoucher must be filled in.")
+    badrows = infaunalabundance[
+        (infaunalabundance.voucher == 'Yes') &
+        (infaunalabundance.personalvoucher.isnull() | (infaunalabundance.personalvoucher == ''))
+    ].tmp_row.tolist()
+    infaunalabundance_args = {
+        "dataframe": infaunalabundance,
+        "tablename": 'tbl_infaunalabundance',
+        "badrows": badrows,
+        "badcolumn": "personalvoucher",
+        "error_type": "Logic Error",
+        "is_core_error": False,
+        "error_message": "PersonalVoucher must be filled in when Voucher is 'Yes'."
+    }
+    warnings = [*warnings, checkData(**infaunalabundance_args)]
+
     print("## END CUSTOM CHECKS ##")
 
     return {'errors': errs, 'warnings': warnings}
